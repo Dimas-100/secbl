@@ -116,6 +116,13 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
     expect(error).toBeNull();
   });
 
+  it("an approved member sees events", async () => {
+    const client = await signIn(memberEmail);
+    const { data, error } = await client.from("events").select("id").eq("id", eventId);
+    expect(error).toBeNull();
+    expect(data?.map((e) => e.id)).toEqual([eventId]);
+  });
+
   it("a pending user sees no events", async () => {
     const client = await signIn(pendingEmail);
     const { data } = await client.from("events").select("id");
