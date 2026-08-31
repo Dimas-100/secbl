@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
+import { formatEventWhen, tallyRsvps } from "@/lib/events";
+import type { RsvpResponse } from "@/lib/types";
 
 export default async function HomePage({
   searchParams,
@@ -43,6 +45,15 @@ export default async function HomePage({
     .order("confirmed_at", { ascending: false })
     .limit(10);
 
+  const { data: nextEvent } = await supabase
+    .from("events")
+    .select("id, title, location, starts_at, ends_at, rsvps(profile_id, response)")
+    .eq("status", "scheduled")
+    .gte("starts_at", new Date().toISOString())
+    .order("starts_at")
+    .limit(1)
+    .maybeSingle();
+
   return (
     <main className="flex flex-col gap-6">
       {message && <p className="rounded-md bg-muted p-3 text-sm">{message}</p>}
@@ -62,6 +73,35 @@ export default async function HomePage({
           </span>
         </CardContent>
       </Card>
+
+      {nextEvent && (() => {
+        const myResponse = tallyRsvps(
+          (nextEvent.rsvps ?? []) as { profile_id: string; response: RsvpResponse }[],
+          user.id
+        ).mine;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Next up</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1 text-sm">
+              <Link
+                href={`/events/${nextEvent.id}`}
+                className="font-medium underline-offset-2 hover:underline"
+              >
+                {nextEvent.title}
+              </Link>
+              <span className="text-muted-foreground">
+                {formatEventWhen(nextEvent.starts_at, nextEvent.ends_at)}
+                {nextEvent.location && ` · ${nextEvent.location}`}
+              </span>
+              <span className="text-muted-foreground text-xs">
+                {myResponse ? `You're ${myResponse}` : "You haven't RSVP'd"}
+              </span>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {(toConfirm ?? []).length > 0 && (
         <Card>
