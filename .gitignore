@@ -45,3 +45,7 @@ next-env.d.ts
 !.env.example
 # throwaway verification scripts live at repo root as .mjs — never commit them
 /*.mjs
+
+# playwright
+test-results/
+playwright-report/
