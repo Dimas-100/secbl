@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
-import { formatEventWhen, tallyRsvps } from "@/lib/events";
+import { formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import type { RsvpResponse } from "@/lib/types";
 
 export default async function HomePage({
@@ -45,14 +45,17 @@ export default async function HomePage({
     .order("confirmed_at", { ascending: false })
     .limit(10);
 
-  const { data: nextEvent } = await supabase
+  const nowIso = new Date().toISOString();
+  // Bound the fetch, but let partitionEvents make the actual upcoming/past
+  // call so the home card and the calendar can never disagree.
+  const { data: scheduledEvents } = await supabase
     .from("events")
     .select("id, title, location, starts_at, ends_at, rsvps(profile_id, response)")
     .eq("status", "scheduled")
-    .gte("starts_at", new Date().toISOString())
+    .or(`ends_at.gte.${nowIso},and(ends_at.is.null,starts_at.gte.${nowIso})`)
     .order("starts_at")
-    .limit(1)
-    .maybeSingle();
+    .limit(5);
+  const nextEvent = partitionEvents(scheduledEvents ?? [], new Date()).upcoming[0] ?? null;
 
   return (
     <main className="flex flex-col gap-6">

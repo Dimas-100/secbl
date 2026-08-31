@@ -14,6 +14,12 @@ const RESPONSE_LABELS: { value: RsvpResponse; label: string }[] = [
   { value: "no", label: "Can't make it" },
 ];
 
+const LOCKED_SUMMARY: Record<RsvpResponse, string> = {
+  going: "You were going.",
+  maybe: "You were a maybe.",
+  no: "You couldn't make it.",
+};
+
 interface AttendeeRow {
   profile_id: string;
   response: RsvpResponse;
@@ -101,33 +107,40 @@ export default async function EventPage({
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {locked ? (
-            <p className="text-muted-foreground text-sm">
-              {event.status === "cancelled"
-                ? "This event was cancelled."
-                : "This event has already happened."}
-            </p>
+            <>
+              <p className="text-muted-foreground text-sm">
+                {event.status === "cancelled"
+                  ? "This event was cancelled."
+                  : "This event has already happened."}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {tally.mine ? LOCKED_SUMMARY[tally.mine] : "You never replied."}
+              </p>
+            </>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {RESPONSE_LABELS.map((option) => (
-                <form action={setRsvp} key={option.value}>
-                  <input type="hidden" name="event_id" value={event.id} />
-                  <input type="hidden" name="response" value={option.value} />
-                  <Button
-                    size="sm"
-                    type="submit"
-                    variant={tally.mine === option.value ? "default" : "outline"}
-                  >
-                    {option.label}
-                  </Button>
-                </form>
-              ))}
-            </div>
+            <>
+              <div className="flex flex-wrap gap-2">
+                {RESPONSE_LABELS.map((option) => (
+                  <form action={setRsvp} key={option.value}>
+                    <input type="hidden" name="event_id" value={event.id} />
+                    <input type="hidden" name="response" value={option.value} />
+                    <Button
+                      size="sm"
+                      type="submit"
+                      variant={tally.mine === option.value ? "default" : "outline"}
+                    >
+                      {option.label}
+                    </Button>
+                  </form>
+                ))}
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {tally.mine
+                  ? "Tap your answer again to clear it."
+                  : "You have not replied yet."}
+              </p>
+            </>
           )}
-          <p className="text-muted-foreground text-xs">
-            {tally.mine
-              ? "Tap your answer again to clear it."
-              : "You have not replied yet."}
-          </p>
         </CardContent>
       </Card>
 
