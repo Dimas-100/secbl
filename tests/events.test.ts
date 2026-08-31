@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addClubWeek,
+  clubDateOf,
   CLUB_TIMEZONE,
   clubTimeToISO,
   formatEventWhen,
@@ -143,5 +144,22 @@ describe("tallyRsvps", () => {
 
   it("handles an event with no RSVPs", () => {
     expect(tallyRsvps([], "a")).toEqual({ going: 0, maybe: 0, no: 0, mine: null });
+  });
+});
+
+describe("clubDateOf", () => {
+  it("returns the club's calendar date, not the UTC one", () => {
+    // 2026-09-06T01:30Z is 9:30 PM EDT on Sep 5. A UTC slice would say Sep 6 —
+    // the bug that pre-fills tomorrow's date for anyone reporting a late match.
+    expect(clubDateOf("2026-09-06T01:30:00Z")).toBe("2026-09-05");
+  });
+
+  it("agrees with UTC during club daytime", () => {
+    expect(clubDateOf("2026-09-05T16:00:00Z")).toBe("2026-09-05");
+  });
+
+  it("handles standard time in winter", () => {
+    // 2026-01-15T02:00Z is 9:00 PM EST on Jan 14.
+    expect(clubDateOf("2026-01-15T02:00:00Z")).toBe("2026-01-14");
   });
 });

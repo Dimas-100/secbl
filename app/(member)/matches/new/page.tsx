@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { clubDateOf } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
 import { reportMatch } from "./actions";
 
@@ -30,7 +31,7 @@ export default async function NewMatchPage({
     .neq("id", user.id)
     .order("display_name");
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = clubDateOf(new Date().toISOString());
   const selectClass =
     "border-input bg-transparent h-9 rounded-md border px-3 text-sm shadow-xs";
 

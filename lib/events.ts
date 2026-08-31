@@ -95,6 +95,13 @@ export function isoToClubTime(iso: string): string {
   return `${part("year")}-${part("month")}-${part("day")}T${hour}:${part("minute")}`;
 }
 
+// The club's calendar date for an instant, as a date input's "YYYY-MM-DD".
+// Slicing toISOString() instead would give the UTC date, which on a UTC server
+// is already tomorrow for anything after 8pm club time.
+export function clubDateOf(iso: string): string {
+  return isoToClubTime(iso).slice(0, 10);
+}
+
 // One calendar week later in CLUB terms: the same wall-clock time seven days
 // on, even when the interval crosses a DST boundary. Adding a fixed 168 hours
 // to the instant would drift by an hour twice a year.
