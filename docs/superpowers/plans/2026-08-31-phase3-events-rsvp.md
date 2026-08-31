@@ -1,5 +1,26 @@
 # SECBL Phase 3 (Events + RSVP) Implementation Plan
 
+> **STATUS: COMPLETED 2026-08-31.** All tasks implemented via subagent-driven development,
+> merged to `master`, and deployed to production at https://secbl.vercel.app. Progress is
+> tracked by the conventional commits on `master`, not the checkboxes below.
+>
+> **Known follow-ups deliberately deferred** (final review triaged all as non-blocking):
+> - Spec §5 asks for past events in a *collapsed* section; they render always-visible. Pair
+>   this with bounding the `/events` query, which currently fetches every event with no
+>   `limit` — the same defect from two sides. Worth doing around 10–15 past events
+>   (roughly one semester of weekly club nights).
+> - `admins update events` does not pin `created_by`, so an admin edit can reassign event
+>   attribution. Not a security predicate anywhere.
+> - Title/location length limits are client-side `maxLength` only.
+> - `deleteEvent` redirects with "Event deleted." even on a zero-row delete (forged id).
+> - The three new `[id]` routes skip the uuid-shape guard used by `players/[id]`.
+> - A malformed `datetime-local` value throws a `RangeError` instead of redirecting with
+>   `?error=`; admin-only path.
+>
+> **Spec amendment owed:** §5 describes Duplicate as carrying the source event's fields as
+> query params. The implementation carries only `?from=<id>` and re-reads server-side, which
+> is strictly better (no tamperable prefill). Amend the spec to match the code.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Admins create one-off club events; approved members RSVP going/maybe/no; the app shows an upcoming-events calendar, per-event headcount and attendee list, and the next event on the home page.
