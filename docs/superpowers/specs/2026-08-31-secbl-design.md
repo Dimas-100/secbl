@@ -14,6 +14,15 @@ URL — installable from the browser to a phone home screen; no app stores.
 Branding assets arrive later: all colors, fonts, and the logo live in a single
 theme-token layer so the branding pass is a token swap, not a redesign.
 
+**Branding landed 2026-08-31** and was exactly the token swap this anticipated — no
+component changed, because nothing hardcoded a color. Club palette, sampled from the
+logo: felt green `#03600c` (`--primary`) and ball gold `#ffde59` (`--secondary`).
+Gold is a fill, never text on a light surface — it is 1.33:1 on white, so it carries
+dark text in light mode and sits as text on deep green in dark mode. The wordmark is
+`public/secbl-logo.png` (auth screens only; its ball letterforms smear below ~40px, so
+the member header uses text in `--primary`), the app icon is a racked triangle in
+`app/icon.svg`, and the source artwork is kept at `docs/brand/secbl-logo-source.png`.
+
 ## 2. Stack
 
 - **Frontend/backend:** Next.js (App Router, TypeScript) deployed on Vercel.

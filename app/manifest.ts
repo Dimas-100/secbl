@@ -7,8 +7,15 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Stats, ratings, brackets, and events for the SEC billiards group",
     start_url: "/",
     display: "standalone",
-    background_color: "#0a0a0a",
-    theme_color: "#0a0a0a",
-    icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
+    // Felt green from the club logo; matches --primary in app/globals.css.
+    background_color: "#03600c",
+    theme_color: "#03600c",
+    icons: [
+      { src: "/icon.svg", sizes: "any", type: "image/svg+xml" },
+      { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      // "maskable" lets Android crop to its own shape without clipping the rack.
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
   };
 }
