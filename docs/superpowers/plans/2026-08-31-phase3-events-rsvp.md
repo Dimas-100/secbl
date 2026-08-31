@@ -372,8 +372,9 @@ const timeFormatter = new Intl.DateTimeFormat("en-US", {
 
 // Recent ICU builds separate the meridiem with U+202F (narrow no-break space).
 // Normalize so output is stable across Node versions and easy to assert on.
+// The escapes are deliberate: the literal characters are invisible in source.
 function normalize(text: string): string {
-  return text.replace(/[  ]/g, " ");
+  return text.replace(/[\u202f\u00a0]/g, " ");
 }
 
 function clubDate(iso: string): string {
