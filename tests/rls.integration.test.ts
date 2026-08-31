@@ -12,6 +12,7 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
   const memberEmail = `rls-member-${Date.now()}@example.com`;
   let pendingId: string;
   let memberId: string;
+  let eventId: string;
 
   beforeAll(async () => {
     const { data: school } = await admin.from("schools").select("id").limit(1).single();
@@ -28,6 +29,18 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
     pendingId = await makeUser(pendingEmail);
     memberId = await makeUser(memberEmail);
     await admin.from("profiles").update({ status: "approved" }).eq("id", memberId);
+
+    const { data: event, error: eventError } = await admin
+      .from("events")
+      .insert({
+        title: `rls-test-event-${Date.now()}`,
+        starts_at: new Date(Date.now() + 86_400_000).toISOString(),
+        created_by: memberId,
+      })
+      .select("id")
+      .single();
+    if (eventError) throw eventError;
+    eventId = event!.id;
   });
 
   afterAll(async () => {
@@ -38,6 +51,7 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
       .or(
         `reporter_id.eq.${pendingId},reporter_id.eq.${memberId},opponent_id.eq.${pendingId},opponent_id.eq.${memberId}`
       );
+    await admin.from("events").delete().eq("id", eventId);
     await admin.auth.admin.deleteUser(pendingId);
     await admin.auth.admin.deleteUser(memberId);
   });
@@ -74,5 +88,37 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
       p_opponent_delta: 0,
     });
     expect(error).not.toBeNull();
+  });
+
+  it("a member cannot create an event", async () => {
+    const client = await signIn(memberEmail);
+    const { error } = await client.from("events").insert({
+      title: "unauthorized event",
+      starts_at: new Date(Date.now() + 86_400_000).toISOString(),
+      created_by: memberId,
+    });
+    expect(error).not.toBeNull();
+  });
+
+  it("a member cannot RSVP on someone else's behalf", async () => {
+    const client = await signIn(memberEmail);
+    const { error } = await client
+      .from("rsvps")
+      .insert({ event_id: eventId, profile_id: pendingId, response: "going" });
+    expect(error).not.toBeNull();
+  });
+
+  it("a member can RSVP for themselves", async () => {
+    const client = await signIn(memberEmail);
+    const { error } = await client
+      .from("rsvps")
+      .insert({ event_id: eventId, profile_id: memberId, response: "going" });
+    expect(error).toBeNull();
+  });
+
+  it("a pending user sees no events", async () => {
+    const client = await signIn(pendingEmail);
+    const { data } = await client.from("events").select("id");
+    expect(data).toEqual([]);
   });
 });
