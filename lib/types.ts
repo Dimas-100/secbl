@@ -39,3 +39,26 @@ export interface Match {
   rating_delta_opponent: number | null;
   created_at: string;
 }
+
+export type EventStatus = "scheduled" | "cancelled";
+export type RsvpResponse = "going" | "maybe" | "no";
+
+export interface Event {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  status: EventStatus;
+  created_by: string;
+  created_at: string;
+}
+
+export interface Rsvp {
+  event_id: string;
+  profile_id: string;
+  response: RsvpResponse;
+  created_at: string;
+  updated_at: string;
+}
