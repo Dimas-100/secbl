@@ -41,7 +41,8 @@ export default async function MemberLayout({
       <nav className="bg-background fixed inset-x-0 bottom-0 border-t">
         <div className="mx-auto flex max-w-3xl justify-around py-3 text-sm">
           <Link href="/">Home</Link>
-          <Link href="/leaderboard">Leaderboard</Link>
+          <Link href="/events">Events</Link>
+          <Link href="/leaderboard">Ranks</Link>
           <Link href="/schools">Schools</Link>
           <Link href="/matches/new">Report</Link>
         </div>
