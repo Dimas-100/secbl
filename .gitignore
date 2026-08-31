@@ -43,3 +43,5 @@ next-env.d.ts
 # superpowers sdd scratch (not part of the app)
 .superpowers/
 !.env.example
+# throwaway verification scripts live at repo root as .mjs — never commit them
+/*.mjs
