@@ -42,3 +42,4 @@ next-env.d.ts
 
 # superpowers sdd scratch (not part of the app)
 .superpowers/
+!.env.example
