@@ -1,5 +1,10 @@
 # SECBL Phases 1–2 (Foundation + Matches/Ratings/Leaderboards) Implementation Plan
 
+> **STATUS: COMPLETED 2026-08-31.** All 15 tasks implemented, merged to `master`, and deployed to
+> production at https://secbl.vercel.app (Vercel project `secbl`). Task-by-task progress is
+> tracked by the conventional commits on `master`, not the checkboxes below. Next up: Phase 3
+> (events + RSVP) per spec §11.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship the SECBL app foundation — signup with school selection, admin approval, auth gating — plus the full match loop: report → opponent confirm → Fargo-style rating update → player/school leaderboards, deployed to Vercel as a PWA.
