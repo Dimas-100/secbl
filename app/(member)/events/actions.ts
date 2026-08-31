@@ -38,19 +38,23 @@ export async function setRsvp(formData: FormData) {
     redirect(`/events/${eventId}?error=${encodeURIComponent("That event has already happened.")}`);
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("rsvps")
     .select("response")
     .eq("event_id", eventId)
     .eq("profile_id", user.id)
     .maybeSingle();
+  if (existingError) {
+    redirect(`/events/${eventId}?error=${encodeURIComponent("Could not read your current RSVP. Try again.")}`);
+  }
 
   if (existing?.response === response) {
     const { error } = await supabase
       .from("rsvps")
       .delete()
       .eq("event_id", eventId)
-      .eq("profile_id", user.id);
+      .eq("profile_id", user.id)
+      .eq("response", response);
     if (error) redirect(`/events/${eventId}?error=${encodeURIComponent(error.message)}`);
   } else {
     const { error } = await supabase.from("rsvps").upsert(
