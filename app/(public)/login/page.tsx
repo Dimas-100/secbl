@@ -36,6 +36,11 @@ export default async function LoginPage({
           Create an account
         </Link>
       </p>
+      <p className="text-sm text-muted-foreground">
+        <Link className="underline" href="/forgot-password">
+          Forgot your password?
+        </Link>
+      </p>
     </main>
   );
 }
