@@ -29,7 +29,11 @@ export async function confirmMatch(formData: FormData) {
   if (!match) {
     redirect(`/?error=${encodeURIComponent("That match can no longer be confirmed.")}`);
   }
-  await confirmPendingMatch(createServiceClient(), match);
+  try {
+    await confirmPendingMatch(createServiceClient(), match);
+  } catch {
+    redirect(`/?error=${encodeURIComponent("Could not confirm the match — please try again.")}`);
+  }
   revalidatePath("/");
   redirect(`/?message=${encodeURIComponent("Match confirmed — ratings updated.")}`);
 }
