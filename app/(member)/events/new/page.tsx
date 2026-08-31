@@ -1,10 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { isoToClubTime } from "@/lib/events";
+import { addClubWeek } from "@/lib/events";
 import { createEvent } from "@/app/(member)/events/admin-actions";
 import { EventForm, type EventFormDefaults } from "@/app/(member)/events/event-form";
-
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 const EMPTY: EventFormDefaults = {
   title: "",
@@ -41,13 +39,12 @@ export default async function NewEventPage({
       .eq("id", from)
       .single();
     if (source) {
-      const bump = (iso: string) => isoToClubTime(new Date(new Date(iso).getTime() + WEEK_MS).toISOString());
       defaults = {
         title: source.title,
         description: source.description ?? "",
         location: source.location ?? "",
-        startsAtLocal: bump(source.starts_at),
-        endsAtLocal: source.ends_at ? bump(source.ends_at) : "",
+        startsAtLocal: addClubWeek(source.starts_at),
+        endsAtLocal: source.ends_at ? addClubWeek(source.ends_at) : "",
       };
     }
   }

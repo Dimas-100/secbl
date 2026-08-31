@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  addClubWeek,
   CLUB_TIMEZONE,
   clubTimeToISO,
   formatEventWhen,
@@ -63,6 +64,29 @@ describe("clubTimeToISO / isoToClubTime", () => {
 
   it("formats an instant back into a datetime-local value", () => {
     expect(isoToClubTime("2026-09-05T23:00:00Z")).toBe("2026-09-05T19:00");
+  });
+});
+
+describe("addClubWeek", () => {
+  it("keeps the same club wall-clock time across the fall-back boundary", () => {
+    // 2026-10-25T23:00Z is Sun Oct 25, 7:00 PM EDT. DST ends Nov 1, so a fixed
+    // 168-hour bump would land on 6:00 PM. It must stay 7:00 PM.
+    expect(addClubWeek("2026-10-25T23:00:00Z")).toBe("2026-11-01T19:00");
+  });
+
+  it("keeps the same club wall-clock time across the spring-forward boundary", () => {
+    // 2026-03-02T00:00Z is Sun Mar 1, 7:00 PM EST. DST begins Mar 8, so a fixed
+    // 168-hour bump would land on 8:00 PM.
+    expect(addClubWeek("2026-03-02T00:00:00Z")).toBe("2026-03-08T19:00");
+  });
+
+  it("advances seven days in an ordinary week", () => {
+    expect(addClubWeek("2026-09-05T23:00:00Z")).toBe("2026-09-12T19:00");
+  });
+
+  it("rolls over month and year boundaries", () => {
+    // Sun Dec 27 2026, 7:00 PM EST -> Sun Jan 3 2027.
+    expect(addClubWeek("2026-12-28T00:00:00Z")).toBe("2027-01-03T19:00");
   });
 });
 

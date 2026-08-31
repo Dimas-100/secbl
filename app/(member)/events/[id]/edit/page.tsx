@@ -8,6 +8,7 @@ import {
   updateEvent,
 } from "@/app/(member)/events/admin-actions";
 import { EventForm } from "@/app/(member)/events/event-form";
+import { DeleteEventButton } from "@/app/(member)/events/[id]/delete-button";
 
 export default async function EditEventPage({
   params,
@@ -72,9 +73,7 @@ export default async function EditEventPage({
           )}
           <form action={deleteEvent}>
             <input type="hidden" name="event_id" value={event.id} />
-            <Button size="sm" variant="destructive" type="submit">
-              Delete
-            </Button>
+            <DeleteEventButton title={event.title} />
           </form>
         </div>
       </div>

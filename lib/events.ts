@@ -95,6 +95,17 @@ export function isoToClubTime(iso: string): string {
   return `${part("year")}-${part("month")}-${part("day")}T${hour}:${part("minute")}`;
 }
 
+// One calendar week later in CLUB terms: the same wall-clock time seven days
+// on, even when the interval crosses a DST boundary. Adding a fixed 168 hours
+// to the instant would drift by an hour twice a year.
+export function addClubWeek(iso: string): string {
+  const [datePart, timePart] = isoToClubTime(iso).split("T");
+  // Calendar math in UTC so the ambient zone cannot influence the day rollover.
+  const day = new Date(`${datePart}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() + 7);
+  return `${day.toISOString().slice(0, 10)}T${timePart}`;
+}
+
 export interface EventLike {
   starts_at: string;
   ends_at: string | null;
