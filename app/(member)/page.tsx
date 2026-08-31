@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,11 +16,13 @@ export default async function HomePage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  // The layout redirects too, but pages render concurrently with layouts.
+  if (!user) redirect("/login");
 
   const { data: me } = await supabase
     .from("profiles")
     .select("display_name, rating, matches_played")
-    .eq("id", user!.id)
+    .eq("id", user.id)
     .single();
 
   const { data: toConfirm } = await supabase
@@ -27,7 +30,7 @@ export default async function HomePage({
     .select(
       "id, reporter_score, opponent_score, game_type, played_at, winner_id, reporter:profiles!matches_reporter_id_fkey(id, display_name)"
     )
-    .eq("opponent_id", user!.id)
+    .eq("opponent_id", user.id)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 
