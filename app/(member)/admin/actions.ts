@@ -80,7 +80,19 @@ export async function adminResolveMatch(formData: FormData) {
   if (error || !updated) {
     redirect(`/admin?error=${encodeURIComponent(error?.message ?? "update failed")}`);
   }
-  await confirmPendingMatch(service, updated);
+  try {
+    await confirmPendingMatch(service, updated);
+  } catch {
+    // Compensate: put the match back in the disputes queue so the admin can retry.
+    await service
+      .from("matches")
+      .update({ status: "disputed" })
+      .eq("id", matchId)
+      .eq("status", "pending");
+    redirect(
+      `/admin?error=${encodeURIComponent("Confirmation failed — the match is back in the disputes queue. Try again.")}`
+    );
+  }
   revalidatePath("/admin");
 }
 
