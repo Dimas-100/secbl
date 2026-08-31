@@ -49,6 +49,13 @@ describe("clubTimeToISO / isoToClubTime", () => {
     expect(clubTimeToISO("2026-11-01T19:00")).toBe("2026-11-02T00:00:00.000Z");
   });
 
+  it("corrects the offset for a wall-clock time just after the spring-forward", () => {
+    // 6:30 AM on 2026-03-08 is already EDT (UTC-4), but 06:30Z reads as
+    // 01:30 EST — still UTC-5. Only the second corrective pass resolves this:
+    // a single-pass implementation returns 11:30Z instead of 10:30Z.
+    expect(clubTimeToISO("2026-03-08T06:30")).toBe("2026-03-08T10:30:00.000Z");
+  });
+
   it("round-trips back to the same wall-clock string", () => {
     expect(isoToClubTime(clubTimeToISO("2026-09-05T19:00"))).toBe("2026-09-05T19:00");
     expect(isoToClubTime(clubTimeToISO("2026-01-14T19:00"))).toBe("2026-01-14T19:00");
