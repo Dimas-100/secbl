@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { generateSingleElim } from "@/lib/bracket";
+import { buildRecomputePayload } from "@/lib/recompute";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -199,6 +201,243 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
       expect(profiles?.map((p) => p.id)).toEqual([memberId]);
     } finally {
       await admin.from("profiles").update({ status: "approved" }).eq("id", memberId);
+    }
+  });
+
+  it("a member cannot create a tournament directly", async () => {
+    const client = await signIn(memberEmail);
+    const { error } = await client
+      .from("tournaments")
+      .insert({ name: "unauthorized", created_by: memberId });
+    expect(error).not.toBeNull();
+  });
+
+  it("a member cannot call the admin tournament functions", async () => {
+    const client = await signIn(memberEmail);
+    const { error } = await client.rpc("create_tournament", {
+      p_name: "unauthorized",
+      p_event_id: null,
+    });
+    expect(error).not.toBeNull();
+  });
+
+  it("a member cannot recompute the ladder", async () => {
+    const client = await signIn(memberEmail);
+    const { error } = await client.rpc("apply_rating_recompute", {
+      p_standings: [{ profile_id: memberId, rating: 9999, matches_played: 0 }],
+      p_history: [],
+      p_deltas: [],
+    });
+    expect(error).not.toBeNull();
+    const { data } = await admin
+      .from("profiles")
+      .select("rating")
+      .eq("id", memberId)
+      .single();
+    expect(data!.rating).not.toBe(9999);
+  });
+
+  it("an approved member can read tournaments", async () => {
+    const { data: created } = await admin
+      .from("tournaments")
+      .insert({ name: `rls-tournament-${Date.now()}`, created_by: memberId })
+      .select("id")
+      .single();
+    try {
+      const client = await signIn(memberEmail);
+      const { data, error } = await client
+        .from("tournaments")
+        .select("id")
+        .eq("id", created!.id);
+      expect(error).toBeNull();
+      expect(data?.map((t) => t.id)).toEqual([created!.id]);
+    } finally {
+      await admin.from("tournaments").delete().eq("id", created!.id);
+    }
+  });
+
+  // Regression guard: void_tournament_result used to `delete from matches`
+  // before clearing rating_history, which violated
+  // rating_history_match_id_fkey and left a recorded result impossible to
+  // undo. Nothing in tests/ exercised these SQL functions against a real
+  // database before this, so the bug survived three review passes.
+  it(
+    "record_tournament_result then void_tournament_result round-trips cleanly",
+    async () => {
+      const { data: school } = await admin
+        .from("schools")
+        .select("id")
+        .limit(1)
+        .single();
+
+      async function makeEntrant(email: string) {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { display_name: email, school_id: school!.id },
+        });
+        if (error) throw error;
+        return data.user!.id;
+      }
+
+      const stamp = Date.now();
+      const emails = [0, 1, 2, 3].map((i) => `rls-bracket-${stamp}-${i}@example.com`);
+      const ids = await Promise.all(emails.map(makeEntrant));
+      const [aId, bId, cId, dId] = ids;
+
+      // A drives every admin-only RPC call below. Nothing stops an admin from
+      // also being a tournament entrant.
+      await admin
+        .from("profiles")
+        .update({ role: "admin", status: "approved" })
+        .eq("id", aId);
+
+      let tournamentId: string | undefined;
+      let matchId: string | undefined;
+
+      try {
+        const adminActor = await signIn(emails[0]);
+
+        const { data: createdId, error: createError } = await adminActor.rpc(
+          "create_tournament",
+          { p_name: `rls-bracket-${stamp}`, p_event_id: null }
+        );
+        expect(createError).toBeNull();
+        tournamentId = createdId as string;
+
+        const { error: entrantsError } = await adminActor.rpc("set_tournament_entrants", {
+          p_tournament_id: tournamentId,
+          p_entrants: [
+            { profile_id: aId, seed: 1 },
+            { profile_id: bId, seed: 2 },
+            { profile_id: cId, seed: 3 },
+            { profile_id: dId, seed: 4 },
+          ],
+        });
+        expect(entrantsError).toBeNull();
+
+        const bracket = generateSingleElim([aId, bId, cId, dId], () => crypto.randomUUID());
+        const { error: startError } = await adminActor.rpc("start_tournament", {
+          p_tournament_id: tournamentId,
+          p_matches: bracket,
+        });
+        expect(startError).toBeNull();
+
+        const { data: roundOne, error: roundOneError } = await admin
+          .from("tournament_matches")
+          .select("id, player1_id, player2_id")
+          .eq("tournament_id", tournamentId)
+          .eq("round", 1)
+          .not("player1_id", "is", null)
+          .not("player2_id", "is", null)
+          .limit(1);
+        expect(roundOneError).toBeNull();
+        const chosen = roundOne![0];
+        const winnerId = chosen.player1_id as string;
+        const loserId = chosen.player2_id as string;
+
+        matchId = crypto.randomUUID();
+        const recordPayload = await buildRecomputePayload(admin, [
+          { id: matchId, reporter_id: winnerId, opponent_id: loserId, winner_id: winnerId },
+        ]);
+        const { error: recordError } = await adminActor.rpc("record_tournament_result", {
+          p_tournament_match_id: chosen.id,
+          p_match_id: matchId,
+          p_player1_score: 5,
+          p_player2_score: 2,
+          p_winner_id: winnerId,
+          p_played_at: "2026-08-31",
+          ...recordPayload,
+        });
+        expect(recordError).toBeNull();
+
+        const { data: rated, error: ratedError } = await admin
+          .from("matches")
+          .select("id, status")
+          .eq("id", matchId)
+          .single();
+        expect(ratedError).toBeNull();
+        expect(rated?.status).toBe("confirmed");
+
+        const { data: afterRecord } = await admin
+          .from("profiles")
+          .select("id, rating")
+          .in("id", [winnerId, loserId]);
+        expect(afterRecord?.length).toBe(2);
+        for (const p of afterRecord ?? []) {
+          expect(p.rating).not.toBe(450);
+        }
+
+        const voidPayload = await buildRecomputePayload(admin, [], matchId);
+        const { error: voidError } = await adminActor.rpc("void_tournament_result", {
+          p_tournament_match_id: chosen.id,
+          ...voidPayload,
+        });
+        // THE REGRESSION GUARD: this used to raise
+        // rating_history_match_id_fkey. It must succeed.
+        expect(voidError).toBeNull();
+
+        const { data: goneMatch } = await admin
+          .from("matches")
+          .select("id")
+          .eq("id", matchId);
+        expect(goneMatch).toEqual([]);
+
+        const { data: afterVoid } = await admin
+          .from("profiles")
+          .select("id, rating")
+          .in("id", [winnerId, loserId]);
+        expect(afterVoid?.length).toBe(2);
+        for (const p of afterVoid ?? []) {
+          expect(p.rating).toBe(450);
+        }
+      } finally {
+        // Load-bearing order: rating_history and matches reference the
+        // tournament's match ids with no cascade, and tournaments.created_by
+        // references profiles(id) with no cascade either — a surviving
+        // tournament blocks deleting the user who created it. Tournament
+        // (and its cascaded tournament_players/tournament_matches) must go
+        // before the four users.
+        if (matchId) {
+          await admin.from("rating_history").delete().eq("match_id", matchId);
+          await admin.from("matches").delete().eq("id", matchId);
+        }
+        if (tournamentId) {
+          await admin.from("tournaments").delete().eq("id", tournamentId);
+        }
+        for (const id of ids) {
+          await admin.auth.admin.deleteUser(id);
+        }
+      }
+    },
+    30000
+  );
+
+  it("updating a match's tournament_match_id to an unknown id is rejected", async () => {
+    const { data: created, error: insertError } = await admin
+      .from("matches")
+      .insert({
+        reporter_id: memberId,
+        opponent_id: pendingId,
+        winner_id: memberId,
+        reporter_score: 5,
+        opponent_score: 2,
+      })
+      .select("id")
+      .single();
+    expect(insertError).toBeNull();
+    try {
+      const { error } = await admin
+        .from("matches")
+        .update({ tournament_match_id: crypto.randomUUID() })
+        .eq("id", created!.id);
+      // matches.tournament_match_id references tournament_matches(id) — a
+      // dangling reference must be rejected by the foreign key, not silently
+      // accepted.
+      expect(error).not.toBeNull();
+    } finally {
+      await admin.from("matches").delete().eq("id", created!.id);
     }
   });
 });
