@@ -65,14 +65,18 @@ test("admin runs a 4-player tournament to a champion", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Round 1" })).toBeVisible();
 
   // Play every match that is ready, round by round, until a champion exists.
+  // Result entry is stepper-based (no number inputs): tap + on each player's
+  // stepper, confirm the winner chip, save.
   for (let guard = 0; guard < 10; guard++) {
-    const forms = page.locator("form:has(select[name='winner_id'])");
+    const forms = page.locator("form[data-result-entry]");
     if ((await forms.count()) === 0) break;
     const form = forms.first();
     const matchId = await form.locator('input[name="tournament_match_id"]').inputValue();
-    await form.locator('input[name="player1_score"]').fill("5");
-    await form.locator('input[name="player2_score"]').fill("3");
-    await form.locator('select[name="winner_id"]').selectOption({ index: 1 });
+    const increase = form.getByRole("button", { name: /^Increase/ });
+    for (let i = 0; i < 5; i++) await increase.nth(0).click();
+    for (let i = 0; i < 3; i++) await increase.nth(1).click();
+    // 5–3 auto-selects player1, but tap the chip anyway — explicit beats implied.
+    await form.getByRole("button", { name: / won$/ }).nth(0).click();
     await form.getByRole("button", { name: "Save" }).click();
     // Wait for THIS match's entry form to go away, i.e. for the action's
     // fresh payload to actually reach the DOM. "networkidle" is not enough:
@@ -81,7 +85,7 @@ test("admin runs a 4-player tournament to a champion", async ({ page }) => {
     // the next iteration would then act on an already-decided match.
     await expect(
       page.locator(
-        `form:has(input[name="tournament_match_id"][value="${matchId}"]):has(select[name='winner_id'])`
+        `form[data-result-entry]:has(input[name="tournament_match_id"][value="${matchId}"])`
       )
     ).toHaveCount(0);
   }

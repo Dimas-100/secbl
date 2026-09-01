@@ -1,12 +1,15 @@
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { HeroBand } from "@/components/hero-band";
+import { SectionLabel } from "@/components/section-label";
 import { SubmitButton } from "@/components/submit-button";
 import { bracketRounds, type GeneratedMatch } from "@/lib/bracket";
 import { createClient } from "@/lib/supabase/server";
-import { correctScores, recordResult, voidResult } from "@/app/(member)/tournaments/actions";
+import { correctScores, voidResult } from "@/app/(member)/tournaments/actions";
 import { LiveRefresh } from "./refresh";
+import { ResultForm } from "./result-form";
 
 interface MatchRow extends GeneratedMatch {
   player1_score: number | null;
@@ -70,15 +73,24 @@ export default async function TournamentPage({
   const isAdmin = me?.role === "admin";
 
   return (
-    <main className="flex flex-col gap-6">
+    <main>
       {tournament.status === "live" && <LiveRefresh />}
-      <div className="flex items-center gap-2">
-        <h1 className="text-xl font-bold">{tournament.name}</h1>
-        <Badge variant={tournament.status === "live" ? "default" : "secondary"}>
-          {tournament.status === "live" ? "Live" : "Complete"}
-        </Badge>
-      </div>
-      {message && <p className="rounded-md bg-muted p-3 text-sm">{message}</p>}
+      <HeroBand
+        title={
+          <span className="flex items-center gap-2">
+            {tournament.name}
+            {tournament.status === "live" ? (
+              <Badge className="bg-gold text-gold-foreground">Live</Badge>
+            ) : (
+              <Badge variant="secondary">Complete</Badge>
+            )}
+          </span>
+        }
+      />
+      <div className="-mt-3 flex flex-col gap-4">
+      {message && (
+        <p className="rounded-md bg-card p-3 text-sm shadow-[var(--shadow-card)]">{message}</p>
+      )}
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
@@ -86,18 +98,19 @@ export default async function TournamentPage({
       {tournament.status === "complete" && final?.winner_id && (
         <Card>
           <CardHeader>
-            <CardTitle>Champion</CardTitle>
+            <SectionLabel>Champion</SectionLabel>
           </CardHeader>
-          <CardContent className="text-2xl font-bold">{label(final.winner_id)}</CardContent>
+          <CardContent className="stat-number text-2xl">{label(final.winner_id)}</CardContent>
         </Card>
       )}
 
       {rounds.map((round, index) => (
         <Card key={index}>
           <CardHeader>
-            <CardTitle>
+            {/* Same heading text the e2e suite waits on ("Round 1", "Final"). */}
+            <SectionLabel>
               {index === rounds.length - 1 ? "Final" : `Round ${index + 1}`}
-            </CardTitle>
+            </SectionLabel>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             {round.map((m) => {
@@ -116,50 +129,20 @@ export default async function TournamentPage({
                       {bye ? "bye" : label(match.player2_id)}
                     </span>
                     {decided && !bye && (
-                      <span className="text-muted-foreground">
+                      <span className="stat-number text-muted-foreground">
                         {" "}
-                        — {match.player1_score}–{match.player2_score}
+                        {match.player1_score}–{match.player2_score}
                       </span>
                     )}
                   </div>
 
                   {isAdmin && ready && !decided && tournament.status === "live" && (
-                    <form action={recordResult} className="flex flex-wrap items-end gap-2">
-                      <input type="hidden" name="tournament_id" value={id} />
-                      <input type="hidden" name="tournament_match_id" value={match.id} />
-                      <Input
-                        name="player1_score"
-                        type="number"
-                        min={0}
-                        required
-                        className="w-16"
-                        aria-label={`${label(match.player1_id)} score`}
-                      />
-                      <Input
-                        name="player2_score"
-                        type="number"
-                        min={0}
-                        required
-                        className="w-16"
-                        aria-label={`${label(match.player2_id)} score`}
-                      />
-                      <select
-                        name="winner_id"
-                        required
-                        defaultValue=""
-                        className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-                        aria-label="Winner"
-                      >
-                        <option value="" disabled>
-                          Winner
-                        </option>
-                        <option value={match.player1_id!}>{label(match.player1_id)}</option>
-                        <option value={match.player2_id!}>{label(match.player2_id)}</option>
-                      </select>
-                      <SubmitButton size="sm" pendingChildren="Saving…">
-                        Save
-                      </SubmitButton>
-                    </form>
+                    <ResultForm
+                      tournamentId={id}
+                      matchId={match.id}
+                      player1={{ id: match.player1_id!, label: label(match.player1_id) }}
+                      player2={{ id: match.player2_id!, label: label(match.player2_id) }}
+                    />
                   )}
 
                   {isAdmin && decided && !bye && (
@@ -172,6 +155,7 @@ export default async function TournamentPage({
                         <Input
                           name="player1_score"
                           type="number"
+                          inputMode="numeric"
                           min={0}
                           required
                           defaultValue={match.player1_score ?? 0}
@@ -181,6 +165,7 @@ export default async function TournamentPage({
                         <Input
                           name="player2_score"
                           type="number"
+                          inputMode="numeric"
                           min={0}
                           required
                           defaultValue={match.player2_score ?? 0}
@@ -206,6 +191,7 @@ export default async function TournamentPage({
           </CardContent>
         </Card>
       ))}
+      </div>
     </main>
   );
 }

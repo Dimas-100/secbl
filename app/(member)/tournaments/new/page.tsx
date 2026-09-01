@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { HeroBand } from "@/components/hero-band";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/server";
@@ -30,8 +31,9 @@ export default async function NewTournamentPage({
     .order("starts_at");
 
   return (
-    <main className="flex flex-col gap-6">
-      <h1 className="text-xl font-bold">New tournament</h1>
+    <main>
+      <HeroBand title="New tournament" />
+      <div className="mt-4 flex flex-col gap-4">
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
@@ -46,7 +48,7 @@ export default async function NewTournamentPage({
             id="event_id"
             name="event_id"
             defaultValue=""
-            className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
+            className="border-input h-10 rounded-md border bg-transparent px-3 text-base md:text-sm"
           >
             <option value="">No linked event</option>
             {(events ?? []).map((e) => (
@@ -56,8 +58,11 @@ export default async function NewTournamentPage({
             ))}
           </select>
         </div>
-        <Button type="submit">Create</Button>
+        <Button type="submit" size="lg" className="w-full">
+          Create
+        </Button>
       </form>
+      </div>
     </main>
   );
 }

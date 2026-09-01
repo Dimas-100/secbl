@@ -1,7 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { HeroBand } from "@/components/hero-band";
+import { SectionLabel } from "@/components/section-label";
 import { createClient } from "@/lib/supabase/server";
 import { saveEntrants, startTournament } from "@/app/(member)/tournaments/actions";
 
@@ -47,9 +49,19 @@ export default async function TournamentSetupPage({
   const chosen = new Set((entrants ?? []).map((e) => e.profile_id as string));
 
   return (
-    <main className="flex flex-col gap-6">
-      <h1 className="text-xl font-bold">{tournament.name}</h1>
-      {message && <p className="rounded-md bg-muted p-3 text-sm">{message}</p>}
+    <main>
+      <HeroBand
+        title={
+          <span className="flex items-center gap-2">
+            {tournament.name}
+            <Badge variant="secondary">Setting up</Badge>
+          </span>
+        }
+      />
+      <div className="-mt-3 flex flex-col gap-4">
+      {message && (
+        <p className="rounded-md bg-card p-3 text-sm shadow-[var(--shadow-card)]">{message}</p>
+      )}
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
@@ -58,7 +70,7 @@ export default async function TournamentSetupPage({
         <input type="hidden" name="tournament_id" value={id} />
         <Card>
           <CardHeader>
-            <CardTitle>Entrants</CardTitle>
+            <SectionLabel>Entrants</SectionLabel>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             <p className="text-muted-foreground text-xs">
@@ -68,12 +80,13 @@ export default async function TournamentSetupPage({
             {(candidates ?? []).map((c) => {
               const school = Array.isArray(c.schools) ? c.schools[0] : c.schools;
               return (
-                <label key={c.id} className="flex items-center gap-2 text-sm">
+                <label key={c.id} className="flex min-h-11 items-center gap-3 text-sm">
                   <input
                     type="checkbox"
                     name="profile_ids"
                     value={c.id}
                     defaultChecked={chosen.has(c.id as string)}
+                    className="accent-primary size-5"
                   />
                   <span className="font-medium">{c.display_name}</span>
                   <Badge variant="secondary">{school?.short_name}</Badge>
@@ -83,20 +96,21 @@ export default async function TournamentSetupPage({
             })}
           </CardContent>
         </Card>
-        <Button type="submit" className="self-start">
+        <Button type="submit" size="lg" className="w-full">
           Save entrants
         </Button>
       </form>
 
       <form action={startTournament}>
         <input type="hidden" name="tournament_id" value={id} />
-        <Button type="submit" variant="default">
+        <Button type="submit" variant="hero" size="xl" className="w-full">
           Start tournament ({chosen.size} entrants)
         </Button>
         <p className="text-muted-foreground mt-2 text-xs">
           Starting generates the whole bracket and locks the entrant list.
         </p>
       </form>
+      </div>
     </main>
   );
 }

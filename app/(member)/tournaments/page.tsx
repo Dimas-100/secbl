@@ -2,7 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { HeroBand } from "@/components/hero-band";
+import { SectionLabel } from "@/components/section-label";
 import { createClient } from "@/lib/supabase/server";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -34,33 +36,38 @@ export default async function TournamentsPage({
     .order("created_at", { ascending: false });
 
   return (
-    <main className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Tournaments</h1>
+    <main>
+      <HeroBand title="Tournaments">
         {me?.role === "admin" && (
-          <Button asChild size="sm">
-            <Link href="/tournaments/new">New tournament</Link>
-          </Button>
+          <div className="mt-2">
+            <Button asChild size="sm" variant="hero">
+              <Link href="/tournaments/new">New tournament</Link>
+            </Button>
+          </div>
         )}
-      </div>
-      {message && <p className="rounded-md bg-muted p-3 text-sm">{message}</p>}
+      </HeroBand>
+      <div className="-mt-3 flex flex-col gap-4">
+      {message && (
+        <p className="rounded-md bg-card p-3 text-sm shadow-[var(--shadow-card)]">{message}</p>
+      )}
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
       <Card>
         <CardHeader>
-          <CardTitle>All tournaments</CardTitle>
+          <SectionLabel>All tournaments</SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-1">
           {(tournaments ?? []).length === 0 && (
             <p className="text-muted-foreground text-sm">Nothing run yet.</p>
           )}
           {(tournaments ?? []).map((t) => {
-            const badge = (
-              <Badge variant={t.status === "live" ? "default" : "secondary"}>
-                {STATUS_LABEL[t.status]}
-              </Badge>
-            );
+            const badge =
+              t.status === "live" ? (
+                <Badge className="bg-gold text-gold-foreground">{STATUS_LABEL[t.status]}</Badge>
+              ) : (
+                <Badge variant="secondary">{STATUS_LABEL[t.status]}</Badge>
+              );
             // A tournament still being set up has nothing to show a member yet,
             // and its only page is admin-only — so don't offer them the click.
             if (t.status === "setup" && me?.role !== "admin") {
@@ -87,6 +94,7 @@ export default async function TournamentsPage({
           })}
         </CardContent>
       </Card>
+      </div>
     </main>
   );
 }
