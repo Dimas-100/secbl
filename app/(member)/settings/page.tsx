@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { HeroBand } from "@/components/hero-band";
+import { SectionLabel } from "@/components/section-label";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/server";
@@ -28,8 +30,9 @@ export default async function SettingsPage({
   const school = Array.isArray(profile?.schools) ? profile.schools[0] : profile?.schools;
 
   return (
-    <main className="flex flex-col gap-6">
-      <h1 className="text-xl font-bold">Settings</h1>
+    <main>
+      <HeroBand title="Settings" />
+      <div className="-mt-3 flex flex-col gap-4">
       {message && <p className="rounded-md bg-muted p-3 text-sm">{message}</p>}
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
@@ -37,7 +40,7 @@ export default async function SettingsPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Your name</CardTitle>
+          <SectionLabel>Your name</SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <form action={updateDisplayName} className="flex flex-col gap-4">
@@ -63,7 +66,7 @@ export default async function SettingsPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Account</CardTitle>
+          <SectionLabel>Account</SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
           <p className="text-muted-foreground">{user.email}</p>
@@ -86,6 +89,7 @@ export default async function SettingsPage({
           Log out
         </Button>
       </form>
+      </div>
     </main>
   );
 }

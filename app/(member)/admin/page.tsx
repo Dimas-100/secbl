@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { HeroBand } from "@/components/hero-band";
+import { SectionLabel } from "@/components/section-label";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -68,14 +70,15 @@ export default async function AdminPage({
     .order("created_at");
 
   return (
-    <main className="flex flex-col gap-6">
-      <h1 className="text-xl font-bold">Admin</h1>
+    <main>
+      <HeroBand title="Admin" />
+      <div className="-mt-3 flex flex-col gap-4">
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
       <Card>
         <CardHeader>
-          <CardTitle>Signup approvals</CardTitle>
+          <SectionLabel>Signup approvals</SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {(pending ?? []).length === 0 && (
@@ -94,13 +97,13 @@ export default async function AdminPage({
               <div className="flex gap-2">
                 <form action={approveProfile}>
                   <input type="hidden" name="profile_id" value={p.id} />
-                  <Button size="sm" type="submit">
+                  <Button type="submit">
                     Approve
                   </Button>
                 </form>
                 <form action={rejectProfile}>
                   <input type="hidden" name="profile_id" value={p.id} />
-                  <Button size="sm" variant="outline" type="submit">
+                  <Button variant="outline" type="submit">
                     Reject
                   </Button>
                 </form>
@@ -112,7 +115,7 @@ export default async function AdminPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Members</CardTitle>
+          <SectionLabel>Members</SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {((members ?? []) as MemberRow[]).length === 0 && (
@@ -130,14 +133,14 @@ export default async function AdminPage({
               {m.status === "suspended" ? (
                 <form action={reinstateProfile}>
                   <input type="hidden" name="profile_id" value={m.id} />
-                  <Button size="sm" type="submit">
+                  <Button type="submit">
                     Reinstate
                   </Button>
                 </form>
               ) : (
                 <form action={suspendProfile}>
                   <input type="hidden" name="profile_id" value={m.id} />
-                  <Button size="sm" variant="outline" type="submit">
+                  <Button variant="outline" type="submit">
                     Suspend
                   </Button>
                 </form>
@@ -153,7 +156,7 @@ export default async function AdminPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Disputed matches</CardTitle>
+          <SectionLabel>Disputed matches</SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           {(disputed ?? []).length === 0 && (
@@ -205,13 +208,13 @@ export default async function AdminPage({
                       className="w-20"
                     />
                   </label>
-                  <Button size="sm" type="submit">
+                  <Button type="submit">
                     Apply &amp; confirm
                   </Button>
                 </form>
                 <form action={adminRejectMatch}>
                   <input type="hidden" name="match_id" value={m.id} />
-                  <Button size="sm" variant="outline" type="submit">
+                  <Button variant="outline" type="submit">
                     Reject permanently
                   </Button>
                 </form>
@@ -220,6 +223,7 @@ export default async function AdminPage({
           })}
         </CardContent>
       </Card>
+      </div>
     </main>
   );
 }

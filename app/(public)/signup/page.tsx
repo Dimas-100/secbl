@@ -19,13 +19,13 @@ export default async function SignupPage({
     .order("name");
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-4">
+    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-4">
       <BrandLogo className="h-auto w-48 self-center" />
       <h1 className="text-center text-2xl font-bold">Join the league</h1>
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
-      <form action={signup} className="flex flex-col gap-4">
+      <form action={signup} className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[var(--shadow-card)]">
         <div className="flex flex-col gap-2">
           <Label htmlFor="display_name">Display name</Label>
           <Input id="display_name" name="display_name" required maxLength={40} />
@@ -57,7 +57,9 @@ export default async function SignupPage({
           <Label htmlFor="password">Password</Label>
           <Input id="password" name="password" type="password" required minLength={8} />
         </div>
-        <Button type="submit">Create account</Button>
+        <Button type="submit" size="lg" className="w-full">
+          Create account
+        </Button>
       </form>
       <p className="text-sm text-muted-foreground">
         Already a member?{" "}
