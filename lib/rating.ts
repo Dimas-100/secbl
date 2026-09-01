@@ -28,3 +28,111 @@ export function ratingUpdate(
   const delta = Math.round(kFactor(matchesPlayed) * ((won ? 1 : 0) - expected));
   return { delta, newRating: Math.max(RATING_FLOOR, rating + delta) };
 }
+
+export interface ReplayMatch {
+  id: string;
+  reporter_id: string;
+  opponent_id: string;
+  winner_id: string;
+}
+
+export interface ReplayStanding {
+  profile_id: string;
+  rating: number;
+  matches_played: number;
+}
+
+export interface ReplayHistoryRow {
+  profile_id: string;
+  match_id: string;
+  rating_before: number;
+  rating_after: number;
+}
+
+export interface ReplayDelta {
+  match_id: string;
+  rating_delta_reporter: number;
+  rating_delta_opponent: number;
+}
+
+export interface ReplayResult {
+  standings: ReplayStanding[];
+  history: ReplayHistoryRow[];
+  deltas: ReplayDelta[];
+}
+
+// Rebuilds the whole ladder from confirmed match history.
+//
+// Rating is path-dependent — K falls after a player's 10th match, and the
+// expected score depends on both ratings at that moment — so a correction
+// cannot be applied by subtracting old deltas and adding new ones. Replaying
+// is both exact and simpler. `matches` must already be ordered by
+// (confirmed_at, id) for the result to be reproducible.
+export function replayRatings(
+  matches: ReplayMatch[],
+  playerIds: string[]
+): ReplayResult {
+  const standings = new Map<string, ReplayStanding>();
+  const ensure = (id: string): ReplayStanding => {
+    let standing = standings.get(id);
+    if (!standing) {
+      standing = { profile_id: id, rating: STARTING_RATING, matches_played: 0 };
+      standings.set(id, standing);
+    }
+    return standing;
+  };
+  for (const id of playerIds) ensure(id);
+
+  const history: ReplayHistoryRow[] = [];
+  const deltas: ReplayDelta[] = [];
+
+  for (const match of matches) {
+    const reporter = ensure(match.reporter_id);
+    const opponent = ensure(match.opponent_id);
+    const reporterWon = match.winner_id === match.reporter_id;
+
+    // Both sides are computed from the pre-match snapshot, so the result does
+    // not depend on which player is updated first.
+    const reporterBefore = reporter.rating;
+    const opponentBefore = opponent.rating;
+    const reporterResult = ratingUpdate(
+      reporterBefore,
+      opponentBefore,
+      reporterWon,
+      reporter.matches_played
+    );
+    const opponentResult = ratingUpdate(
+      opponentBefore,
+      reporterBefore,
+      !reporterWon,
+      opponent.matches_played
+    );
+
+    reporter.rating = reporterResult.newRating;
+    opponent.rating = opponentResult.newRating;
+    reporter.matches_played += 1;
+    opponent.matches_played += 1;
+
+    history.push(
+      {
+        profile_id: reporter.profile_id,
+        match_id: match.id,
+        rating_before: reporterBefore,
+        rating_after: reporterResult.newRating,
+      },
+      {
+        profile_id: opponent.profile_id,
+        match_id: match.id,
+        rating_before: opponentBefore,
+        rating_after: opponentResult.newRating,
+      }
+    );
+    deltas.push({
+      match_id: match.id,
+      rating_delta_reporter: reporterResult.newRating - reporterBefore,
+      rating_delta_opponent: opponentResult.newRating - opponentBefore,
+    });
+  }
+
+  return { standings: [...standings.values()], history, deltas };
+}
