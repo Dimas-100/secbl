@@ -47,8 +47,8 @@ export default async function MemberLayout({
         <div className="mx-auto flex max-w-3xl justify-around py-3 text-sm">
           <Link href="/">Home</Link>
           <Link href="/events">Events</Link>
+          <Link href="/tournaments">Cups</Link>
           <Link href="/leaderboard">Ranks</Link>
-          <Link href="/schools">Schools</Link>
           <Link href="/matches/new">Report</Link>
         </div>
       </nav>
