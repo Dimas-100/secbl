@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { HeroBand } from "@/components/hero-band";
+import { SectionLabel } from "@/components/section-label";
+import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
 import { formatEventWhen, tallyRsvps } from "@/lib/events";
 import type { RsvpResponse } from "@/lib/types";
@@ -11,7 +13,7 @@ import { setRsvp } from "@/app/(member)/events/actions";
 const RESPONSE_LABELS: { value: RsvpResponse; label: string }[] = [
   { value: "going", label: "Going" },
   { value: "maybe", label: "Maybe" },
-  { value: "no", label: "Can't make it" },
+  { value: "no", label: "Out" },
 ];
 
 const LOCKED_SUMMARY: Record<RsvpResponse, string> = {
@@ -70,40 +72,45 @@ export default async function EventPage({
   const locked = event.status === "cancelled" || isOver;
 
   return (
-    <main className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold">{event.title}</h1>
-          {event.status === "cancelled" && <Badge variant="destructive">Cancelled</Badge>}
-        </div>
-        <p className="text-muted-foreground text-sm">
+    <main>
+      <HeroBand
+        title={
+          <span className="flex items-center gap-2">
+            {event.title}
+            {event.status === "cancelled" && <Badge variant="destructive">Cancelled</Badge>}
+          </span>
+        }
+      >
+        <p className="mt-1 text-sm text-white/70">
           {formatEventWhen(event.starts_at, event.ends_at)}
           {event.location && ` · ${event.location}`}
         </p>
         {me?.role === "admin" && (
-          <div className="flex gap-3 text-sm">
+          <div className="mt-2 flex gap-3 text-sm text-white/80">
             <Link href={`/events/${event.id}/edit`} className="underline">
               Edit
             </Link>
-            <Link
-              href={`/events/new?from=${event.id}`}
-              className="text-muted-foreground underline"
-            >
+            <Link href={`/events/new?from=${event.id}`} className="underline">
               Duplicate
             </Link>
           </div>
         )}
-      </div>
+      </HeroBand>
 
+      <div className="-mt-3 flex flex-col gap-4">
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
 
-      {event.description && <p className="text-sm whitespace-pre-line">{event.description}</p>}
+      {event.description && (
+        <p className="rounded-xl bg-card p-4 text-sm whitespace-pre-line shadow-[var(--shadow-card)]">
+          {event.description}
+        </p>
+      )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Your RSVP</CardTitle>
+          <SectionLabel>Your RSVP</SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {locked ? (
@@ -119,18 +126,17 @@ export default async function EventPage({
             </>
           ) : (
             <>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {RESPONSE_LABELS.map((option) => (
-                  <form action={setRsvp} key={option.value}>
+                  <form action={setRsvp} key={option.value} className="contents">
                     <input type="hidden" name="event_id" value={event.id} />
                     <input type="hidden" name="response" value={option.value} />
-                    <Button
-                      size="sm"
-                      type="submit"
+                    <SubmitButton
+                      className="h-11"
                       variant={tally.mine === option.value ? "default" : "outline"}
                     >
                       {option.label}
-                    </Button>
+                    </SubmitButton>
                   </form>
                 ))}
               </div>
@@ -146,9 +152,9 @@ export default async function EventPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>
+          <SectionLabel>
             {tally.going} going · {tally.maybe} maybe · {tally.no} out
-          </CardTitle>
+          </SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm">
           {attendees.length === 0 && <p className="text-muted-foreground">No RSVPs yet.</p>}
@@ -164,6 +170,7 @@ export default async function EventPage({
           })}
         </CardContent>
       </Card>
+      </div>
     </main>
   );
 }

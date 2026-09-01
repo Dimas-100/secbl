@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { HeroBand } from "@/components/hero-band";
 import { createClient } from "@/lib/supabase/server";
 import { isoToClubTime } from "@/lib/events";
 import {
@@ -39,8 +40,9 @@ export default async function EditEventPage({
   if (!event) notFound();
 
   return (
-    <main className="flex flex-col gap-6">
-      <h1 className="text-xl font-bold">Edit event</h1>
+    <main>
+      <HeroBand title="Edit event" />
+      <div className="mt-4 flex flex-col gap-4">
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
@@ -76,6 +78,7 @@ export default async function EditEventPage({
             <DeleteEventButton title={event.title} />
           </form>
         </div>
+      </div>
       </div>
     </main>
   );

@@ -65,7 +65,9 @@ export function EventForm({
         <Label htmlFor="description">Details</Label>
         <Textarea id="description" name="description" rows={4} defaultValue={defaults.description} />
       </div>
-      <Button type="submit">{submitLabel}</Button>
+      <Button type="submit" size="lg" className="w-full">
+        {submitLabel}
+      </Button>
       <p className="text-muted-foreground text-xs">All times are club time (Eastern).</p>
     </form>
   );

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { HeroBand } from "@/components/hero-band";
 import { createClient } from "@/lib/supabase/server";
 import { addClubWeek } from "@/lib/events";
 import { createEvent } from "@/app/(member)/events/admin-actions";
@@ -50,12 +51,14 @@ export default async function NewEventPage({
   }
 
   return (
-    <main className="flex flex-col gap-6">
-      <h1 className="text-xl font-bold">{from ? "Duplicate event" : "New event"}</h1>
+    <main>
+      <HeroBand title={from ? "Duplicate event" : "New event"} />
+      <div className="mt-4 flex flex-col gap-4">
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
       <EventForm action={createEvent} defaults={defaults} submitLabel="Create event" />
+      </div>
     </main>
   );
 }
