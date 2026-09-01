@@ -34,6 +34,7 @@ export interface ReplayMatch {
   reporter_id: string;
   opponent_id: string;
   winner_id: string;
+  confirmed_at: string;
 }
 
 export interface ReplayStanding {
@@ -47,6 +48,10 @@ export interface ReplayHistoryRow {
   match_id: string;
   rating_before: number;
   rating_after: number;
+  // The match's own confirmation time, not the recompute's. Without this,
+  // rebuilt history rows all default to now() and every player's rating
+  // history loses its order permanently.
+  created_at: string;
 }
 
 export interface ReplayDelta {
@@ -119,12 +124,14 @@ export function replayRatings(
         match_id: match.id,
         rating_before: reporterBefore,
         rating_after: reporterResult.newRating,
+        created_at: match.confirmed_at,
       },
       {
         profile_id: opponent.profile_id,
         match_id: match.id,
         rating_before: opponentBefore,
         rating_after: opponentResult.newRating,
+        created_at: match.confirmed_at,
       }
     );
     deltas.push({

@@ -152,6 +152,10 @@ export async function recordResult(formData: FormData) {
     .single();
   if (tmError || !tm) fail("That match is no longer available.");
 
+  // record_tournament_result stamps this match's own confirmed_at with the
+  // SQL now() at insert time (same call, milliseconds later), so this JS-side
+  // stand-in only has to sort last among confirmed matches.
+  const nowIso = new Date().toISOString();
   let payload: Awaited<ReturnType<typeof buildRecomputePayload>> | null = null;
   try {
     payload = await buildRecomputePayload(service, [
@@ -160,6 +164,7 @@ export async function recordResult(formData: FormData) {
         reporter_id: tm!.player1_id as string,
         opponent_id: tm!.player2_id as string,
         winner_id: winnerId,
+        confirmed_at: nowIso,
       },
     ]);
   } catch {

@@ -70,7 +70,15 @@ describe("replayRatings", () => {
 
   it("reproduces a single match exactly as ratingUpdate would", () => {
     const result = replayRatings(
-      [{ id: "m1", reporter_id: "a", opponent_id: "b", winner_id: "a" }],
+      [
+        {
+          id: "m1",
+          reporter_id: "a",
+          opponent_id: "b",
+          winner_id: "a",
+          confirmed_at: "2026-01-01T00:00:00.000Z",
+        },
+      ],
       ids
     );
     const expected = ratingUpdate(STARTING_RATING, STARTING_RATING, true, 0);
@@ -86,7 +94,15 @@ describe("replayRatings", () => {
     // If it used A's updated rating when computing B, the deltas would not be
     // equal and opposite for an even first meeting.
     const { deltas } = replayRatings(
-      [{ id: "m1", reporter_id: "a", opponent_id: "b", winner_id: "a" }],
+      [
+        {
+          id: "m1",
+          reporter_id: "a",
+          opponent_id: "b",
+          winner_id: "a",
+          confirmed_at: "2026-01-01T00:00:00.000Z",
+        },
+      ],
       ids
     );
     expect(deltas[0].rating_delta_reporter).toBe(-deltas[0].rating_delta_opponent);
@@ -95,15 +111,39 @@ describe("replayRatings", () => {
   it("is deterministic and depends on order", () => {
     const forward = replayRatings(
       [
-        { id: "m1", reporter_id: "a", opponent_id: "b", winner_id: "a" },
-        { id: "m2", reporter_id: "a", opponent_id: "b", winner_id: "b" },
+        {
+          id: "m1",
+          reporter_id: "a",
+          opponent_id: "b",
+          winner_id: "a",
+          confirmed_at: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "m2",
+          reporter_id: "a",
+          opponent_id: "b",
+          winner_id: "b",
+          confirmed_at: "2026-01-02T00:00:00.000Z",
+        },
       ],
       ids
     );
     const again = replayRatings(
       [
-        { id: "m1", reporter_id: "a", opponent_id: "b", winner_id: "a" },
-        { id: "m2", reporter_id: "a", opponent_id: "b", winner_id: "b" },
+        {
+          id: "m1",
+          reporter_id: "a",
+          opponent_id: "b",
+          winner_id: "a",
+          confirmed_at: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "m2",
+          reporter_id: "a",
+          opponent_id: "b",
+          winner_id: "b",
+          confirmed_at: "2026-01-02T00:00:00.000Z",
+        },
       ],
       ids
     );
@@ -121,16 +161,32 @@ describe("replayRatings", () => {
   });
 
   it("emits one history row per player per match", () => {
-    const { history } = replayRatings(
-      [
-        { id: "m1", reporter_id: "a", opponent_id: "b", winner_id: "a" },
-        { id: "m2", reporter_id: "b", opponent_id: "a", winner_id: "b" },
-      ],
-      ids
-    );
+    const matches = [
+      {
+        id: "m1",
+        reporter_id: "a",
+        opponent_id: "b",
+        winner_id: "a",
+        confirmed_at: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "m2",
+        reporter_id: "b",
+        opponent_id: "a",
+        winner_id: "b",
+        confirmed_at: "2026-01-02T00:00:00.000Z",
+      },
+    ];
+    const { history } = replayRatings(matches, ids);
     expect(history).toHaveLength(4);
     expect(history.filter((h) => h.match_id === "m1")).toHaveLength(2);
     expect(history.every((h) => h.rating_before !== h.rating_after)).toBe(true);
+    // Recomputed history must carry the match's own confirmation time, not
+    // the recompute's — otherwise every row collapses onto one timestamp.
+    for (const row of history) {
+      const source = matches.find((m) => m.id === row.match_id)!;
+      expect(row.created_at).toBe(source.confirmed_at);
+    }
   });
 
   it("starts everyone at the documented starting rating", () => {
@@ -144,7 +200,15 @@ describe("replayRatings", () => {
 
   it("rates a player who appears only as an opponent", () => {
     const { standings } = replayRatings(
-      [{ id: "m1", reporter_id: "a", opponent_id: "c", winner_id: "c" }],
+      [
+        {
+          id: "m1",
+          reporter_id: "a",
+          opponent_id: "c",
+          winner_id: "c",
+          confirmed_at: "2026-01-01T00:00:00.000Z",
+        },
+      ],
       ["a", "b", "c"]
     );
     expect(standings.find((s) => s.profile_id === "c")!.matches_played).toBe(1);
@@ -160,6 +224,7 @@ describe("replayRatings", () => {
       reporter_id: "a",
       opponent_id: `o${i + 1}`,
       winner_id: "a",
+      confirmed_at: `2026-01-${String(i + 1).padStart(2, "0")}T00:00:00.000Z`,
     }));
     const { history } = replayRatings(matches, ids);
 

@@ -350,7 +350,13 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
 
         matchId = crypto.randomUUID();
         const recordPayload = await buildRecomputePayload(admin, [
-          { id: matchId, reporter_id: winnerId, opponent_id: loserId, winner_id: winnerId },
+          {
+            id: matchId,
+            reporter_id: winnerId,
+            opponent_id: loserId,
+            winner_id: winnerId,
+            confirmed_at: new Date().toISOString(),
+          },
         ]);
         const { error: recordError } = await adminActor.rpc("record_tournament_result", {
           p_tournament_match_id: chosen.id,

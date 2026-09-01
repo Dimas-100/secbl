@@ -31,15 +31,22 @@ export async function buildRecomputePayload(
 ): Promise<RecomputePayload> {
   const { data: rows, error } = await service
     .from("matches")
-    .select("id, reporter_id, opponent_id, winner_id")
+    .select("id, reporter_id, opponent_id, winner_id, confirmed_at")
     .eq("status", "confirmed")
     .order("confirmed_at", { ascending: true })
-    .order("id", { ascending: true });
+    .order("id", { ascending: true })
+    // PostgREST's default "Max rows" setting (1000) truncates a rangeless
+    // select silently; without an explicit range a league that crosses that
+    // threshold would have its recompute permanently jammed by the
+    // expected-count guard below, with no retry able to fix it.
+    .range(0, 99999);
   if (error) throw new Error(error.message);
 
   const { data: profiles, error: profilesError } = await service
     .from("profiles")
-    .select("id");
+    .select("id")
+    // Same silent-truncation risk as the matches select above.
+    .range(0, 99999);
   if (profilesError) throw new Error(profilesError.message);
 
   const confirmed = (rows ?? []) as ReplayMatch[];
