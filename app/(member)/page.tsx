@@ -72,7 +72,14 @@ export default async function HomePage({
 
   return (
     <main>
-      <HeroBand title="SECBL">
+      {/* The header wordmark already says SECBL — the band labels the number. */}
+      <HeroBand
+        title={
+          <span className="text-[11px] font-bold tracking-[0.12em] text-white/70 uppercase">
+            Your rating
+          </span>
+        }
+      >
         <div className="mt-2 flex items-baseline gap-3">
           <span className="stat-number text-gold text-5xl leading-none">{me?.rating}</span>
           <div className="text-[11px] leading-tight">

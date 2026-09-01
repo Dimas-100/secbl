@@ -29,7 +29,7 @@ export default async function ResetPasswordPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-4">
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 px-4">
       <BrandLogo className="h-auto w-44 self-center" />
       <h1 className="text-center text-2xl font-bold">Choose a new password</h1>
       {error && (

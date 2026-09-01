@@ -12,7 +12,7 @@ export default async function LoginPage({
 }) {
   const { error, message } = await searchParams;
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-4">
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 px-4">
       <h1 className="sr-only">SECBL</h1>
       <BrandLogo className="h-auto w-56 self-center" />
       {message && <p className="rounded-md bg-muted p-3 text-sm">{message}</p>}

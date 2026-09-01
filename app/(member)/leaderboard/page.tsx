@@ -43,7 +43,9 @@ export default async function LeaderboardPage() {
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/players/${r.id}`}
-                    className="truncate font-semibold underline-offset-2 hover:underline"
+                    // block, not inline: truncate can't clip an inline box,
+                    // and one long display name drags the whole page wider.
+                    className="block truncate font-semibold underline-offset-2 hover:underline"
                   >
                     {r.display_name}
                     {r.matches_played < 10 && (

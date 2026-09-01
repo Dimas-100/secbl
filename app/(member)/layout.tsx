@@ -22,7 +22,10 @@ export default async function MemberLayout({
   if (!profile || profile.status !== "approved") redirect("/pending");
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pb-28">
+    // w-full matters: body is a flex column, and a flex child with mx-auto
+    // shrink-wraps its content instead of stretching — every page would size
+    // to its longest text line without it.
+    <div className="mx-auto w-full max-w-3xl px-4 pb-28">
       <header className="flex items-center justify-between py-3">
         {/* Text, not the logo image: the wordmark's ball letterforms smear at
             header size. --primary carries the brand here instead. */}
