@@ -62,3 +62,43 @@ export interface Rsvp {
   created_at: string;
   updated_at: string;
 }
+
+export type TournamentFormat = "single_elim" | "double_elim";
+export type TournamentStatus = "setup" | "live" | "complete";
+export type BracketSide = "winners" | "losers" | "grand_final";
+
+export interface Tournament {
+  id: string;
+  name: string;
+  format: TournamentFormat;
+  status: TournamentStatus;
+  event_id: string | null;
+  created_by: string;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface TournamentPlayer {
+  tournament_id: string;
+  profile_id: string;
+  seed: number;
+}
+
+export interface TournamentMatch {
+  id: string;
+  tournament_id: string;
+  bracket: BracketSide;
+  round: number;
+  position: number;
+  player1_id: string | null;
+  player2_id: string | null;
+  player1_score: number | null;
+  player2_score: number | null;
+  winner_id: string | null;
+  winner_advances_to: string | null;
+  winner_advances_slot: 1 | 2 | null;
+  loser_advances_to: string | null;
+  loser_advances_slot: 1 | 2 | null;
+  created_at: string;
+}
