@@ -46,7 +46,6 @@ export async function createTournament(formData: FormData) {
 export async function saveEntrants(formData: FormData) {
   const { supabase } = await requireAdmin();
   const tournamentId = String(formData.get("tournament_id") ?? "");
-  // Checkbox order in the DOM is seed order, highest rating first.
   const profileIds = formData.getAll("profile_ids").map(String).filter(Boolean);
   if (profileIds.length > MAX_PLAYERS) {
     redirect(
@@ -55,8 +54,24 @@ export async function saveEntrants(formData: FormData) {
       )}`
     );
   }
-  const entrants = profileIds.map((profile_id, index) => ({
-    profile_id,
+  // Seed by rating, not by the order the checkboxes happened to submit in:
+  // the spec defines seeding as rating order, and deriving it here means a UI
+  // change cannot silently mis-seed a bracket.
+  const { data: chosen, error: chosenError } = await supabase
+    .from("profiles")
+    .select("id, rating")
+    .in("id", profileIds)
+    .order("rating", { ascending: false })
+    .order("id", { ascending: true });
+  if (chosenError || !chosen || chosen.length !== profileIds.length) {
+    redirect(
+      `/tournaments/${tournamentId}/setup?error=${encodeURIComponent(
+        "Could not read those players. Try again."
+      )}`
+    );
+  }
+  const entrants = chosen!.map((player, index) => ({
+    profile_id: player.id as string,
     seed: index + 1,
   }));
   const { error } = await supabase.rpc("set_tournament_entrants", {
@@ -87,6 +102,13 @@ export async function startTournament(formData: FormData) {
     redirect(
       `/tournaments/${tournamentId}/setup?error=${encodeURIComponent(
         `A tournament needs at least ${MIN_PLAYERS} entrants.`
+      )}`
+    );
+  }
+  if (ids.length > MAX_PLAYERS) {
+    redirect(
+      `/tournaments/${tournamentId}/setup?error=${encodeURIComponent(
+        `A tournament can hold at most ${MAX_PLAYERS} entrants.`
       )}`
     );
   }
@@ -130,14 +152,20 @@ export async function recordResult(formData: FormData) {
     .single();
   if (tmError || !tm) fail("That match is no longer available.");
 
-  const payload = await buildRecomputePayload(service, [
-    {
-      id: matchId,
-      reporter_id: tm!.player1_id as string,
-      opponent_id: tm!.player2_id as string,
-      winner_id: winnerId,
-    },
-  ]);
+  let payload: Awaited<ReturnType<typeof buildRecomputePayload>> | null = null;
+  try {
+    payload = await buildRecomputePayload(service, [
+      {
+        id: matchId,
+        reporter_id: tm!.player1_id as string,
+        opponent_id: tm!.player2_id as string,
+        winner_id: winnerId,
+      },
+    ]);
+  } catch {
+    payload = null;
+  }
+  if (!payload) fail("Could not read the match history just now. Try again.");
 
   const { error } = await supabase.rpc("record_tournament_result", {
     p_tournament_match_id: tournamentMatchId,
@@ -191,8 +219,25 @@ export async function voidResult(formData: FormData) {
     .select("id")
     .eq("tournament_match_id", tournamentMatchId)
     .maybeSingle();
+  if (!rated) {
+    redirect(
+      `/tournaments/${tournamentId}?error=${encodeURIComponent("A bye has no result to void.")}`
+    );
+  }
 
-  const payload = await buildRecomputePayload(service, [], rated?.id as string | undefined);
+  let payload: Awaited<ReturnType<typeof buildRecomputePayload>> | null = null;
+  try {
+    payload = await buildRecomputePayload(service, [], rated.id as string);
+  } catch {
+    payload = null;
+  }
+  if (!payload) {
+    redirect(
+      `/tournaments/${tournamentId}?error=${encodeURIComponent(
+        "Could not read the match history just now. Try again."
+      )}`
+    );
+  }
 
   const { error } = await supabase.rpc("void_tournament_result", {
     p_tournament_match_id: tournamentMatchId,
