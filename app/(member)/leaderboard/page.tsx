@@ -51,6 +51,11 @@ export default async function LeaderboardPage() {
         </TableBody>
       </Table>
       <p className="text-xs text-muted-foreground">* provisional (fewer than 10 matches)</p>
+      <p className="text-sm">
+        <Link href="/schools" className="underline">
+          School standings
+        </Link>
+      </p>
     </main>
   );
 }
