@@ -1,5 +1,37 @@
 # SECBL Phase 4 (Tournaments & Brackets) Implementation Plan
 
+> **STATUS: COMPLETED 2026-09-01.** All ten tasks implemented via subagent-driven
+> development and merged to `master`. **Not yet deployed** — the code is on `master`
+> and every migration is applied to the live database, but production still runs the
+> Phase 3 build. Progress is tracked by the conventional commits, not the checkboxes.
+>
+> **Open follow-up that needs a human:**
+> - **Check Supabase → Settings → API → Max Rows.** `buildRecomputePayload` reads every
+>   confirmed match, and `.range(0, 99999)` does NOT bypass PostgREST's `db-max-rows`,
+>   which is a hard server-side cap defaulting to **1000**. If it is at the default,
+>   then at ~1000 confirmed matches the payload silently truncates, the concurrency
+>   guard sees a count mismatch, and tournament result entry refuses **permanently**
+>   with "the ladder changed while this result was being prepared — try again", which
+>   no retry can clear. Either raise that setting or implement real windowed pagination.
+>   Fail-closed, not corrupting — but badly misleading when it hits.
+>
+> **Deferred, none blocking:**
+> - Double elimination (schema keeps `bracket` / `loser_advances_to` so it is additive).
+> - Supabase Realtime (interval refresh instead), manual seed reordering, third-place
+>   playoffs.
+> - Spec §3 claims this gives the admin dispute path a rating-correction route. It does
+>   not — `apply_rating_recompute` has no caller outside the tournament functions.
+> - Rated tournament matches are hardcoded to game type `8ball`.
+> - `start_tournament` verifies every bracket player is an entrant, but not that every
+>   entrant is in the bracket; and entrant `status` is not re-checked at start, so a
+>   member suspended between save and start still plays and still rates.
+> - `CardTitle` is now an `h3`, so card pages have `h1 → h3` level skips (no `h2`s).
+> - **Accepted trust decision:** the tournament functions must be granted to
+>   `authenticated` for `auth.uid()` to resolve, and they pass the rating payload
+>   through unvalidated — so an admin session can write arbitrary ratings by calling the
+>   API directly. Not durable: the next genuine recompute rebuilds the whole ladder from
+>   the replay.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Single-elimination tournaments for 3–32 players with byes: an admin seeds and starts a bracket, the director enters results, winners advance automatically, and every result rates immediately — with an exact correction path.

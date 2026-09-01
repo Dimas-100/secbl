@@ -62,8 +62,8 @@ export default async function TournamentSetupPage({
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             <p className="text-muted-foreground text-xs">
-              Listed strongest first. Seeds are assigned by rating when you start, so the
-              order here does not matter.
+              Listed strongest first. Seeds are assigned by rating when you save, so the
+              order here does not matter — save again if ratings change before you start.
             </p>
             {(candidates ?? []).map((c) => {
               const school = Array.isArray(c.schools) ? c.schools[0] : c.schools;
