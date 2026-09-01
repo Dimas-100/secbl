@@ -112,6 +112,12 @@ describe("replayRatings", () => {
     // match is rated against ratings the first one moved.
     const a = forward.standings.find((s) => s.profile_id === "a")!;
     expect(a.matches_played).toBe(2);
+    // The values, not just the shape: a path-independent implementation would
+    // rate match 2 at 450 v 450 again, the deltas would cancel, and both would
+    // land back on exactly 450.
+    const b = forward.standings.find((s) => s.profile_id === "b")!;
+    expect(a.rating).toBe(443);
+    expect(b.rating).toBe(457);
   });
 
   it("emits one history row per player per match", () => {
@@ -143,5 +149,30 @@ describe("replayRatings", () => {
     );
     expect(standings.find((s) => s.profile_id === "c")!.matches_played).toBe(1);
     expect(standings.find((s) => s.profile_id === "b")!.rating).toBe(STARTING_RATING);
+  });
+
+  it("drops to the standard K-factor on a player's eleventh match", () => {
+    // "a" wins ten matches against fresh opponents, so the eleventh is the
+    // first rated with matches_played = 10.
+    const ids = ["a", ...Array.from({ length: 11 }, (_, i) => `o${i + 1}`)];
+    const matches = Array.from({ length: 11 }, (_, i) => ({
+      id: `m${i + 1}`,
+      reporter_id: "a",
+      opponent_id: `o${i + 1}`,
+      winner_id: "a",
+    }));
+    const { history } = replayRatings(matches, ids);
+
+    const mine = history.find((h) => h.match_id === "m11" && h.profile_id === "a")!;
+    const theirs = history.find((h) => h.match_id === "m11" && h.profile_id === "o11")!;
+    const actual = mine.rating_after - mine.rating_before;
+
+    // The eleventh match must be rated with K=32, not the provisional K=64.
+    expect(actual).toBe(
+      ratingUpdate(mine.rating_before, theirs.rating_before, true, PROVISIONAL_GAMES).delta
+    );
+    expect(actual).not.toBe(
+      ratingUpdate(mine.rating_before, theirs.rating_before, true, PROVISIONAL_GAMES - 1).delta
+    );
   });
 });
