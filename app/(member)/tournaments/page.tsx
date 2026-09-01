@@ -55,18 +55,36 @@ export default async function TournamentsPage({
           {(tournaments ?? []).length === 0 && (
             <p className="text-muted-foreground text-sm">Nothing run yet.</p>
           )}
-          {(tournaments ?? []).map((t) => (
-            <Link
-              key={t.id}
-              href={t.status === "setup" ? `/tournaments/${t.id}/setup` : `/tournaments/${t.id}`}
-              className="hover:bg-muted -mx-3 flex items-center justify-between rounded-md p-3"
-            >
-              <span className="font-medium">{t.name}</span>
+          {(tournaments ?? []).map((t) => {
+            const badge = (
               <Badge variant={t.status === "live" ? "default" : "secondary"}>
                 {STATUS_LABEL[t.status]}
               </Badge>
-            </Link>
-          ))}
+            );
+            // A tournament still being set up has nothing to show a member yet,
+            // and its only page is admin-only — so don't offer them the click.
+            if (t.status === "setup" && me?.role !== "admin") {
+              return (
+                <div
+                  key={t.id}
+                  className="-mx-3 flex items-center justify-between p-3"
+                >
+                  <span className="text-muted-foreground">{t.name}</span>
+                  {badge}
+                </div>
+              );
+            }
+            return (
+              <Link
+                key={t.id}
+                href={t.status === "setup" ? `/tournaments/${t.id}/setup` : `/tournaments/${t.id}`}
+                className="hover:bg-muted -mx-3 flex items-center justify-between rounded-md p-3"
+              >
+                <span className="font-medium">{t.name}</span>
+                {badge}
+              </Link>
+            );
+          })}
         </CardContent>
       </Card>
     </main>
