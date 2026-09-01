@@ -18,6 +18,7 @@ export function serviceClient(): SupabaseClient {
 const userIds = new Set<string>();
 const displayNames = new Set<string>();
 const eventTitles = new Set<string>();
+const tournamentNames = new Set<string>();
 
 /** Delete this auth user during teardown. profiles cascade from auth.users. */
 export function trackUser(id: string) {
@@ -34,6 +35,11 @@ export function trackEventTitle(title: string) {
   eventTitles.add(title);
 }
 
+/** Delete any tournament with this (unique per run) name during teardown. */
+export function trackTournamentName(name: string) {
+  tournamentNames.add(name);
+}
+
 export async function cleanupTracked() {
   const service = serviceClient();
 
@@ -47,6 +53,11 @@ export async function cleanupTracked() {
     const { data } = await service.from("events").select("id").eq("title", title);
     for (const row of data ?? []) await service.from("events").delete().eq("id", row.id);
   }
+  // Must precede deleteUser: tournaments.created_by has no cascade, so a
+  // surviving tournament blocks deletion of the admin who created it.
+  for (const name of tournamentNames) {
+    await service.from("tournaments").delete().eq("name", name);
+  }
   for (const id of userIds) {
     await service.auth.admin.deleteUser(id);
   }
@@ -54,4 +65,5 @@ export async function cleanupTracked() {
   userIds.clear();
   displayNames.clear();
   eventTitles.clear();
+  tournamentNames.clear();
 }
