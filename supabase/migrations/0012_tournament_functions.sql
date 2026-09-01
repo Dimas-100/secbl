@@ -74,6 +74,9 @@ begin
   if v_players < 3 then
     raise exception 'a tournament needs at least 3 entrants';
   end if;
+  if p_matches is null or jsonb_array_length(p_matches) = 0 then
+    raise exception 'bracket is empty';
+  end if;
 
   -- Two passes: rows first, then the self-referencing advance links. Doing it
   -- this way keeps the foreign keys non-deferrable.
@@ -95,6 +98,37 @@ begin
     id uuid, winner_advances_to uuid, winner_advances_slot smallint
   )
   where t.id = m.id and t.tournament_id = p_tournament_id;
+
+  -- Reject any bracket row whose player is not one of this tournament's
+  -- frozen entrants: otherwise a stray id in the payload gets a real, rated
+  -- result written for it once record_tournament_result runs.
+  if exists (
+    select 1 from tournament_matches tm
+    where tm.tournament_id = p_tournament_id
+      and (
+        (tm.player1_id is not null and not exists (
+           select 1 from tournament_players tp
+           where tp.tournament_id = p_tournament_id and tp.profile_id = tm.player1_id))
+        or (tm.player2_id is not null and not exists (
+           select 1 from tournament_players tp
+           where tp.tournament_id = p_tournament_id and tp.profile_id = tm.player2_id))
+      )
+  ) then
+    raise exception 'bracket contains players who are not entrants';
+  end if;
+
+  -- Reject any advance link that escapes this tournament's own bracket:
+  -- otherwise record_tournament_result would write a winner into a match row
+  -- belonging to a different tournament entirely.
+  if exists (
+    select 1 from tournament_matches t
+    left join tournament_matches target on target.id = t.winner_advances_to
+    where t.tournament_id = p_tournament_id
+      and t.winner_advances_to is not null
+      and (target.id is null or target.tournament_id <> p_tournament_id)
+  ) then
+    raise exception 'bracket advance links must stay within this tournament';
+  end if;
 
   update tournaments
   set status = 'live', started_at = now()
@@ -188,16 +222,21 @@ begin
 
   if tm.winner_advances_to is not null then
     if tm.winner_advances_slot = 1 then
-      update tournament_matches set player1_id = p_winner_id where id = tm.winner_advances_to;
+      update tournament_matches set player1_id = p_winner_id
+        where id = tm.winner_advances_to and tournament_id = tm.tournament_id;
     else
-      update tournament_matches set player2_id = p_winner_id where id = tm.winner_advances_to;
+      update tournament_matches set player2_id = p_winner_id
+        where id = tm.winner_advances_to and tournament_id = tm.tournament_id;
     end if;
   end if;
 
   -- The ladder we are about to write must describe exactly the confirmed
   -- matches that now exist: same count, same ids. A bare count would miss a
-  -- simultaneous confirm and void cancelling each other out.
-  if (select count(*) from matches where status = 'confirmed') <> jsonb_array_length(p_deltas)
+  -- simultaneous confirm and void cancelling each other out. jsonb_array_length
+  -- of a null p_deltas is null, not 0, so the null check must come first or
+  -- this whole condition evaluates to null and the guard silently no-ops.
+  if p_deltas is null
+     or (select count(*) from matches where status = 'confirmed') <> jsonb_array_length(p_deltas)
      or exists (
        select 1 from matches m
        where m.status = 'confirmed'
@@ -260,6 +299,9 @@ begin
   if tm.winner_id is null then
     raise exception 'that match has no result to void';
   end if;
+  if tm.player1_id is null or tm.player2_id is null then
+    raise exception 'a bye has no result to void';
+  end if;
 
   if tm.winner_advances_to is not null then
     select winner_id is not null into v_downstream_decided
@@ -274,6 +316,14 @@ begin
     end if;
   end if;
 
+  -- rating_history.match_id references matches with NO ACTION, so history rows
+  -- must go first. apply_rating_recompute clears that table, but not until
+  -- after this delete.
+  delete from rating_history
+  where match_id in (
+    select id from matches where tournament_match_id = p_tournament_match_id
+  );
+
   delete from matches where tournament_match_id = p_tournament_match_id;
 
   update tournament_matches
@@ -285,8 +335,11 @@ begin
 
   -- The ladder we are about to write must describe exactly the confirmed
   -- matches that now exist: same count, same ids. A bare count would miss a
-  -- simultaneous confirm and void cancelling each other out.
-  if (select count(*) from matches where status = 'confirmed') <> jsonb_array_length(p_deltas)
+  -- simultaneous confirm and void cancelling each other out. jsonb_array_length
+  -- of a null p_deltas is null, not 0, so the null check must come first or
+  -- this whole condition evaluates to null and the guard silently no-ops.
+  if p_deltas is null
+     or (select count(*) from matches where status = 'confirmed') <> jsonb_array_length(p_deltas)
      or exists (
        select 1 from matches m
        where m.status = 'confirmed'
@@ -326,6 +379,9 @@ begin
   end if;
   if tm.winner_id is null then
     raise exception 'that match has no result to correct';
+  end if;
+  if tm.player1_id is null or tm.player2_id is null then
+    raise exception 'a bye has no score to correct';
   end if;
   if p_player1_score = p_player2_score then
     raise exception 'a tournament match cannot end level';
