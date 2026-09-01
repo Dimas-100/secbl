@@ -283,20 +283,31 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
 
       const stamp = Date.now();
       const emails = [0, 1, 2, 3].map((i) => `rls-bracket-${stamp}-${i}@example.com`);
-      const ids = await Promise.all(emails.map(makeEntrant));
-      const [aId, bId, cId, dId] = ids;
 
-      // A drives every admin-only RPC call below. Nothing stops an admin from
-      // also being a tournament entrant.
-      await admin
-        .from("profiles")
-        .update({ role: "admin", status: "approved" })
-        .eq("id", aId);
-
+      // Declared outside the try so finally can still see whichever ids were
+      // actually created, but populated inside it: these tests run against
+      // production, and a failure partway through createUser must not leak
+      // real accounts that finally never gets a chance to clean up.
+      const ids: string[] = [];
       let tournamentId: string | undefined;
       let matchId: string | undefined;
 
       try {
+        // Sequential, not Promise.all: a parallel rejection can leave
+        // sibling creations still in flight with no id ever recorded, so
+        // even this try/finally would miss them.
+        for (const email of emails) {
+          ids.push(await makeEntrant(email));
+        }
+        const [aId, bId, cId, dId] = ids;
+
+        // A drives every admin-only RPC call below. Nothing stops an admin
+        // from also being a tournament entrant.
+        await admin
+          .from("profiles")
+          .update({ role: "admin", status: "approved" })
+          .eq("id", aId);
+
         const adminActor = await signIn(emails[0]);
 
         const { data: createdId, error: createError } = await adminActor.rpc(
