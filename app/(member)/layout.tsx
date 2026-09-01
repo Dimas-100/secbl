@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { TabBar } from "@/components/tab-bar";
 import { createClient } from "@/lib/supabase/server";
-import { logout } from "@/app/(public)/login/actions";
 
 export default async function MemberLayout({
   children,
@@ -21,37 +22,31 @@ export default async function MemberLayout({
   if (!profile || profile.status !== "approved") redirect("/pending");
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pb-24 pt-4">
-      <header className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-3xl px-4 pb-28">
+      <header className="flex items-center justify-between py-3">
         {/* Text, not the logo image: the wordmark's ball letterforms smear at
             header size. --primary carries the brand here instead. */}
-        <Link href="/" className="text-primary text-lg font-bold tracking-tight">
+        <Link href="/" className="text-primary text-lg font-extrabold tracking-tight">
           SECBL
         </Link>
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center gap-3">
           {profile.role === "admin" && (
-            <Link href="/admin" className="underline">
-              Admin
-            </Link>
+            <Badge asChild variant="outline">
+              <Link href="/admin">Admin</Link>
+            </Badge>
           )}
-          <Link href="/settings" className="underline">
-            Settings
+          {/* Settings (and Log out, which lives there now) behind the avatar. */}
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-full text-sm font-bold"
+          >
+            {(profile.display_name ?? "?")[0]?.toUpperCase()}
           </Link>
-          <form action={logout}>
-            <button className="text-muted-foreground underline">Log out</button>
-          </form>
         </div>
       </header>
       {children}
-      <nav className="bg-background fixed inset-x-0 bottom-0 border-t">
-        <div className="mx-auto flex max-w-3xl justify-around py-3 text-sm">
-          <Link href="/">Home</Link>
-          <Link href="/events">Events</Link>
-          <Link href="/tournaments">Cups</Link>
-          <Link href="/leaderboard">Ranks</Link>
-          <Link href="/matches/new">Report</Link>
-        </div>
-      </nav>
+      <TabBar />
     </div>
   );
 }

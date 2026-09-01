@@ -21,6 +21,10 @@ export const metadata: Metadata = {
 // --primary in app/globals.css and theme_color in app/manifest.ts.
 export const viewport: Viewport = {
   themeColor: "#03600c",
+  // Lets the fixed tab bar extend under the iPhone home indicator; its
+  // bottom padding uses env(safe-area-inset-bottom), which only reports
+  // non-zero when the viewport covers the inset.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

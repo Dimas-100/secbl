@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/server";
+import { logout } from "@/app/(public)/login/actions";
 import { updateDisplayName } from "./actions";
 
 export default async function SettingsPage({
@@ -78,6 +79,13 @@ export default async function SettingsPage({
           </p>
         </CardContent>
       </Card>
+
+      {/* Moved out of the header when it slimmed down to the avatar chip. */}
+      <form action={logout}>
+        <Button variant="outline" className="text-destructive w-full">
+          Log out
+        </Button>
+      </form>
     </main>
   );
 }
