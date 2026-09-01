@@ -40,6 +40,35 @@ async function requireAdmin() {
     .eq("id", user.id)
     .single();
   if (me?.role !== "admin") redirect("/");
+  return { supabase, user };
+}
+
+// Suspending keeps everything — matches, ratings, history — and only revokes
+// access, because is_approved() gates every policy on status = 'approved'.
+// Reinstating restores the member exactly as they were.
+async function setMembership(formData: FormData, status: "suspended" | "approved") {
+  const { supabase, user } = await requireAdmin();
+  const profileId = String(formData.get("profile_id") ?? "");
+  if (!profileId) {
+    redirect(`/admin?error=${encodeURIComponent("No member selected.")}`);
+  }
+  // Without this an admin can suspend themselves, and if they are the only
+  // admin there is nobody left who can undo it.
+  if (profileId === user.id) {
+    redirect(`/admin?error=${encodeURIComponent("You cannot suspend your own account.")}`);
+  }
+  const { error } = await supabase.from("profiles").update({ status }).eq("id", profileId);
+  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/admin");
+  revalidatePath("/leaderboard");
+}
+
+export async function suspendProfile(formData: FormData) {
+  await setMembership(formData, "suspended");
+}
+
+export async function reinstateProfile(formData: FormData) {
+  await setMembership(formData, "approved");
 }
 
 export async function adminResolveMatch(formData: FormData) {

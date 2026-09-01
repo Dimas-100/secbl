@@ -4,7 +4,26 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/server";
-import { adminRejectMatch, adminResolveMatch, approveProfile, rejectProfile } from "./actions";
+import {
+  adminRejectMatch,
+  adminResolveMatch,
+  approveProfile,
+  reinstateProfile,
+  rejectProfile,
+  suspendProfile,
+} from "./actions";
+
+interface MemberRow {
+  id: string;
+  display_name: string;
+  status: string;
+  schools: { short_name: string } | { short_name: string }[] | null;
+}
+
+function schoolCode(row: MemberRow): string | undefined {
+  const school = Array.isArray(row.schools) ? row.schools[0] : row.schools;
+  return school?.short_name;
+}
 
 export default async function AdminPage({
   searchParams,
@@ -29,6 +48,16 @@ export default async function AdminPage({
     .select("id, display_name, created_at, schools(short_name)")
     .eq("status", "pending")
     .order("created_at");
+
+  // Everyone who is in the club or was until they were suspended. Excludes the
+  // signup queue above, and excludes you — self-suspension would lock the only
+  // admin out of their own club.
+  const { data: members } = await supabase
+    .from("profiles")
+    .select("id, display_name, status, schools(short_name)")
+    .in("status", ["approved", "suspended"])
+    .neq("id", user.id)
+    .order("display_name");
 
   const { data: disputed } = await supabase
     .from("matches")
@@ -80,6 +109,48 @@ export default async function AdminPage({
           ))}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Members</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {((members ?? []) as MemberRow[]).length === 0 && (
+            <p className="text-sm text-muted-foreground">No other members yet.</p>
+          )}
+          {((members ?? []) as MemberRow[]).map((m) => (
+            <div key={m.id} className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className={m.status === "suspended" ? "text-muted-foreground" : "font-medium"}>
+                  {m.display_name}
+                </span>
+                <Badge variant="secondary">{schoolCode(m)}</Badge>
+                {m.status === "suspended" && <Badge variant="destructive">Suspended</Badge>}
+              </div>
+              {m.status === "suspended" ? (
+                <form action={reinstateProfile}>
+                  <input type="hidden" name="profile_id" value={m.id} />
+                  <Button size="sm" type="submit">
+                    Reinstate
+                  </Button>
+                </form>
+              ) : (
+                <form action={suspendProfile}>
+                  <input type="hidden" name="profile_id" value={m.id} />
+                  <Button size="sm" variant="outline" type="submit">
+                    Suspend
+                  </Button>
+                </form>
+              )}
+            </div>
+          ))}
+          <p className="text-muted-foreground text-xs">
+            Suspending revokes access and hides the member from leaderboards. Their
+            matches, rating and history are kept, and reinstating restores everything.
+          </p>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Disputed matches</CardTitle>

@@ -1,5 +1,5 @@
 export type MemberRole = "member" | "admin";
-export type MemberStatus = "pending" | "approved" | "rejected";
+export type MemberStatus = "pending" | "approved" | "rejected" | "suspended";
 export type GameType = "8ball" | "9ball" | "10ball" | "other";
 export type MatchStatus = "pending" | "confirmed" | "rejected" | "disputed";
 

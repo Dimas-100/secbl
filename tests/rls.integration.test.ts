@@ -128,4 +128,77 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
     const { data } = await client.from("events").select("id");
     expect(data).toEqual([]);
   });
+
+  it("a member can rename themselves", async () => {
+    const client = await signIn(memberEmail);
+    const { error } = await client.rpc("update_display_name", {
+      p_profile_id: memberId,
+      p_display_name: "Renamed Member",
+    });
+    expect(error).toBeNull();
+    const { data } = await admin
+      .from("profiles")
+      .select("display_name")
+      .eq("id", memberId)
+      .single();
+    expect(data!.display_name).toBe("Renamed Member");
+  });
+
+  it("a member cannot rename someone else", async () => {
+    const client = await signIn(memberEmail);
+    const { error } = await client.rpc("update_display_name", {
+      p_profile_id: pendingId,
+      p_display_name: "Hijacked",
+    });
+    expect(error).not.toBeNull();
+    const { data } = await admin
+      .from("profiles")
+      .select("display_name")
+      .eq("id", pendingId)
+      .single();
+    expect(data!.display_name).not.toBe("Hijacked");
+  });
+
+  it("a member cannot rename themselves to blank", async () => {
+    const client = await signIn(memberEmail);
+    const { error } = await client.rpc("update_display_name", {
+      p_profile_id: memberId,
+      p_display_name: "   ",
+    });
+    expect(error).not.toBeNull();
+  });
+
+  // The reason renaming is a function rather than an RLS policy: a policy
+  // permitting "update your own profile row" would also permit these.
+  it("a member still cannot self-approve or promote themselves", async () => {
+    const client = await signIn(memberEmail);
+    await client.from("profiles").update({ role: "admin" }).eq("id", memberId);
+    await client.from("profiles").update({ status: "approved" }).eq("id", pendingId);
+    const { data: me } = await admin
+      .from("profiles")
+      .select("role")
+      .eq("id", memberId)
+      .single();
+    const { data: other } = await admin
+      .from("profiles")
+      .select("status")
+      .eq("id", pendingId)
+      .single();
+    expect(me!.role).toBe("member");
+    expect(other!.status).toBe("pending");
+  });
+
+  it("a suspended member loses read access to the club", async () => {
+    await admin.from("profiles").update({ status: "suspended" }).eq("id", memberId);
+    try {
+      const client = await signIn(memberEmail);
+      const { data: events } = await client.from("events").select("id");
+      expect(events).toEqual([]);
+      const { data: profiles } = await client.from("profiles").select("id");
+      // Only their own row, via the "read own profile" policy.
+      expect(profiles?.map((p) => p.id)).toEqual([memberId]);
+    } finally {
+      await admin.from("profiles").update({ status: "approved" }).eq("id", memberId);
+    }
+  });
 });

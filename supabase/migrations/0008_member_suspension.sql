@@ -1,0 +1,15 @@
+-- A distinct 'suspended' state, separate from 'rejected'.
+--
+-- Reusing 'rejected' would work mechanically but would tell a suspended member
+-- "your signup was not approved", which is both wrong and confusing for someone
+-- who has been playing for months.
+--
+-- No policy changes are needed: is_approved() already gates on
+-- status = 'approved', so a suspended member loses read access to club data,
+-- drops off the leaderboard and school_stats views, and is bounced to /pending
+-- by the member layout. Their match history and ratings are untouched, so
+-- reinstating restores everything.
+--
+-- Alone in its own migration on purpose: Postgres allows ADD VALUE inside a
+-- transaction but forbids USING the new value in that same transaction.
+alter type public.member_status add value if not exists 'suspended';

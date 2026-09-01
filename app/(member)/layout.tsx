@@ -34,6 +34,9 @@ export default async function MemberLayout({
               Admin
             </Link>
           )}
+          <Link href="/settings" className="underline">
+            Settings
+          </Link>
           <form action={logout}>
             <button className="text-muted-foreground underline">Log out</button>
           </form>
