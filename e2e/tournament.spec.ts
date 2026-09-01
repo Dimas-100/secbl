@@ -69,11 +69,21 @@ test("admin runs a 4-player tournament to a champion", async ({ page }) => {
     const forms = page.locator("form:has(select[name='winner_id'])");
     if ((await forms.count()) === 0) break;
     const form = forms.first();
+    const matchId = await form.locator('input[name="tournament_match_id"]').inputValue();
     await form.locator('input[name="player1_score"]').fill("5");
     await form.locator('input[name="player2_score"]').fill("3");
     await form.locator('select[name="winner_id"]').selectOption({ index: 1 });
     await form.getByRole("button", { name: "Save" }).click();
-    await page.waitForLoadState("networkidle");
+    // Wait for THIS match's entry form to go away, i.e. for the action's
+    // fresh payload to actually reach the DOM. "networkidle" is not enough:
+    // a Server Action returns the re-rendered route inside its own response,
+    // so the network can fall idle a render before the bracket updates, and
+    // the next iteration would then act on an already-decided match.
+    await expect(
+      page.locator(
+        `form:has(input[name="tournament_match_id"][value="${matchId}"]):has(select[name='winner_id'])`
+      )
+    ).toHaveCount(0);
   }
 
   await expect(page.getByRole("heading", { name: "Champion" })).toBeVisible();

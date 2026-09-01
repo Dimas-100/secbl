@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { SubmitButton } from "@/components/submit-button";
 import { bracketRounds, type GeneratedMatch } from "@/lib/bracket";
 import { createClient } from "@/lib/supabase/server";
 import { correctScores, recordResult, voidResult } from "@/app/(member)/tournaments/actions";
@@ -156,9 +156,9 @@ export default async function TournamentPage({
                         <option value={match.player1_id!}>{label(match.player1_id)}</option>
                         <option value={match.player2_id!}>{label(match.player2_id)}</option>
                       </select>
-                      <Button size="sm" type="submit">
+                      <SubmitButton size="sm" pendingChildren="Saving…">
                         Save
-                      </Button>
+                      </SubmitButton>
                     </form>
                   )}
 
@@ -187,16 +187,16 @@ export default async function TournamentPage({
                           className="w-16"
                           aria-label="Corrected second score"
                         />
-                        <Button size="sm" variant="outline" type="submit">
+                        <SubmitButton size="sm" variant="outline" pendingChildren="Saving…">
                           Fix score
-                        </Button>
+                        </SubmitButton>
                       </form>
                       <form action={voidResult}>
                         <input type="hidden" name="tournament_id" value={id} />
                         <input type="hidden" name="tournament_match_id" value={match.id} />
-                        <Button size="sm" variant="outline" type="submit">
+                        <SubmitButton size="sm" variant="outline" pendingChildren="Voiding…">
                           Void result
-                        </Button>
+                        </SubmitButton>
                       </form>
                     </div>
                   )}
