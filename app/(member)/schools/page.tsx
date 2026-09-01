@@ -1,4 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { HeroBand } from "@/components/hero-band";
+import { SectionLabel } from "@/components/section-label";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function SchoolsPage() {
@@ -7,8 +9,9 @@ export default async function SchoolsPage() {
   const { data: h2h } = await supabase.from("school_head_to_head").select("*");
 
   return (
-    <main className="flex flex-col gap-6">
-      <h1 className="text-xl font-bold">Schools</h1>
+    <main>
+      <HeroBand title="School standings" />
+      <div className="-mt-3 flex flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
         {(stats ?? []).map((s) => (
           <Card key={s.id}>
@@ -18,11 +21,11 @@ export default async function SchoolsPage() {
             <CardContent className="flex flex-col gap-1 text-sm">
               <p className="text-muted-foreground">{s.name}</p>
               <p>
-                <span className="font-medium">{s.member_count}</span> members ·{" "}
-                <span className="font-medium">{s.avg_rating}</span> avg rating
+                <span className="stat-number">{s.member_count}</span> members ·{" "}
+                <span className="stat-number">{s.avg_rating}</span> avg rating
               </p>
               <p>
-                Record: <span className="font-medium">{s.wins}–{s.losses}</span>
+                Record: <span className="stat-number">{s.wins}–{s.losses}</span>
               </p>
             </CardContent>
           </Card>
@@ -30,7 +33,7 @@ export default async function SchoolsPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>School vs. school</CardTitle>
+          <SectionLabel>School vs. school</SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
           {(h2h ?? []).length === 0 && (
@@ -44,6 +47,7 @@ export default async function SchoolsPage() {
           ))}
         </CardContent>
       </Card>
+      </div>
     </main>
   );
 }

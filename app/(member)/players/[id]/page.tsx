@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { HeroBand } from "@/components/hero-band";
+import { SectionLabel } from "@/components/section-label";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function PlayerPage({
@@ -38,25 +40,30 @@ export default async function PlayerPage({
     .limit(10);
 
   return (
-    <main className="flex flex-col gap-6">
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-bold">{profile.display_name}</h1>
-        <Badge variant="secondary">{school?.short_name}</Badge>
-      </div>
-
-      <Card>
-        <CardContent className="flex items-baseline justify-between pt-6">
-          <span className="text-4xl font-bold">{profile.rating}</span>
-          <span className="text-sm text-muted-foreground">
+    <main>
+      <HeroBand
+        title={
+          <span className="flex items-center gap-2">
+            {profile.display_name}
+            <Badge variant="secondary">{school?.short_name}</Badge>
+          </span>
+        }
+      >
+        <div className="mt-2 flex items-baseline gap-3">
+          <span className="stat-number text-gold text-4xl leading-none">
+            {profile.rating}
+          </span>
+          <span className="text-[11px] text-white/60">
             {profile.matches_played} matches
             {profile.matches_played < 10 && " · provisional"}
           </span>
-        </CardContent>
-      </Card>
+        </div>
+      </HeroBand>
 
+      <div className="-mt-3 flex flex-col gap-4">
       <Card>
         <CardHeader>
-          <CardTitle>Recent matches</CardTitle>
+          <SectionLabel>Recent matches</SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 text-sm">
           {(matches ?? []).length === 0 && (
@@ -68,14 +75,25 @@ export default async function PlayerPage({
             const won = m.winner_id === id;
             const other = reporter?.id === id ? opponent : reporter;
             return (
-              <p key={m.id}>
-                <span className={won ? "font-medium" : "text-muted-foreground"}>
-                  {won ? "W" : "L"}
-                </span>{" "}
-                vs {other?.display_name} {Math.max(m.reporter_score, m.opponent_score)}–
-                {Math.min(m.reporter_score, m.opponent_score)}{" "}
-                <span className="text-muted-foreground">({m.played_at})</span>
-              </p>
+              <div key={m.id} className="flex items-baseline justify-between gap-2">
+                <span className="min-w-0 truncate">
+                  <span
+                    className={
+                      won
+                        ? "text-primary font-bold"
+                        : "text-muted-foreground font-bold"
+                    }
+                  >
+                    {won ? "W" : "L"}
+                  </span>{" "}
+                  vs {other?.display_name}{" "}
+                  <span className="text-muted-foreground text-xs">({m.played_at})</span>
+                </span>
+                <span className="stat-number shrink-0">
+                  {Math.max(m.reporter_score, m.opponent_score)}–
+                  {Math.min(m.reporter_score, m.opponent_score)}
+                </span>
+              </div>
             );
           })}
         </CardContent>
@@ -83,7 +101,7 @@ export default async function PlayerPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Rating history</CardTitle>
+          <SectionLabel>Rating history</SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
           {(history ?? []).length === 0 && (
@@ -103,6 +121,7 @@ export default async function PlayerPage({
           })}
         </CardContent>
       </Card>
+      </div>
     </main>
   );
 }
