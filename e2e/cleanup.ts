@@ -55,7 +55,36 @@ export async function cleanupTracked() {
   }
   // Must precede deleteUser: tournaments.created_by has no cascade, so a
   // surviving tournament blocks deletion of the admin who created it.
+  //
+  // Deleting the tournament alone is not enough. matches.tournament_match_id
+  // is ON DELETE SET NULL, not CASCADE (deliberately -- see
+  // supabase/migrations/0010b_tournament_integrity.sql -- so that deleting a
+  // tournament in production never silently erases real ladder history). So
+  // the rated matches recordResult wrote (and their rating_history rows,
+  // which reference matches with no cascade either) survive the tournament
+  // delete, orphaned with tournament_match_id set to null, still referencing
+  // the test players -- which then blocks deleteUser the same way a
+  // surviving tournament would. Delete them explicitly, first.
   for (const name of tournamentNames) {
+    const { data: tournaments } = await service.from("tournaments").select("id").eq("name", name);
+    for (const t of tournaments ?? []) {
+      const { data: tMatches } = await service
+        .from("tournament_matches")
+        .select("id")
+        .eq("tournament_id", t.id as string);
+      const tMatchIds = (tMatches ?? []).map((m) => m.id as string);
+      if (tMatchIds.length > 0) {
+        const { data: rated } = await service
+          .from("matches")
+          .select("id")
+          .in("tournament_match_id", tMatchIds);
+        const ratedIds = (rated ?? []).map((m) => m.id as string);
+        if (ratedIds.length > 0) {
+          await service.from("rating_history").delete().in("match_id", ratedIds);
+          await service.from("matches").delete().in("id", ratedIds);
+        }
+      }
+    }
     await service.from("tournaments").delete().eq("name", name);
   }
   for (const id of userIds) {

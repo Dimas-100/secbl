@@ -28,9 +28,13 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
   return (
-    <div
+    // A real heading, not a div: card titles are the document outline on
+    // every page in this app, and a div gives screen readers nothing.
+    // Tailwind's preflight resets heading margins and sizing, so this is
+    // visually identical to the div it replaces.
+    <h3
       data-slot="card-title"
       className={cn("leading-none font-semibold", className)}
       {...props}
