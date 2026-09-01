@@ -11,6 +11,13 @@ export interface RecomputePayload {
   p_standings: ReplayStanding[];
   p_history: ReplayHistoryRow[];
   p_deltas: ReplayDelta[];
+  /**
+   * How many confirmed matches existed when this payload was built. The SQL
+   * functions re-check it after taking the rating lock and refuse to write if
+   * it has changed, because the SELECT above happens before that lock: without
+   * this, a match confirmed in between is silently erased from the ladder.
+   */
+  p_expected_confirmed: number;
 }
 
 // Builds the arguments for apply_rating_recompute by replaying every confirmed
@@ -35,7 +42,9 @@ export async function buildRecomputePayload(
     .select("id");
   if (profilesError) throw new Error(profilesError.message);
 
-  const history = ((rows ?? []) as ReplayMatch[])
+  const confirmed = (rows ?? []) as ReplayMatch[];
+
+  const history = confirmed
     .filter((m) => m.id !== excludeMatchId)
     .concat(extra);
 
@@ -43,5 +52,10 @@ export async function buildRecomputePayload(
     history,
     (profiles ?? []).map((p) => p.id as string)
   );
-  return { p_standings: standings, p_history: rows2, p_deltas: deltas };
+  return {
+    p_standings: standings,
+    p_history: rows2,
+    p_deltas: deltas,
+    p_expected_confirmed: confirmed.length,
+  };
 }
