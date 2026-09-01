@@ -89,8 +89,13 @@ export function generateSingleElim(
   }
 
   // Resolve byes now: a round-one match with one player has nobody to play.
-  // Byes cannot reach round two on both sides of a match, because the field is
-  // always more than half the bracket, so no cascade beyond this pass exists.
+  // One pass is enough because no round-one match can be a DOUBLE bye: size is
+  // the smallest power of two >= n, so n > size/2, and every round-one match
+  // pairs a seed from the always-real top half {1..size/2} with one from the
+  // bottom half. Note two byes CAN feed the same round-two match (n=5 does
+  // exactly that) -- that is fine, the result is an ordinary two-player match.
+  // This guarantee is specific to a full first round; a losers bracket would
+  // need its own argument.
   for (const match of matches.filter((m) => m.round === 1)) {
     const solo =
       match.player1_id !== null && match.player2_id === null

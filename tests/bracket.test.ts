@@ -112,6 +112,30 @@ describe("generateSingleElim", () => {
     }
   );
 
+  it.each([8, 16, 32])(
+    "keeps the top four seeds in the halves standard seeding requires (%i players)",
+    (size) => {
+      const matches = generateSingleElim(players(size), idFactory());
+      const roundOne = matches
+        .filter((m) => m.round === 1)
+        .sort((a, b) => a.position - b.position);
+      // Which half of the draw a seed sits in: the first half of the round-one
+      // matches feed one semi-final, the second half feed the other.
+      const half = (seed: number) => {
+        const id = `p${seed}`;
+        const index = roundOne.findIndex(
+          (m) => m.player1_id === id || m.player2_id === id
+        );
+        return index < roundOne.length / 2 ? 0 : 1;
+      };
+      // The whole point of seeding: 1 and 2 cannot meet before the final.
+      expect(half(1)).not.toBe(half(2));
+      // And 4 is drawn into 1's half, 3 into 2's, so the semis are 1v4 and 2v3.
+      expect(half(4)).toBe(half(1));
+      expect(half(3)).toBe(half(2));
+    }
+  );
+
   it("rejects a field smaller than three", () => {
     expect(() => generateSingleElim(players(2), idFactory())).toThrow();
   });
