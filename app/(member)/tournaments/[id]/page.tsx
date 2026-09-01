@@ -62,7 +62,7 @@ export default async function TournamentPage({
     seedOf.set(e.profile_id as string, e.seed as number);
   }
   const label = (playerId: string | null) =>
-    playerId ? `${nameOf.get(playerId) ?? "Unknown"} (${seedOf.get(playerId)})` : "TBD";
+    playerId ? `${nameOf.get(playerId) ?? "Unknown"} (${seedOf.get(playerId) ?? "?"})` : "TBD";
 
   const matches = (rows ?? []) as MatchRow[];
   const rounds = bracketRounds(matches);
