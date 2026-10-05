@@ -8,6 +8,8 @@ import { SectionLabel } from "@/components/section-label";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
+import { formStrip, winnerDelta } from "@/lib/form";
+import { cn } from "@/lib/utils";
 import type { RsvpResponse } from "@/lib/types";
 
 export default async function HomePage({
@@ -52,11 +54,29 @@ export default async function HomePage({
   const { data: recent } = await supabase
     .from("matches")
     .select(
-      "id, reporter_score, opponent_score, played_at, winner_id, reporter:profiles!matches_reporter_id_fkey(id, display_name), opponent:profiles!matches_opponent_id_fkey(id, display_name)"
+      "id, reporter_id, reporter_score, opponent_score, played_at, winner_id, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name), opponent:profiles!matches_opponent_id_fkey(id, display_name)"
     )
     .eq("status", "confirmed")
     .order("confirmed_at", { ascending: false })
     .limit(10);
+
+  // Last five results, newest first, for the form strip in the hero.
+  const { data: myRecent } = await supabase
+    .from("matches")
+    .select("id, winner_id")
+    .eq("status", "confirmed")
+    .or(`reporter_id.eq.${user.id},opponent_id.eq.${user.id}`)
+    .order("confirmed_at", { ascending: false })
+    .limit(5);
+  const form = formStrip(myRecent ?? [], user.id);
+
+  // Reports you filed that are still waiting on the other player.
+  const { data: awaiting } = await supabase
+    .from("matches")
+    .select("id, opponent:profiles!matches_opponent_id_fkey(display_name)")
+    .eq("reporter_id", user.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
 
   const nowIso = new Date().toISOString();
   // Bound the fetch, but let partitionEvents make the actual upcoming/past
@@ -94,6 +114,29 @@ export default async function HomePage({
             </div>
           </div>
         </div>
+        {form.length > 0 && (
+          <div
+            className="mt-3 flex items-center gap-2"
+            aria-label={`Recent form: ${form.map((f) => (f.won ? "win" : "loss")).join(", ")}`}
+          >
+            <span className="text-[10px] font-bold tracking-[0.12em] text-white/60 uppercase">
+              Form
+            </span>
+            <span className="flex gap-1">
+              {form.map((f) => (
+                <span
+                  key={f.id}
+                  className={cn(
+                    "stat-number flex size-6 items-center justify-center rounded-full text-[11px]",
+                    f.won ? "bg-gold text-gold-foreground" : "bg-white/15 text-white/70"
+                  )}
+                >
+                  {f.won ? "W" : "L"}
+                </span>
+              ))}
+            </span>
+          </div>
+        )}
       </HeroBand>
 
       <div className="-mt-3 flex flex-col gap-4">
@@ -169,6 +212,25 @@ export default async function HomePage({
           </Card>
         )}
 
+        {(awaiting ?? []).length > 0 && (
+          <Card>
+            <CardHeader>
+              <SectionLabel>Waiting on confirmation</SectionLabel>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1 text-sm">
+              {(awaiting ?? []).map((m) => {
+                const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
+                return (
+                  <p key={m.id} className="text-muted-foreground">
+                    <span className="text-foreground font-semibold">{opponent?.display_name}</span>{" "}
+                    hasn&apos;t confirmed your report yet.
+                  </p>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <SectionLabel>Recent matches</SectionLabel>
@@ -187,6 +249,7 @@ export default async function HomePage({
               const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
               const winner = m.winner_id === reporter?.id ? reporter : opponent;
               const loser = m.winner_id === reporter?.id ? opponent : reporter;
+              const delta = winnerDelta(m);
               return (
                 <div key={m.id} className="flex items-baseline justify-between gap-2">
                   <span className="min-w-0 truncate">
@@ -194,9 +257,14 @@ export default async function HomePage({
                     {loser?.display_name}{" "}
                     <span className="text-muted-foreground text-xs">({m.played_at})</span>
                   </span>
-                  <span className="stat-number shrink-0">
-                    {Math.max(m.reporter_score, m.opponent_score)}–
-                    {Math.min(m.reporter_score, m.opponent_score)}
+                  <span className="flex shrink-0 items-baseline gap-2">
+                    {delta !== null && (
+                      <span className="stat-number text-primary text-xs">+{delta}</span>
+                    )}
+                    <span className="stat-number">
+                      {Math.max(m.reporter_score, m.opponent_score)}–
+                      {Math.min(m.reporter_score, m.opponent_score)}
+                    </span>
                   </span>
                 </div>
               );

@@ -15,15 +15,16 @@ export async function startDm(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Errors travel as fixed codes the page maps to copy — never as free text
+  // in the URL, which anyone could craft into a convincing fake notice.
   const otherId = String(formData.get("profile_id") ?? "");
-  if (!UUID_RE.test(otherId)) {
-    redirect(`/chat?error=${encodeURIComponent("Pick a member to message.")}`);
-  }
+  if (!UUID_RE.test(otherId)) redirect("/chat?error=pick");
   const { data, error } = await supabase.rpc("get_or_create_dm", { p_other_id: otherId });
   if (error || !data) {
-    redirect(
-      `/chat?error=${encodeURIComponent(error?.message ?? "Could not start that conversation.")}`
-    );
+    const code = /not available|pick someone else/i.test(error?.message ?? "")
+      ? "unavailable"
+      : "failed";
+    redirect(`/chat?error=${code}`);
   }
   redirect(`/chat/${data}`);
 }

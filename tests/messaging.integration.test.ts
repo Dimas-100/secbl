@@ -78,10 +78,16 @@ describe.skipIf(!url || !anonKey || !serviceKey)("messaging", () => {
     for (const id of all) await admin.auth.admin.deleteUser(id);
   });
 
+  // One session per user for the whole file: Supabase Auth rate-limits
+  // password sign-ins, and a fresh login per assertion trips it.
+  const sessions = new Map<string, ReturnType<typeof createClient>>();
   async function signIn(email: string) {
-    const client = createClient(url!, anonKey!);
+    const cached = sessions.get(email);
+    if (cached) return cached;
+    const client = createClient(url!, anonKey!, { auth: { persistSession: false } });
     const { error } = await client.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    sessions.set(email, client);
     return client;
   }
 

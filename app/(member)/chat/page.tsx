@@ -22,6 +22,12 @@ function stamp(iso: string, now: Date): string {
   });
 }
 
+const ERRORS: Record<string, string> = {
+  pick: "Pick a member to message.",
+  unavailable: "That member can't be messaged right now.",
+  failed: "Couldn't start that conversation. Try again.",
+};
+
 function RoomAvatar({ row }: { row: InboxRow }) {
   if (row.type === "everyone") {
     return (
@@ -84,8 +90,8 @@ export default async function ChatPage({
       </HeroBand>
 
       <div className="-mt-3 flex flex-col gap-4">
-        {error && (
-          <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+        {error && ERRORS[error] && (
+          <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{ERRORS[error]}</p>
         )}
         <Card className="py-2">
           <CardContent className="divide-border/60 flex flex-col divide-y px-3">
