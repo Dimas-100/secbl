@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Messaging RLS and function behaviour, executed against the real project
@@ -80,8 +80,8 @@ describe.skipIf(!url || !anonKey || !serviceKey)("messaging", () => {
 
   // One session per user for the whole file: Supabase Auth rate-limits
   // password sign-ins, and a fresh login per assertion trips it.
-  const sessions = new Map<string, ReturnType<typeof createClient>>();
-  async function signIn(email: string) {
+  const sessions = new Map<string, SupabaseClient>();
+  async function signIn(email: string): Promise<SupabaseClient> {
     const cached = sessions.get(email);
     if (cached) return cached;
     const client = createClient(url!, anonKey!, { auth: { persistSession: false } });
