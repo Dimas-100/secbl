@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { HeroBand } from "@/components/hero-band";
 import { SectionLabel } from "@/components/section-label";
 import { createClient } from "@/lib/supabase/server";
+import { SubmitButton } from "@/components/submit-button";
+import { startDm } from "@/app/(member)/chat/actions";
 
 export default async function PlayerPage({
   params,
@@ -13,6 +15,9 @@ export default async function PlayerPage({
   const { id } = await params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -57,6 +62,14 @@ export default async function PlayerPage({
             {profile.matches_played} matches
             {profile.matches_played < 10 && " · provisional"}
           </span>
+          {user && user.id !== profile.id && (
+            <form action={startDm} className="ml-auto">
+              <input type="hidden" name="profile_id" value={profile.id} />
+              <SubmitButton size="sm" variant="hero" pendingChildren="Opening…">
+                Message
+              </SubmitButton>
+            </form>
+          )}
         </div>
       </HeroBand>
 

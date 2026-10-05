@@ -87,6 +87,11 @@ export async function cleanupTracked() {
     }
     await service.from("tournaments").delete().eq("name", name);
   }
+  // Messages and memberships cascade from the user, but a DM channel does
+  // not (it belongs to the pair), so it would survive as an empty room.
+  for (const id of userIds) {
+    await service.from("channels").delete().eq("type", "dm").like("dm_key", `%${id}%`);
+  }
   for (const id of userIds) {
     await service.auth.admin.deleteUser(id);
   }

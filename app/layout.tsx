@@ -25,6 +25,9 @@ export const viewport: Viewport = {
   // bottom padding uses env(safe-area-inset-bottom), which only reports
   // non-zero when the viewport covers the inset.
   viewportFit: "cover",
+  // Android Chrome: shrink the layout viewport for the keyboard so the chat
+  // composer stays visible above it (iOS is handled via visualViewport).
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
