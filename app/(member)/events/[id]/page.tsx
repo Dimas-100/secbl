@@ -6,7 +6,7 @@ import { HeroBand } from "@/components/hero-band";
 import { SectionLabel } from "@/components/section-label";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
-import { formatEventWhen, tallyRsvps } from "@/lib/events";
+import { formatEventWhen, isEventOver, tallyRsvps } from "@/lib/events";
 import type { RsvpResponse } from "@/lib/types";
 import { setRsvp } from "@/app/(member)/events/actions";
 
@@ -68,8 +68,9 @@ export default async function EventPage({
 
   const attendees = (rsvps ?? []) as AttendeeRow[];
   const tally = tallyRsvps(attendees, user.id);
-  const isOver = new Date(event.ends_at ?? event.starts_at).getTime() < Date.now();
-  const locked = event.status === "cancelled" || isOver;
+  // new Date() rather than Date.now(): same instant, but the React compiler's
+  // purity lint flags Date.now in render, and this is how the home page does it.
+  const locked = event.status === "cancelled" || isEventOver(event, new Date());
 
   return (
     <main>

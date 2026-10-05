@@ -118,6 +118,14 @@ export interface EventLike {
   ends_at: string | null;
 }
 
+// An event is over once it ends (or, with no end time, once it starts). The
+// single definition both the calendar partition and the RSVP lock use, so the
+// event page can never lock RSVPs while the calendar still lists it upcoming.
+export function isEventOver(event: EventLike, now: Date): boolean {
+  const endsAt = new Date(event.ends_at ?? event.starts_at);
+  return endsAt.getTime() < now.getTime();
+}
+
 // An event stays "upcoming" until it ends, so an in-progress club night does
 // not drop into the past list halfway through.
 export function partitionEvents<T extends EventLike>(
@@ -127,9 +135,8 @@ export function partitionEvents<T extends EventLike>(
   const upcoming: T[] = [];
   const past: T[] = [];
   for (const event of events) {
-    const endsAt = new Date(event.ends_at ?? event.starts_at);
-    if (endsAt.getTime() >= now.getTime()) upcoming.push(event);
-    else past.push(event);
+    if (isEventOver(event, now)) past.push(event);
+    else upcoming.push(event);
   }
   const startTime = (e: T) => new Date(e.starts_at).getTime();
   upcoming.sort((a, b) => startTime(a) - startTime(b));

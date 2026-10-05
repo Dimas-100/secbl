@@ -4,7 +4,6 @@ import {
   bracketRounds,
   bracketSize,
   generateSingleElim,
-  type GeneratedMatch,
 } from "@/lib/bracket";
 
 // Deterministic ids so assertions are readable.

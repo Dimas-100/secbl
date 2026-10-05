@@ -5,6 +5,7 @@ import {
   CLUB_TIMEZONE,
   clubTimeToISO,
   formatEventWhen,
+  isEventOver,
   isoToClubTime,
   partitionEvents,
   tallyRsvps,
@@ -116,6 +117,27 @@ describe("partitionEvents", () => {
   it("treats a start-only event as past once its start has passed", () => {
     const started = [{ id: "started", starts_at: "2026-09-05T10:00:00Z", ends_at: null }];
     expect(partitionEvents(started, now).past.map((e) => e.id)).toEqual(["started"]);
+  });
+});
+
+describe("isEventOver", () => {
+  const now = new Date("2026-09-05T12:00:00Z");
+
+  it("is over once a start-only event has started", () => {
+    expect(isEventOver({ starts_at: "2026-09-05T10:00:00Z", ends_at: null }, now)).toBe(true);
+    expect(isEventOver({ starts_at: "2026-09-05T13:00:00Z", ends_at: null }, now)).toBe(false);
+  });
+
+  it("stays open until the end time when one is set", () => {
+    const running = { starts_at: "2026-09-05T10:00:00Z", ends_at: "2026-09-05T14:00:00Z" };
+    expect(isEventOver(running, now)).toBe(false);
+    expect(isEventOver(running, new Date("2026-09-05T14:00:01Z"))).toBe(true);
+  });
+
+  it("agrees with partitionEvents at the boundary", () => {
+    const atEnd = { id: "x", starts_at: "2026-09-05T10:00:00Z", ends_at: "2026-09-05T12:00:00Z" };
+    expect(isEventOver(atEnd, now)).toBe(false);
+    expect(partitionEvents([atEnd], now).upcoming).toHaveLength(1);
   });
 });
 
