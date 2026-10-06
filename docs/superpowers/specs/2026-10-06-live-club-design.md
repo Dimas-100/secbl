@@ -1,7 +1,7 @@
 # SECBL Live Club — chat recency, push notifications, app framing, title badges, school logos, show-more, races & spots, live scoreboard
 
 **Date:** 2026-10-06
-**Status:** Draft — written autonomously from the owner's goal statement; every call made on their behalf is in §0.
+**Status:** Implemented 2026-10-06 (plan: `docs/superpowers/plans/2026-10-06-live-club.md`). Written autonomously from the owner's goal statement; every call made on their behalf is in §0. Two deviations during the build: school logos sit on a white disc (not a transparent ground), and the suggested spot rounds the weaker player's games *up* (smaller spots).
 **Builds on:** `2026-10-06-elevated-dark-redesign-design.md` (tokens, components), `2026-10-06-levels-xp-design.md` (titles, XP), `2026-10-05-messaging-design.md` (channels, Realtime).
 
 ## 0. The ask, and the calls made
