@@ -1,6 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { clubWeekOf } from "@/lib/events";
+import { fetchAllPages } from "@/lib/paging";
 import { levelFromXp, xpFromMatches, type LevelInfo, type XpMatch, type XpResult } from "@/lib/levels";
+
+interface MatchScanRow {
+  id: string;
+  reporter_id: string;
+  opponent_id: string;
+  winner_id: string;
+  status: string;
+  confirmed_at: string | null;
+  tournament_match_id: string | null;
+}
 
 // One loader for every surface that shows a level, so Home, Profile and the
 // ladder can never disagree. Reads only; nothing is stored.
@@ -8,16 +19,20 @@ export async function loadXp(
   supabase: SupabaseClient,
   memberId: string
 ): Promise<{ xp: XpResult; level: LevelInfo }> {
-  const [{ data: rows }, { data: finals }] = await Promise.all([
-    supabase
-      .from("matches")
-      .select("id, reporter_id, opponent_id, winner_id, status, confirmed_at, tournament_match_id")
-      .eq("status", "confirmed")
-      .or(`reporter_id.eq.${memberId},opponent_id.eq.${memberId}`)
-      .order("confirmed_at", { ascending: true })
-      // PostgREST's default max rows (1000) would silently truncate a long
-      // career; a member cannot plausibly pass this bound.
-      .range(0, 4999),
+  const [rows, { data: finals }] = await Promise.all([
+    // PostgREST caps every response at db-max-rows (1000) whatever range is
+    // asked for, so the scan pages (lib/paging.ts).
+    fetchAllPages<MatchScanRow>((from, to) =>
+      supabase
+        .from("matches")
+        .select("id, reporter_id, opponent_id, winner_id, status, confirmed_at, tournament_match_id")
+        .eq("status", "confirmed")
+        .or(`reporter_id.eq.${memberId},opponent_id.eq.${memberId}`)
+        .order("confirmed_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+        .then(({ data }) => (data ?? []) as MatchScanRow[])
+    ),
     // Finals: the match whose winner advances nowhere, in a finished cup.
     supabase
       .from("tournament_matches")
@@ -27,7 +42,7 @@ export async function loadXp(
       .eq("tournaments.status", "complete"),
   ]);
   const finalIds = new Set((finals ?? []).map((f) => f.id as string));
-  const matches: XpMatch[] = (rows ?? []).map((r) => ({
+  const matches: XpMatch[] = rows.map((r) => ({
     id: r.id,
     reporter_id: r.reporter_id,
     opponent_id: r.opponent_id,
@@ -44,13 +59,17 @@ export async function loadXp(
 // once (the leaderboard). Same inputs as loadXp, grouped per player, so the
 // badge beside a name can never disagree with that player's profile.
 export async function loadAllLevels(supabase: SupabaseClient): Promise<Map<string, LevelInfo>> {
-  const [{ data: rows }, { data: finals }] = await Promise.all([
-    supabase
-      .from("matches")
-      .select("id, reporter_id, opponent_id, winner_id, status, confirmed_at, tournament_match_id")
-      .eq("status", "confirmed")
-      .order("confirmed_at", { ascending: true })
-      .range(0, 19999),
+  const [rows, { data: finals }] = await Promise.all([
+    fetchAllPages<MatchScanRow>((from, to) =>
+      supabase
+        .from("matches")
+        .select("id, reporter_id, opponent_id, winner_id, status, confirmed_at, tournament_match_id")
+        .eq("status", "confirmed")
+        .order("confirmed_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+        .then(({ data }) => (data ?? []) as MatchScanRow[])
+    ),
     supabase
       .from("tournament_matches")
       .select("id, winner_id, tournaments!inner(status)")
@@ -60,7 +79,7 @@ export async function loadAllLevels(supabase: SupabaseClient): Promise<Map<strin
   ]);
   const finalIds = new Set((finals ?? []).map((f) => f.id as string));
   const byPlayer = new Map<string, XpMatch[]>();
-  for (const r of rows ?? []) {
+  for (const r of rows) {
     const m: XpMatch = {
       id: r.id,
       reporter_id: r.reporter_id,

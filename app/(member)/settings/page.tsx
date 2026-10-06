@@ -10,9 +10,9 @@ import { SectionLabel } from "@/components/section-label";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/server";
-import { logout } from "@/app/(public)/login/actions";
 import { updateDisplayName } from "./actions";
 import { LookEditor } from "./look-editor";
+import { LogoutButton } from "./logout-button";
 import { NotificationsCard } from "./notifications-card";
 
 export default async function SettingsPage({
@@ -163,11 +163,7 @@ export default async function SettingsPage({
       </Card>
 
       {/* Moved out of the header when it slimmed down to the avatar chip. */}
-      <form action={logout}>
-        <Button variant="ghost" className="text-destructive w-full">
-          Log out
-        </Button>
-      </form>
+      <LogoutButton />
       </div>
     </main>
   );

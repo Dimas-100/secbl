@@ -50,15 +50,18 @@ function flatten(body: string): string {
   return flat.length <= BODY_MAX ? flat : flat.slice(0, BODY_MAX);
 }
 
-// Missing prefs = everything on. The actor never hears about their own action.
+// Missing prefs = everything on. The actor never hears about their own
+// action, and a member who is no longer approved (suspended, say) hears
+// nothing at all — their room memberships may still exist.
 export function recipientsFor(
-  candidates: { profile_id: string; prefs: Prefs | null }[],
+  candidates: { profile_id: string; prefs: Prefs | null; approved?: boolean }[],
   category: PushCategory,
   excludeId: string | null
 ): string[] {
   const out: string[] = [];
   for (const c of candidates) {
     if (c.profile_id === excludeId) continue;
+    if (c.approved === false) continue;
     if (c.prefs && !c.prefs[category]) continue;
     if (!out.includes(c.profile_id)) out.push(c.profile_id);
   }

@@ -67,6 +67,9 @@ database from pausing after a quiet week.
   wire) is already inside the receiver's score, so `winner_id` is always the
   higher score. `race_to` null means open play, including every row written
   before migration 0020. Spots never change rating or XP.
+- PostgREST caps every response at the project's Max Rows (1000) whatever
+  `.range()` asks for. Whole-table scans (`lib/xp-data.ts`) page through
+  `lib/paging.ts`; `lib/recompute.ts` guards against truncation.
 - Push notifications are a courtesy, never part of the write: every trigger
   runs after the row is saved and swallows its own failures. A message's push
   is claimed by stamping `messages.notified_at` first, so it can only fire once.

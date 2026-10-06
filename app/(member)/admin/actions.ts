@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { confirmPendingMatch } from "@/lib/confirm-match";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { validateResult } from "@/lib/race";
 import { assertPublicFeedUrl, syncAllSources } from "@/lib/sync-sources";
 
 async function setStatus(formData: FormData, status: "approved" | "rejected") {
@@ -95,6 +96,24 @@ export async function adminResolveMatch(formData: FormData) {
     opponentScore < 0
   ) {
     redirect(`/admin?error=${encodeURIComponent("Invalid resolution.")}`);
+  }
+  // The winner must be the higher score, and a race keeps its format: the
+  // same rule the reporter was held to, so the DB's check constraints never
+  // surface as a raw error here.
+  if ((winnerId === match.reporter_id) !== reporterScore > opponentScore) {
+    redirect(`/admin?error=${encodeURIComponent("The winner must have the higher score.")}`);
+  }
+  const problem = validateResult({
+    reporterId: match.reporter_id,
+    opponentId: match.opponent_id,
+    reporterScore,
+    opponentScore,
+    raceTo: match.race_to,
+    spot: match.spot,
+    spotTo: match.spot_to,
+  });
+  if (problem) {
+    redirect(`/admin?error=${encodeURIComponent(`${problem}.`)}`);
   }
   const { data: updated, error } = await service
     .from("matches")

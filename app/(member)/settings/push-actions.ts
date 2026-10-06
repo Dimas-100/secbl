@@ -2,7 +2,7 @@
 
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { isKnownPushEndpoint, type Prefs } from "@/lib/push";
-import { sendPush } from "@/lib/push-send";
+import { reownSubscription, sendPush } from "@/lib/push-send";
 
 // The member's own push rows, through their own client so RLS applies.
 
@@ -28,18 +28,23 @@ export async function savePushSubscription(
   if (!sub?.endpoint || !isKnownPushEndpoint(sub.endpoint) || !sub.keys?.p256dh || !sub.keys?.auth) {
     return { error: "That subscription is not valid." };
   }
-  const { error } = await supabase.from("push_subscriptions").upsert(
-    {
-      profile_id: user.id,
-      endpoint: sub.endpoint,
-      p256dh: sub.keys.p256dh,
-      auth: sub.keys.auth,
-      user_agent: userAgent?.slice(0, 200) ?? null,
-      last_seen_at: new Date().toISOString(),
-    },
-    { onConflict: "endpoint" }
-  );
-  return { error: error?.message ?? null };
+  // Service role on purpose: on a shared device the endpoint may still be
+  // registered to whoever logged in before, and only the server may take it
+  // from them. The caller is authenticated and holds the endpoint.
+  const { data: profile } = await supabase.from("profiles").select("status").eq("id", user.id).single();
+  if (profile?.status !== "approved") return { error: "Your account isn't approved yet." };
+  const result = await reownSubscription(createServiceClient(), user.id, {
+    endpoint: sub.endpoint,
+    p256dh: sub.keys.p256dh,
+    auth: sub.keys.auth,
+    user_agent: userAgent?.slice(0, 200) ?? null,
+  });
+  return { error: result.error ? friendly(result.error) : null };
+}
+
+function friendly(message: string): string {
+  if (/row-level security|policy/i.test(message)) return "Notifications aren't available for this account.";
+  return "Couldn't save that on the server. Try again.";
 }
 
 export async function removePushSubscription(endpoint: string): Promise<{ error: string | null }> {

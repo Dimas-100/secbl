@@ -63,19 +63,27 @@ export async function sendPush(service: SupabaseClient, profileIds: string[], pa
   if (dead.length > 0) await service.from("push_subscriptions").delete().in("id", dead);
 }
 
+// Prefs plus approval for each candidate. Suspension flips profiles.status
+// but leaves room memberships in place, so approval is checked here, at the
+// one choke point every trigger goes through.
 export async function loadPrefs(
   service: SupabaseClient,
   ids: string[]
-): Promise<{ profile_id: string; prefs: Prefs | null }[]> {
+): Promise<{ profile_id: string; prefs: Prefs | null; approved: boolean }[]> {
   if (ids.length === 0) return [];
-  const { data } = await service
-    .from("notification_prefs")
-    .select("profile_id, messages, matches, events")
-    .in("profile_id", ids);
-  const byId = new Map((data ?? []).map((p) => [p.profile_id as string, p as Prefs & { profile_id: string }]));
+  const [{ data: prefRows }, { data: approvedRows }] = await Promise.all([
+    service.from("notification_prefs").select("profile_id, messages, matches, events").in("profile_id", ids),
+    service.from("profiles").select("id").in("id", ids).eq("status", "approved"),
+  ]);
+  const byId = new Map((prefRows ?? []).map((p) => [p.profile_id as string, p as Prefs & { profile_id: string }]));
+  const approved = new Set((approvedRows ?? []).map((p) => p.id as string));
   return ids.map((id) => {
     const p = byId.get(id);
-    return { profile_id: id, prefs: p ? { messages: p.messages, matches: p.matches, events: p.events } : null };
+    return {
+      profile_id: id,
+      prefs: p ? { messages: p.messages, matches: p.matches, events: p.events } : null,
+      approved: approved.has(id),
+    };
   });
 }
 
@@ -91,4 +99,34 @@ export async function notify(
   } catch (err) {
     console.warn("push: notify failed", err);
   }
+}
+
+// A browser's push subscription belongs to the origin, not to an account, so
+// on a shared device the next person to log in inherits it. Possession of the
+// endpoint is the proof of ownership: whoever presents it now owns it, and
+// any other member's row for that endpoint is dropped so their messages stop
+// landing on this screen.
+export async function reownSubscription(
+  service: SupabaseClient,
+  profileId: string,
+  sub: { endpoint: string; p256dh: string; auth: string; user_agent: string | null }
+): Promise<{ error: string | null }> {
+  const { error: dropErr } = await service
+    .from("push_subscriptions")
+    .delete()
+    .eq("endpoint", sub.endpoint)
+    .neq("profile_id", profileId);
+  if (dropErr) return { error: dropErr.message };
+  const { error } = await service.from("push_subscriptions").upsert(
+    {
+      profile_id: profileId,
+      endpoint: sub.endpoint,
+      p256dh: sub.p256dh,
+      auth: sub.auth,
+      user_agent: sub.user_agent,
+      last_seen_at: new Date().toISOString(),
+    },
+    { onConflict: "endpoint" }
+  );
+  return { error: error?.message ?? null };
 }

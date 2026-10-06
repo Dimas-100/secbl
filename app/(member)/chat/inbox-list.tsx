@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Search, Users } from "lucide-react";
 import { Avatar } from "@/components/avatar";
@@ -34,6 +34,12 @@ export function InboxList({
   const [items, setItems] = useState<InboxItem[]>(rows);
   const [tab, setTab] = useState<InboxTab>("all");
   const [query, setQuery] = useState("");
+  // Read through a ref so the subscription effect does not re-run on every
+  // server render (the object identity changes each time).
+  const schoolsRef = useRef(schoolsById);
+  useEffect(() => {
+    schoolsRef.current = schoolsById;
+  }, [schoolsById]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -43,13 +49,16 @@ export function InboxList({
       clearTimeout(timer);
       timer = setTimeout(() => {
         supabase.rpc("list_my_channels").then(({ data }) => {
-          if (data) setItems(buildInboxItems(data as InboxRow[], { meId, now: new Date(), schoolsById }));
+          if (data) setItems(buildInboxItems(data as InboxRow[], { meId, now: new Date(), schoolsById: schoolsRef.current }));
         });
       }, 400);
     };
     // No filter on purpose: Realtime applies this subscriber's RLS, so only
-    // rooms you are a member of ever arrive.
-    const channel = supabase.channel("inbox");
+    // rooms you are a member of ever arrive. The topic is unique per mount:
+    // the client is a singleton and removeChannel is async, so a remount
+    // within one round trip would otherwise be handed the channel that is
+    // still being torn down.
+    const channel = supabase.channel(`inbox:${crypto.randomUUID()}`);
     let active = true;
     (async () => {
       const {
@@ -71,7 +80,7 @@ export function InboxList({
       document.removeEventListener("visibilitychange", onVisible);
       void supabase.removeChannel(channel);
     };
-  }, [meId, schoolsById]);
+  }, [meId]);
 
   const visible = filterInbox(items, tab, query) as InboxItem[];
   return (

@@ -23,6 +23,9 @@ describe("recipientsFor", () => {
     expect(recipientsFor(list, "matches", null)).toEqual(["a", "b"]);
     expect(recipientsFor(list, "events", null)).toEqual(["a", "b", "c"]);
   });
+  it("drops members who are no longer approved", () => {
+    expect(recipientsFor([c("a", null), { profile_id: "s", prefs: null, approved: false }], "messages", null)).toEqual(["a"]);
+  });
   it("never includes the actor, and dedupes", () => {
     expect(recipientsFor([c("a", null), c("me", null), c("a", null)], "events", "me")).toEqual(["a"]);
   });

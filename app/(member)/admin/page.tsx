@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SubmitButton } from "@/components/submit-button";
 import { SchoolLogoUploader } from "./school-logo-uploader";
 import { formatEventWhen } from "@/lib/events";
+import { formatLabel } from "@/lib/race";
 import {
   addEventSource,
   adminRejectMatch,
@@ -95,7 +96,7 @@ export default async function AdminPage({
   const { data: disputed } = await supabase
     .from("matches")
     .select(
-      "id, reporter_score, opponent_score, game_type, played_at, reporter:profiles!matches_reporter_id_fkey(id, display_name), opponent:profiles!matches_opponent_id_fkey(id, display_name)"
+      "id, reporter_score, opponent_score, game_type, played_at, race_to, spot, spot_to, reporter:profiles!matches_reporter_id_fkey(id, display_name), opponent:profiles!matches_opponent_id_fkey(id, display_name)"
     )
     .eq("status", "disputed")
     .order("created_at");
@@ -295,6 +296,14 @@ export default async function AdminPage({
                 <p className="text-sm">
                   {reporter?.display_name} reported {m.reporter_score}–{m.opponent_score} vs{" "}
                   {opponent?.display_name} ({m.game_type}, {m.played_at}) — rejected by opponent.
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {formatLabel(
+                    m.race_to,
+                    m.spot,
+                    m.spot_to === reporter?.id ? reporter?.display_name : m.spot_to === opponent?.id ? opponent?.display_name : null
+                  ) ?? "Open play"}
+                  {m.race_to && " — scores include the spot; the winner must reach the race."}
                 </p>
                 <form action={adminResolveMatch} className="flex flex-wrap items-end gap-3">
                   <input type="hidden" name="match_id" value={m.id} />

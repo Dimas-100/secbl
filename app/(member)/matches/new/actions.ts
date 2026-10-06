@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { GAME_LABEL } from "@/lib/identity";
 import { matchReportedPayload } from "@/lib/push";
 import { notify } from "@/lib/push-send";
-import { formatShort } from "@/lib/race";
+import { formatShort, validateResult } from "@/lib/race";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 function fail(message: string): never {
@@ -39,15 +39,16 @@ export async function reportMatch(formData: FormData) {
   const spotTo = rawSpotTo === "me" ? user.id : rawSpotTo === "them" ? opponentId : null;
   if (raceTo !== null && (!Number.isInteger(raceTo) || raceTo < 1 || raceTo > 25)) fail("Pick a race length");
   if (!Number.isInteger(spot) || spot < 0) fail("That spot doesn't fit the race");
-  if ((spot === 0) !== (spotTo === null)) fail("That spot doesn't fit the race");
-  if (raceTo !== null) {
-    if (spot >= raceTo) fail("That spot doesn't fit the race");
-    if (Math.max(myScore, theirScore) !== raceTo || Math.min(myScore, theirScore) >= raceTo) {
-      fail("That race isn't finished yet");
-    }
-  } else if (spot > 0) {
-    fail("A spot needs a race");
-  }
+  const problem = validateResult({
+    reporterId: user.id,
+    opponentId,
+    reporterScore: myScore,
+    opponentScore: theirScore,
+    raceTo,
+    spot,
+    spotTo,
+  });
+  if (problem) fail(problem);
 
   const gameType = String(formData.get("game_type") ?? "8ball");
   const { data: created, error } = await supabase

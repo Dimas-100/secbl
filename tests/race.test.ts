@@ -11,6 +11,7 @@ import {
   raceSubmitState,
   startingScores,
   suggestedSpot,
+  validateResult,
   type RaceState,
 } from "@/lib/race";
 
@@ -104,5 +105,21 @@ describe("copy", () => {
       reason: "Enter the score",
     });
     expect(raceSubmitState(st({ you: 3, them: 1, raceTo: null }), "Sam")).toMatchObject({ disabled: false });
+  });
+});
+
+describe("validateResult", () => {
+  const base = { reporterId: "r", opponentId: "o", reporterScore: 5, opponentScore: 3 };
+  it("accepts a finished race and open play, and names what is wrong otherwise", () => {
+    expect(validateResult({ ...base, raceTo: 5, spot: 0, spotTo: null })).toBeNull();
+    expect(validateResult({ ...base, raceTo: null, spot: 0, spotTo: null })).toBeNull();
+    expect(validateResult({ ...base, raceTo: 5, spot: 2, spotTo: "o" })).toBeNull();
+    expect(validateResult({ ...base, opponentScore: 5, raceTo: null, spot: 0, spotTo: null })).toBe("Scores can't be equal");
+    expect(validateResult({ ...base, reporterScore: 4, raceTo: 5, spot: 0, spotTo: null })).toBe("That race isn't finished yet — first to 5");
+    expect(validateResult({ ...base, opponentScore: 1, raceTo: 5, spot: 2, spotTo: "o" })).toBe("The spot receiver can't finish below their 2-game spot");
+    expect(validateResult({ ...base, raceTo: 5, spot: 5, spotTo: "o" })).toBe("That spot doesn't fit the race");
+    expect(validateResult({ ...base, raceTo: 5, spot: 1, spotTo: null })).toBe("That spot doesn't fit the race");
+    expect(validateResult({ ...base, raceTo: 5, spot: 1, spotTo: "x" })).toBe("That spot doesn't fit the race");
+    expect(validateResult({ ...base, raceTo: null, spot: 1, spotTo: "o" })).toBe("A spot needs a race");
   });
 });

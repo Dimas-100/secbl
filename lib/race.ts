@@ -91,6 +91,36 @@ export function needLine(s: RaceState, theirFirstName: string): string {
   return `You need ${s.raceTo - s.you} · ${theirFirstName} needs ${s.raceTo - s.them}`;
 }
 
+// The one server-side rule for a submitted result, shared by match reporting
+// and admin dispute resolution so the two can never disagree with the DB's
+// check constraints. Null when the result is sound; otherwise a sentence the
+// person can act on. Scores include the spot.
+export function validateResult(r: {
+  reporterId: string;
+  opponentId: string;
+  reporterScore: number;
+  opponentScore: number;
+  raceTo: number | null;
+  spot: number;
+  spotTo: string | null;
+}): string | null {
+  if (r.reporterScore === r.opponentScore) return "Scores can't be equal";
+  if ((r.spot === 0) !== (r.spotTo === null)) return "That spot doesn't fit the race";
+  if (r.spotTo !== null && r.spotTo !== r.reporterId && r.spotTo !== r.opponentId) {
+    return "That spot doesn't fit the race";
+  }
+  if (r.raceTo === null) return r.spot > 0 ? "A spot needs a race" : null;
+  if (r.spot >= r.raceTo) return "That spot doesn't fit the race";
+  const hi = Math.max(r.reporterScore, r.opponentScore);
+  const lo = Math.min(r.reporterScore, r.opponentScore);
+  if (hi !== r.raceTo || lo >= r.raceTo) return `That race isn't finished yet — first to ${r.raceTo}`;
+  const receiverScore = r.spotTo === r.reporterId ? r.reporterScore : r.spotTo === r.opponentId ? r.opponentScore : null;
+  if (receiverScore !== null && receiverScore < r.spot) {
+    return `The spot receiver can't finish below their ${r.spot}-game spot`;
+  }
+  return null;
+}
+
 export function raceSubmitState(
   s: RaceState,
   opponentName: string | null
