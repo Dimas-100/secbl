@@ -51,7 +51,7 @@ database from pausing after a quiet week.
 |---|---|
 | `app/(public)` | login, signup, password reset |
 | `app/(member)` | everything behind approval: home, log a game, events (+ cups), leaderboard, players, chat, settings, admin |
-| `lib/rating.ts`, `lib/bracket.ts`, `lib/events.ts`, `lib/chat.ts`, `lib/report-form.ts` | pure, test-first logic |
+| `lib/rating.ts`, `lib/bracket.ts`, `lib/events.ts`, `lib/chat.ts`, `lib/report-form.ts`, `lib/levels.ts` | pure, test-first logic |
 | `supabase/migrations` | schema, RLS, SECURITY DEFINER functions (the only write path for ratings, brackets, membership) |
 | `docs/superpowers/specs` | design specs per phase; `plans/` the implementation plans |
 

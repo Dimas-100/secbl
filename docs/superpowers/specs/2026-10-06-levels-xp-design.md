@@ -1,7 +1,7 @@
 # SECBL Levels & XP — the achievement ladder
 
 **Date:** 2026-10-06
-**Status:** Approved direction (owner), not started. Build after or alongside `2026-10-06-elevated-dark-redesign-design.md`; independent of it.
+**Status:** Implemented 2026-10-06 (plan: `docs/superpowers/plans/2026-10-06-levels-xp.md`). Build after or alongside `2026-10-06-elevated-dark-redesign-design.md`; independent of it.
 **Scope:** Pure logic + display. **No migration in v1.**
 
 ## 1. Two tracks, kept apart
