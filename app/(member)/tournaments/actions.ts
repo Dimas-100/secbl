@@ -43,44 +43,40 @@ export async function createTournament(formData: FormData) {
   redirect(`/tournaments/${data}/setup`);
 }
 
-export async function saveEntrants(formData: FormData) {
-  const { supabase } = await requireAdmin();
-  const tournamentId = String(formData.get("tournament_id") ?? "");
-  const profileIds = formData.getAll("profile_ids").map(String).filter(Boolean);
-  if (profileIds.length > MAX_PLAYERS) {
-    redirect(
-      `/tournaments/${tournamentId}/setup?error=${encodeURIComponent(
-        `At most ${MAX_PLAYERS} entrants.`
-      )}`
-    );
+// Seeds come from the order the admin set on the Setup screen: position in
+// the submitted list is the seed. The screen offers "by rating" and "random
+// draw" as starting points, but the admin's judgement is the final word —
+// with a club that all starts at the same rating, it has to be.
+async function persistEntrants(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>["supabase"],
+  tournamentId: string,
+  profileIds: string[]
+): Promise<string | null> {
+  const unique = [...new Set(profileIds)];
+  if (unique.length !== profileIds.length) return "A player is listed twice.";
+  if (unique.length > MAX_PLAYERS) return `At most ${MAX_PLAYERS} entrants.`;
+  if (unique.length > 0) {
+    const { data: found, error } = await supabase
+      .from("profiles")
+      .select("id")
+      .in("id", unique)
+      .eq("status", "approved");
+    if (error || !found || found.length !== unique.length) return "Could not read those players. Try again.";
   }
-  // Seed by rating, not by the order the checkboxes happened to submit in:
-  // the spec defines seeding as rating order, and deriving it here means a UI
-  // change cannot silently mis-seed a bracket.
-  const { data: chosen, error: chosenError } = await supabase
-    .from("profiles")
-    .select("id, rating")
-    .in("id", profileIds)
-    .order("rating", { ascending: false })
-    .order("id", { ascending: true });
-  if (chosenError || !chosen || chosen.length !== profileIds.length) {
-    redirect(
-      `/tournaments/${tournamentId}/setup?error=${encodeURIComponent(
-        "Could not read those players. Try again."
-      )}`
-    );
-  }
-  const entrants = chosen!.map((player, index) => ({
-    profile_id: player.id as string,
-    seed: index + 1,
-  }));
+  const entrants = unique.map((profile_id, index) => ({ profile_id, seed: index + 1 }));
   const { error } = await supabase.rpc("set_tournament_entrants", {
     p_tournament_id: tournamentId,
     p_entrants: entrants,
   });
-  if (error) {
-    redirect(`/tournaments/${tournamentId}/setup?error=${encodeURIComponent(error.message)}`);
-  }
+  return error ? error.message : null;
+}
+
+export async function saveEntrants(formData: FormData) {
+  const { supabase } = await requireAdmin();
+  const tournamentId = String(formData.get("tournament_id") ?? "");
+  const profileIds = formData.getAll("profile_ids").map(String).filter(Boolean);
+  const problem = await persistEntrants(supabase, tournamentId, profileIds);
+  if (problem) redirect(`/tournaments/${tournamentId}/setup?error=${encodeURIComponent(problem)}`);
   revalidatePath(`/tournaments/${tournamentId}/setup`);
   redirect(`/tournaments/${tournamentId}/setup?message=${encodeURIComponent("Entrants saved.")}`);
 }
@@ -88,6 +84,14 @@ export async function saveEntrants(formData: FormData) {
 export async function startTournament(formData: FormData) {
   const { supabase } = await requireAdmin();
   const tournamentId = String(formData.get("tournament_id") ?? "");
+
+  // Start submits the seed list as shown, so an unsaved reorder is never
+  // silently lost. A form without the list (older callers) starts what is saved.
+  if (formData.has("profile_ids")) {
+    const submitted = formData.getAll("profile_ids").map(String).filter(Boolean);
+    const problem = await persistEntrants(supabase, tournamentId, submitted);
+    if (problem) redirect(`/tournaments/${tournamentId}/setup?error=${encodeURIComponent(problem)}`);
+  }
 
   const { data: entrants, error: entrantsError } = await supabase
     .from("tournament_players")

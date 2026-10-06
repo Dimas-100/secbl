@@ -1,11 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
-import { SectionLabel } from "@/components/section-label";
 import { createClient } from "@/lib/supabase/server";
-import { saveEntrants, startTournament } from "@/app/(member)/tournaments/actions";
+import { EntrantsEditor, type Candidate } from "./entrants-editor";
 
 export default async function TournamentSetupPage({
   params,
@@ -42,17 +39,21 @@ export default async function TournamentSetupPage({
   }
   if (tournament.status !== "setup") redirect(`/tournaments/${id}`);
 
-  const { data: candidates } = await supabase
-    .from("profiles")
-    .select("id, display_name, rating, schools(short_name)")
-    .eq("status", "approved")
-    .order("rating", { ascending: false });
+  const [{ data: candidates }, { data: entrants }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, display_name, rating, schools(short_name)")
+      .eq("status", "approved")
+      .order("rating", { ascending: false })
+      .order("display_name"),
+    supabase.from("tournament_players").select("profile_id, seed").eq("tournament_id", id).order("seed"),
+  ]);
 
-  const { data: entrants } = await supabase
-    .from("tournament_players")
-    .select("profile_id")
-    .eq("tournament_id", id);
-  const chosen = new Set((entrants ?? []).map((e) => e.profile_id as string));
+  const options: Candidate[] = (candidates ?? []).map((c) => {
+    const school = Array.isArray(c.schools) ? c.schools[0] : c.schools;
+    return { id: c.id, display_name: c.display_name, rating: c.rating, school: school?.short_name ?? null };
+  });
+  const seeds = (entrants ?? []).map((e) => e.profile_id as string);
 
   return (
     <main>
@@ -62,57 +63,12 @@ export default async function TournamentSetupPage({
         trailing={<Badge variant="secondary">Setting up</Badge>}
       />
       <div className="mt-6 flex flex-col gap-6">
-      {message && (
-        <p className="bg-card rounded-2xl p-3 text-sm shadow-[inset_0_0_0_1px_var(--hairline-row)]">{message}</p>
-      )}
-      {error && (
-        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
-      )}
-
-      <form action={saveEntrants} className="flex flex-col gap-4">
-        <input type="hidden" name="tournament_id" value={id} />
-        <Card>
-          <CardHeader>
-            <SectionLabel>Entrants</SectionLabel>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            <p className="text-muted-foreground text-xs">
-              Listed strongest first. Seeds are assigned by rating when you save, so the
-              order here does not matter — save again if ratings change before you start.
-            </p>
-            {(candidates ?? []).map((c) => {
-              const school = Array.isArray(c.schools) ? c.schools[0] : c.schools;
-              return (
-                <label key={c.id} className="flex min-h-11 items-center gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    name="profile_ids"
-                    value={c.id}
-                    defaultChecked={chosen.has(c.id as string)}
-                    className="accent-primary size-5"
-                  />
-                  <span className="font-medium">{c.display_name}</span>
-                  <Badge variant="secondary">{school?.short_name}</Badge>
-                  <span className="text-muted-foreground">{c.rating}</span>
-                </label>
-              );
-            })}
-          </CardContent>
-        </Card>
-        <Button type="submit" size="lg" className="w-full">
-          Save entrants
-        </Button>
-      </form>
-
-      <form action={startTournament}>
-        <input type="hidden" name="tournament_id" value={id} />
-        <Button type="submit" size="xl" className="w-full">
-          Start tournament ({chosen.size} entrants)
-        </Button>
-        <p className="text-muted-foreground mt-2 text-xs">
-          Starting generates the whole bracket and locks the entrant list.
-        </p>
-      </form>
+        {message && (
+          <p className="bg-card rounded-2xl p-3 text-sm shadow-[inset_0_0_0_1px_var(--hairline-row)]">{message}</p>
+        )}
+        {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
+        {/* key: a save re-renders with the stored order; the editor restarts from it. */}
+        <EntrantsEditor key={seeds.join(",")} tournamentId={id} candidates={options} initialSeeds={seeds} />
       </div>
     </main>
   );
