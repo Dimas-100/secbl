@@ -38,7 +38,7 @@ test("members DM each other and replies arrive live", async ({ browser }) => {
       page.waitForURL((url) => !url.pathname.startsWith("/login")),
       page.click('button[type="submit"]'),
     ]);
-    await expect(page.getByRole("heading", { name: /league feed/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^recent$/i })).toBeVisible();
   }
 
   const contextA = await browser.newContext();

@@ -1,28 +1,27 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Trophy } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { HeroBand } from "@/components/hero-band";
+import { Avatar, type AvatarIdentity } from "@/components/avatar";
+import { AvatarStack } from "@/components/avatar-stack";
+import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
-import { SectionLabel } from "@/components/section-label";
+import { MessagesButton } from "@/components/messages-button";
+import { SectionHeading } from "@/components/section-heading";
 import { Sparkline } from "@/components/sparkline";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
-import { formStrip, winnerDelta } from "@/lib/form";
+import { winnerDelta } from "@/lib/form";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
-import {
-  currentStreak,
-  groupByPlayedDate,
-  ratingChangeSince,
-  winRate,
-  type StatMatch,
-} from "@/lib/stats";
+import { labelPlayedDate, overallRank, ratingChangeSince, seasonLabel, winRate } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import type { RsvpResponse } from "@/lib/types";
+
+type NextRsvp = {
+  profile_id: string;
+  response: RsvpResponse;
+  profile: AvatarIdentity | AvatarIdentity[] | null;
+};
 
 export default async function HomePage({
   searchParams,
@@ -45,7 +44,6 @@ export default async function HomePage({
     { data: me },
     { data: board },
     { data: history },
-    { data: myMatches },
     { data: toConfirm },
     { data: awaiting },
     { data: recent },
@@ -53,12 +51,12 @@ export default async function HomePage({
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("display_name, rating, matches_played, schools(short_name)")
+      .select("id, display_name, rating, matches_played, avatar_url, ball")
       .eq("id", user.id)
       .single(),
     // Rank, wins and losses come from the same view the leaderboard renders,
-    // so the hero can never disagree with the Ranks tab.
-    supabase.from("leaderboard").select("id, school_short_name, wins, losses"),
+    // so the home block can never disagree with the Ranks tab.
+    supabase.from("leaderboard").select("id, wins, losses"),
     supabase
       .from("rating_history")
       .select("rating_before, rating_after, created_at")
@@ -67,22 +65,15 @@ export default async function HomePage({
       .limit(30),
     supabase
       .from("matches")
-      .select("id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, confirmed_at")
-      .eq("status", "confirmed")
-      .or(`reporter_id.eq.${user.id},opponent_id.eq.${user.id}`)
-      .order("confirmed_at", { ascending: false })
-      .limit(10),
-    supabase
-      .from("matches")
       .select(
-        "id, reporter_score, opponent_score, game_type, played_at, winner_id, reporter:profiles!matches_reporter_id_fkey(id, display_name)"
+        "id, reporter_score, opponent_score, game_type, played_at, winner_id, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball)"
       )
       .eq("opponent_id", user.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
     supabase
       .from("matches")
-      .select("id, opponent:profiles!matches_opponent_id_fkey(display_name)")
+      .select("id, opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)")
       .eq("reporter_id", user.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
@@ -99,24 +90,24 @@ export default async function HomePage({
     // call so the home card and the calendar can never disagree.
     supabase
       .from("events")
-      .select("id, title, location, starts_at, ends_at, rsvps(profile_id, response)")
+      .select(
+        "id, title, location, starts_at, ends_at, rsvps(profile_id, response, profile:profiles(id, display_name, avatar_url, ball))"
+      )
       .eq("status", "scheduled")
       .or(`ends_at.gte.${nowIso},and(ends_at.is.null,starts_at.gte.${nowIso})`)
       .order("starts_at")
       .limit(5),
   ]);
 
-  const mySchool = Array.isArray(me?.schools) ? me.schools[0] : me?.schools;
   const rating = me?.rating ?? 450;
   const played = me?.matches_played ?? 0;
   const provisional = played < 10;
 
-  const schoolRows = (board ?? []).filter((r) => r.school_short_name === mySchool?.short_name);
-  const schoolRank = schoolRows.findIndex((r) => r.id === user.id) + 1;
   const myRow = (board ?? []).find((r) => r.id === user.id);
   const wins = Number(myRow?.wins ?? 0);
   const losses = Number(myRow?.losses ?? 0);
   const rate = winRate(wins, losses);
+  const rank = overallRank(board ?? [], user.id);
 
   const chronological = [...(history ?? [])].reverse();
   const ratings =
@@ -124,228 +115,183 @@ export default async function HomePage({
       ? [chronological[0].rating_before, ...chronological.map((h) => h.rating_after)]
       : [rating];
   const change = ratingChangeSince(history ?? [], monthAgo, rating);
-  const streak = currentStreak((myMatches ?? []) as StatMatch[], user.id);
-  const form = formStrip((myMatches ?? []).slice(0, 5), user.id);
+
+  const today = clubDateOf(nowIso);
+  const greeting = greetingFor(now, me?.display_name ?? "").split(",")[0];
+  const first = (me?.display_name ?? "").trim().split(/\s+/)[0] || "there";
 
   const nextEvent = partitionEvents(scheduledEvents ?? [], now).upcoming[0] ?? null;
-  const feed = groupByPlayedDate(recent ?? [], clubDateOf(nowIso));
+  const nextRsvps = (nextEvent?.rsvps ?? []) as NextRsvp[];
+  const myResponse = nextEvent ? tallyRsvps(nextRsvps, user.id).mine : null;
+  const going = nextRsvps
+    .filter((r) => r.response === "going")
+    .map((r) => (Array.isArray(r.profile) ? r.profile[0] : r.profile))
+    .filter((p): p is AvatarIdentity => !!p);
+  const others = going.filter((p) => p.id !== user.id).length;
+  const goingCaption =
+    myResponse === "going"
+      ? others > 0
+        ? `You + ${others} going`
+        : "You're going"
+      : `${going.length} going`;
 
   return (
-    <main>
-      <HeroBand title={greetingFor(now, me?.display_name ?? "")}>
-        <span className="mt-3 block text-[11px] font-semibold tracking-[0.14em] text-white/55 uppercase">
-          Your rating
-        </span>
-        <div className="mt-1 flex items-end justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-              <span className="stat-number text-gold text-[64px] leading-[0.9] tracking-[-0.03em]">
-                {rating}
+    <main className="flex flex-col gap-9 pt-3">
+      <header className="flex items-center justify-between gap-3">
+        <Link href={`/players/${user.id}`} aria-label="Your profile" className="press flex items-center gap-3">
+          <Avatar
+            person={{ id: user.id, display_name: me?.display_name, avatar_url: me?.avatar_url, ball: me?.ball }}
+            size="lg"
+          />
+          <span className="flex flex-col gap-px">
+            <span className="text-muted-foreground text-[12px]">{greeting}</span>
+            <span className="text-[16px] font-medium">{first}</span>
+          </span>
+        </Link>
+        <MessagesButton />
+      </header>
+
+      {message && <p className="bg-card rounded-2xl p-3 text-sm">{message}</p>}
+      {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
+
+      <section className="flex flex-col gap-[18px]">
+        <span className="overline">Rating · {seasonLabel(today)}</span>
+        <div className="flex items-end justify-between gap-4">
+          <span className="hero-number">{rating}</span>
+          {change !== null && (
+            <span className={cn("stat-number pb-1.5 text-[13px]", change >= 0 ? "text-win" : "text-loss")}>
+              {change >= 0 ? "+" : "−"}
+              {Math.abs(change)} this month
+            </span>
+          )}
+        </div>
+        <Sparkline ratings={ratings} />
+        <StatGrid cols={3}>
+          <StatTile label="Overall rank" value={rank ? `#${rank}` : "–"} />
+          <StatTile label="Win rate" value={rate === null ? "–" : `${rate}%`} />
+          <StatTile label="Record" value={`${wins}–${losses}`} note={provisional ? "provisional" : undefined} />
+        </StatGrid>
+      </section>
+
+      {(toConfirm ?? []).length > 0 && (
+        <section className="flex flex-col gap-1.5">
+          <SectionHeading>Confirm results</SectionHeading>
+          {(toConfirm ?? []).map((m) => {
+            const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
+            const theyWon = m.winner_id === reporter?.id;
+            return (
+              <ListRow
+                key={m.id}
+                leading={<Avatar person={reporter ?? { id: "unknown", display_name: null }} size="md" />}
+                title={
+                  <>
+                    {reporter?.display_name ?? "Member"} · {theyWon ? "beat you" : "lost to you"}{" "}
+                    <span className="stat-number">
+                      {m.reporter_score}–{m.opponent_score}
+                    </span>
+                  </>
+                }
+                meta={GAME_LABEL[m.game_type] ?? m.game_type}
+                trailing={
+                  <span className="flex items-center gap-4 text-[13px]">
+                    <form action={rejectMatch}>
+                      <input type="hidden" name="match_id" value={m.id} />
+                      <button type="submit" className="text-muted-foreground press">
+                        Reject
+                      </button>
+                    </form>
+                    <form action={confirmMatch}>
+                      <input type="hidden" name="match_id" value={m.id} />
+                      <button type="submit" className="text-brass press font-medium">
+                        Confirm
+                      </button>
+                    </form>
+                  </span>
+                }
+              />
+            );
+          })}
+        </section>
+      )}
+
+      {(awaiting ?? []).length > 0 && (
+        <section className="flex flex-col gap-1.5">
+          <SectionHeading>Waiting on</SectionHeading>
+          {(awaiting ?? []).map((m) => {
+            const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
+            return (
+              <ListRow
+                key={m.id}
+                leading={<Avatar person={opponent ?? { id: "unknown", display_name: null }} size="md" />}
+                title={opponent?.display_name ?? "Member"}
+                meta="Hasn't confirmed your report yet"
+              />
+            );
+          })}
+        </section>
+      )}
+
+      {nextEvent && (
+        <section className="flex flex-col gap-3.5">
+          <SectionHeading action={{ href: "/events", label: "Calendar" }}>Next match</SectionHeading>
+          <Link
+            href={`/events/${nextEvent.id}`}
+            className="press bg-card flex flex-col gap-[18px] rounded-[20px] p-5 shadow-[inset_0_0_0_1px_var(--hairline-row)]"
+          >
+            <div className="flex flex-col gap-1.5">
+              <span className="text-brass text-[12px] tracking-[0.06em] uppercase">
+                {formatEventWhen(nextEvent.starts_at, nextEvent.ends_at)}
               </span>
-              {change !== null && (
-                <span
-                  className={cn(
-                    "stat-number mb-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
-                    change >= 0 ? "bg-white/12 text-gold" : "bg-white/12 text-white/85"
-                  )}
-                >
-                  {change >= 0 ? "▲" : "▼"} {Math.abs(change)}
-                  <span className="font-medium text-white/60">this month</span>
-                </span>
+              <span className="text-[18px] font-medium">{nextEvent.title}</span>
+              {nextEvent.location && (
+                <span className="text-muted-foreground text-[13px]">{nextEvent.location}</span>
               )}
             </div>
-            <div className="mt-2 text-[12px] text-white/65">
-              {schoolRank > 0 && mySchool ? `#${schoolRank} at ${mySchool.short_name}` : "Unranked"}
-              {" · "}
-              {played} played{provisional && " · provisional"}
+            <div className="flex items-center justify-between gap-3">
+              <AvatarStack people={going} caption={goingCaption} />
+              <span
+                className={cn(
+                  "shrink-0 text-[12px] font-medium",
+                  myResponse === "going" ? "text-win" : "text-brass"
+                )}
+              >
+                {myResponse === "going" ? "Attending" : myResponse === "maybe" ? "Maybe" : "RSVP"}
+              </span>
             </div>
-          </div>
-          {/* The one memorable element: your line, drawing itself once. */}
-          <Sparkline ratings={ratings} width={150} height={56} className="text-gold shrink-0" />
-        </div>
-        {form.length > 0 && (
-          <div
-            className="mt-3 flex items-center gap-2"
-            aria-label={`Recent form: ${form.map((f) => (f.won ? "win" : "loss")).join(", ")}`}
-          >
-            <span className="text-[10px] font-semibold tracking-[0.14em] text-white/55 uppercase">
-              Form
-            </span>
-            <span className="flex gap-1.5">
-              {form.map((f) => (
-                <span
-                  key={f.id}
-                  className={cn(
-                    "stat-number flex size-6 items-center justify-center rounded-full text-[11px]",
-                    f.won ? "bg-gold text-gold-foreground" : "bg-white/12 text-white/60 ring-1 ring-white/20"
-                  )}
-                >
-                  {f.won ? "W" : "L"}
-                </span>
-              ))}
-            </span>
-          </div>
+          </Link>
+        </section>
+      )}
+
+      <section className="flex flex-col gap-1.5">
+        <SectionHeading action={{ href: `/players/${user.id}`, label: "All games" }}>Recent</SectionHeading>
+        {(recent ?? []).length === 0 && (
+          <p className="text-muted-foreground py-6 text-center text-sm">
+            No results yet this season.{" "}
+            <Link href="/matches/new" className="text-brass">
+              Log the first game.
+            </Link>
+          </p>
         )}
-      </HeroBand>
-
-      <div className="-mt-3 flex flex-col gap-4">
-        <StatGrid>
-          <StatTile label="Record" value={`${wins}–${losses}`} />
-          <StatTile label="Win rate" value={rate === null ? "–" : `${rate}%`} />
-          <StatTile
-            label="Streak"
-            value={streak ? `${streak.kind}${streak.length}` : "–"}
-            tone={streak ? (streak.kind === "W" ? "win" : "loss") : "default"}
-          />
-          <StatTile
-            label="Rank"
-            value={schoolRank > 0 ? `#${schoolRank}` : "–"}
-            note={mySchool ? `at ${mySchool.short_name}` : undefined}
-          />
-        </StatGrid>
-
-        {message && (
-          <p className="bg-card rounded-2xl p-3 text-sm shadow-[inset_0_0_0_1px_var(--hairline-row)]">{message}</p>
-        )}
-        {error && (
-          <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
-        )}
-
-        {(toConfirm ?? []).length > 0 && (
-          <Card>
-            <CardHeader>
-              <SectionLabel>Confirm results</SectionLabel>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {(toConfirm ?? []).map((m) => {
-                const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
-                const theyWon = m.winner_id === reporter?.id;
-                return (
-                  <div key={m.id} className="flex flex-col gap-2">
-                    <div className="text-sm">
-                      <span className="font-semibold">{reporter?.display_name}</span> reported{" "}
-                      {theyWon ? "beating you" : "losing to you"}{" "}
-                      <span className="stat-number">
-                        {m.reporter_score}–{m.opponent_score}
-                      </span>{" "}
-                      <Badge variant="secondary">{GAME_LABEL[m.game_type] ?? m.game_type}</Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <form action={confirmMatch} className="contents">
-                        <input type="hidden" name="match_id" value={m.id} />
-                        <Button type="submit">Confirm</Button>
-                      </form>
-                      <form action={rejectMatch} className="contents">
-                        <input type="hidden" name="match_id" value={m.id} />
-                        <Button variant="outline" type="submit">
-                          Reject
-                        </Button>
-                      </form>
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        )}
-
-        {(awaiting ?? []).length > 0 && (
-          <Card>
-            <CardHeader>
-              <SectionLabel>Waiting on confirmation</SectionLabel>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-1 text-sm">
-              {(awaiting ?? []).map((m) => {
-                const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
-                return (
-                  <p key={m.id} className="text-muted-foreground">
-                    <span className="text-foreground font-semibold">{opponent?.display_name}</span>{" "}
-                    hasn&apos;t confirmed your report yet.
-                  </p>
-                );
-              })}
-            </CardContent>
-          </Card>
-        )}
-
-        {nextEvent &&
-          (() => {
-            const myResponse = tallyRsvps(
-              (nextEvent.rsvps ?? []) as { profile_id: string; response: RsvpResponse }[],
-              user.id
-            ).mine;
-            return (
-              <Card>
-                <CardHeader>
-                  <SectionLabel>Next up</SectionLabel>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-1 text-sm">
-                  <Link
-                    href={`/events/${nextEvent.id}`}
-                    className="font-semibold underline-offset-2 hover:underline"
-                  >
-                    {nextEvent.title}
-                  </Link>
-                  <span className="text-muted-foreground">
-                    {formatEventWhen(nextEvent.starts_at, nextEvent.ends_at)}
-                    {nextEvent.location && ` · ${nextEvent.location}`}
-                  </span>
-                  <span className="text-muted-foreground text-xs">
-                    {myResponse ? `You're ${myResponse}` : "You haven't RSVP'd"}
-                  </span>
-                </CardContent>
-              </Card>
-            );
-          })()}
-
-        <Card>
-          <CardHeader>
-            <SectionLabel>League feed</SectionLabel>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {feed.length === 0 && (
-              <div className="flex flex-col items-center gap-2 py-6 text-center">
-                <span className="bg-muted text-primary flex size-12 items-center justify-center rounded-full">
-                  <Trophy className="size-6" />
-                </span>
-                <p className="text-sm font-semibold">No results yet this season.</p>
-                <Button asChild size="sm">
-                  <Link href="/matches/new">Report the first match</Link>
-                </Button>
-              </div>
-            )}
-            {feed.map((group) => (
-              <div key={group.date}>
-                <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground shrink-0 text-[11px] font-semibold tracking-[0.1em] uppercase">
-                    {group.label}
-                  </span>
-                  <span className="bg-hairline h-px flex-1" />
-                </div>
-                <div className="divide-hairline flex flex-col divide-y">
-                  {group.matches.map((m) => {
-                    const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
-                    const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
-                    const reporterWon = m.winner_id === reporter?.id;
-                    return (
-                      <MatchRow
-                        key={m.id}
-                        winner={reporterWon ? reporter : opponent}
-                        loser={reporterWon ? opponent : reporter}
-                        winnerScore={Math.max(m.reporter_score, m.opponent_score)}
-                        loserScore={Math.min(m.reporter_score, m.opponent_score)}
-                        delta={winnerDelta(m)}
-                        viewerId={user.id}
-                        gameType={GAME_LABEL[m.game_type] ?? m.game_type}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+        {(recent ?? []).map((m) => {
+          const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
+          const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
+          const reporterWon = m.winner_id === reporter?.id;
+          return (
+            <MatchRow
+              key={m.id}
+              winner={reporterWon ? reporter : opponent}
+              loser={reporterWon ? opponent : reporter}
+              winnerScore={Math.max(m.reporter_score, m.opponent_score)}
+              loserScore={Math.min(m.reporter_score, m.opponent_score)}
+              delta={winnerDelta(m)}
+              viewerId={user.id}
+              perspectiveId={user.id}
+              gameType={GAME_LABEL[m.game_type] ?? m.game_type}
+              meta={labelPlayedDate(m.played_at, today)}
+            />
+          );
+        })}
+      </section>
     </main>
   );
 }

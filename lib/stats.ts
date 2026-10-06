@@ -166,3 +166,17 @@ export function movementSince(
   }
   return out;
 }
+
+// "Fall 2026" / "Spring 2027" / "Summer 2027" from a club calendar date
+// (YYYY-MM-DD from lib/events clubDateOf). Semesters, not quarters.
+export function seasonLabel(clubDate: string): string {
+  const [year, month] = clubDate.split("-").map(Number);
+  const name = month >= 8 ? "Fall" : month <= 5 ? "Spring" : "Summer";
+  return `${name} ${year}`;
+}
+
+// 1-based position in a rating-ordered board; null when the member has no row.
+export function overallRank(board: { id: string }[], id: string): number | null {
+  const i = board.findIndex((r) => r.id === id);
+  return i === -1 ? null : i + 1;
+}

@@ -35,7 +35,7 @@ test("admin creates an event, member RSVPs, headcount updates", async ({ page })
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', password);
   await page.click('button[type="submit"]');
-  await expect(page.getByRole("heading", { name: /league feed/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^recent$/i })).toBeVisible();
 
   // Create the event, one week out at 7pm club time.
   const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)

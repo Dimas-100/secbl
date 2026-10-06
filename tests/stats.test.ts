@@ -6,8 +6,10 @@ import {
   headToHead,
   labelPlayedDate,
   movementSince,
+  overallRank,
   peakRating,
   ratingChangeSince,
+  seasonLabel,
   sparklinePoints,
   winRate,
   type StatMatch,
@@ -148,5 +150,26 @@ describe("movementSince", () => {
     ];
     const moves = movementSince(history, { a: 480, b: 490, c: 450 });
     expect(moves).toEqual({ a: 30, b: -10 });
+  });
+});
+
+describe("seasonLabel", () => {
+  it("names the club season from a club calendar date", () => {
+    expect(seasonLabel("2026-10-06")).toBe("Fall 2026");
+    expect(seasonLabel("2026-08-01")).toBe("Fall 2026");
+    expect(seasonLabel("2027-01-15")).toBe("Spring 2027");
+    expect(seasonLabel("2027-05-31")).toBe("Spring 2027");
+    expect(seasonLabel("2027-06-10")).toBe("Summer 2027");
+  });
+});
+
+describe("overallRank", () => {
+  const board = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  it("is the 1-based position in the ordered board", () => {
+    expect(overallRank(board, "b")).toBe(2);
+  });
+  it("is null for a member with no row (no confirmed matches yet)", () => {
+    expect(overallRank(board, "zed")).toBeNull();
+    expect(overallRank([], "a")).toBeNull();
   });
 });
