@@ -22,11 +22,7 @@ interface EventRow {
   ends_at: string | null;
   status: "scheduled" | "cancelled";
   source_name: string | null;
-  rsvps: {
-    profile_id: string;
-    response: string;
-    profile: AvatarIdentity | AvatarIdentity[] | null;
-  }[];
+  rsvps: { profile_id: string; response: string }[];
 }
 
 interface TournamentRow {
@@ -52,11 +48,8 @@ const STATUS_LABEL: Record<TournamentRow["status"], string> = {
   complete: "Complete",
 };
 
-function goingPeople(event: EventRow): AvatarIdentity[] {
-  return event.rsvps
-    .filter((r) => r.response === "going")
-    .map((r) => (Array.isArray(r.profile) ? r.profile[0] : r.profile))
-    .filter((p): p is AvatarIdentity => !!p);
+function goingCount(event: EventRow): number {
+  return event.rsvps.filter((r) => r.response === "going").length;
 }
 
 function isGoing(event: EventRow, viewerId: string): boolean {
@@ -73,9 +66,16 @@ function dateParts(iso: string): { weekday: string; day: string; month: string }
   };
 }
 
-function FeaturedEvent({ event, viewerId }: { event: EventRow; viewerId: string }) {
+function FeaturedEvent({
+  event,
+  going,
+  viewerId,
+}: {
+  event: EventRow;
+  going: AvatarIdentity[];
+  viewerId: string;
+}) {
   const { day, month } = dateParts(event.starts_at);
-  const going = goingPeople(event);
   const mine = isGoing(event, viewerId);
   return (
     <article className="bg-card flex flex-col gap-[22px] rounded-[24px] p-6 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
@@ -105,7 +105,7 @@ function FeaturedEvent({ event, viewerId }: { event: EventRow; viewerId: string 
         </div>
       </Link>
       <div className="flex items-center justify-between gap-3">
-        <AvatarStack people={going} caption={`${going.length} going`} />
+        <AvatarStack people={going} caption={`${goingCount(event)} going`} />
         {mine ? (
           <Button asChild variant="ghost" size="sm" className="text-win">
             <Link href={`/events/${event.id}`}>Going</Link>
@@ -126,7 +126,7 @@ function FeaturedEvent({ event, viewerId }: { event: EventRow; viewerId: string 
 
 function EventRowLink({ event, viewerId, past }: { event: EventRow; viewerId: string; past: boolean }) {
   const { weekday, day } = dateParts(event.starts_at);
-  const going = goingPeople(event).length;
+  const going = goingCount(event);
   const mine = isGoing(event, viewerId);
   const status = past ? (mine ? "You went" : "Done") : mine ? "Going" : "RSVP";
   return (
@@ -213,9 +213,9 @@ export default async function EventsPage({
     supabase.from("profiles").select("role, schools(name, short_name)").eq("id", user.id).single(),
     supabase
       .from("events")
-      .select(
-        "id, title, location, starts_at, ends_at, status, source_name, rsvps(profile_id, response, profile:profiles(id, display_name, avatar_url, ball))"
-      )
+      // Counts only; the featured card's attendee faces come from one small
+      // select below, so this payload stays bounded as the calendar grows.
+      .select("id, title, location, starts_at, ends_at, status, source_name, rsvps(profile_id, response)")
       .order("starts_at"),
     supabase.from("tournaments").select("id, name, status").order("created_at", { ascending: false }),
   ]);
@@ -234,6 +234,18 @@ export default async function EventsPage({
           : upcoming;
   const featured = tab === "upcoming" ? (upcoming[0] ?? null) : null;
   const rest = featured ? list.slice(1) : list;
+  let going: AvatarIdentity[] = [];
+  if (featured) {
+    const { data: goingRows } = await supabase
+      .from("rsvps")
+      .select("profile:profiles(id, display_name, avatar_url, ball)")
+      .eq("event_id", featured.id)
+      .eq("response", "going")
+      .limit(8);
+    going = (goingRows ?? [])
+      .map((r) => (Array.isArray(r.profile) ? r.profile[0] : r.profile) as AvatarIdentity | null)
+      .filter((p): p is AvatarIdentity => !!p);
+  }
   const monthLabel = now.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: CLUB_TIMEZONE });
 
   return (
@@ -269,10 +281,14 @@ export default async function EventsPage({
         <Cups tournaments={(tournaments ?? []) as TournamentRow[]} admin={admin} />
       ) : (
         <>
-          {featured && <FeaturedEvent event={featured} viewerId={user.id} />}
+          {featured && <FeaturedEvent event={featured} going={going} viewerId={user.id} />}
           <section className="flex flex-col">
             <SectionHeading>{tab === "past" ? "Past" : "Coming up"}</SectionHeading>
-            {rest.length === 0 && <p className="text-muted-foreground py-6 text-sm">{EMPTY[tab]}</p>}
+            {rest.length === 0 && (
+              <p className="text-muted-foreground py-6 text-sm">
+                {featured ? "Nothing else coming up." : EMPTY[tab]}
+              </p>
+            )}
             {rest.map((e) => (
               <EventRowLink key={e.id} event={e} viewerId={user.id} past={tab === "past"} />
             ))}

@@ -151,11 +151,11 @@ export default async function LeaderboardPage({
                       #{rank}
                     </span>
                     <span className="flex w-full flex-col items-center gap-0.5">
-                      <span className="w-full truncate text-[14px] font-medium">
-                        {r.display_name}
-                        {r.matches_played < 10 && <span className="text-muted-foreground"> *</span>}
+                      <span className="w-full truncate text-[14px] font-medium">{r.display_name}</span>
+                      <span className="text-muted-foreground stat-number text-[12px]">
+                        {r.rating}
+                        {r.matches_played < 10 && " *"}
                       </span>
-                      <span className="text-muted-foreground stat-number text-[12px]">{r.rating}</span>
                       <Movement value={moves[r.id]} />
                     </span>
                   </Link>
@@ -179,12 +179,7 @@ export default async function LeaderboardPage({
                           <Avatar person={r} size="sm" />
                         </>
                       }
-                      title={
-                        <>
-                          {r.display_name}
-                          {r.matches_played < 10 && <span className="text-muted-foreground"> *</span>}
-                        </>
-                      }
+                      title={r.display_name}
                       meta={
                         <span className="flex items-center gap-1.5">
                           <SchoolDot color={r.school_color} />
@@ -195,7 +190,10 @@ export default async function LeaderboardPage({
                       }
                       trailing={
                         <>
-                          <span className="stat-number text-[15px]">{r.rating}</span>
+                          <span className="stat-number text-[15px]">
+                            {r.rating}
+                            {r.matches_played < 10 && <span className="text-muted-foreground"> *</span>}
+                          </span>
                           <span className="text-muted-foreground text-[12px]">
                             {r.wins}–{r.losses}
                           </span>

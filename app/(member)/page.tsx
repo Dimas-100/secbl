@@ -141,6 +141,7 @@ export default async function HomePage({
 
   return (
     <main className="flex flex-col gap-9 pt-3">
+      <h1 className="sr-only">Home</h1>
       <header className="flex items-center justify-between gap-3">
         <Link href={`/players/${user.id}`} aria-label="Your profile" className="press flex items-center gap-3">
           <Avatar
