@@ -49,20 +49,26 @@ test("admin runs a 4-player tournament to a champion", async ({ page }) => {
   // Check the four test players. Everyone in this club is a candidate, so
   // select by the value of each checkbox rather than by position.
   for (const id of [admin.id]) {
-    await page.locator(`input[name="profile_ids"][value="${id}"]`).check();
+    await page.locator(`input[type="checkbox"][value="${id}"]`).check();
   }
   const others = await service
     .from("profiles")
     .select("id, display_name")
     .like("display_name", `Cup %${stamp}`);
   for (const row of others.data ?? []) {
-    await page.locator(`input[name="profile_ids"][value="${row.id}"]`).check();
+    await page.locator(`input[type="checkbox"][value="${row.id}"]`).check();
   }
   await page.getByRole("button", { name: "Save entrants" }).click();
   await expect(page.getByText(/entrants saved/i)).toBeVisible();
 
+  // Manual seeding: the admin ticked themselves first, so they are seed 1.
+  // Move p1 to the top and start — Start submits the order as shown.
+  const p1Name = `Cup p1 ${stamp}`;
+  await page.getByRole("button", { name: `Move ${p1Name} up` }).click();
+  await expect(page.locator("ol li").first()).toContainText(p1Name);
   await page.getByRole("button", { name: /start tournament/i }).click();
   await expect(page.getByRole("heading", { name: "Round 1" })).toBeVisible();
+  await expect(page.getByText(`${p1Name} (1)`).first()).toBeVisible();
 
   // Play every match that is ready, round by round, until a champion exists.
   // Result entry is stepper-based (no number inputs): tap + on each player's
