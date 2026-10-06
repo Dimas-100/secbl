@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Camera, ChevronLeft, SlidersHorizontal } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
+import { LevelBar } from "@/components/level-bar";
 import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
 import { MessagesButton } from "@/components/messages-button";
@@ -14,6 +15,7 @@ import { StatGrid, StatTile } from "@/components/stat-tile";
 import { SubmitButton } from "@/components/submit-button";
 import { ACHIEVEMENTS, earnedAchievements } from "@/lib/achievements";
 import { GAME_LABEL } from "@/lib/identity";
+import { xpCaption } from "@/lib/levels";
 import { createClient } from "@/lib/supabase/server";
 import { startDm } from "@/app/(member)/chat/actions";
 import { clubDateOf } from "@/lib/events";
@@ -30,6 +32,7 @@ import {
   type StatMatch,
 } from "@/lib/stats";
 import { cn } from "@/lib/utils";
+import { loadXp } from "@/lib/xp-data";
 
 interface PlayerRef {
   id: string;
@@ -80,7 +83,7 @@ export default async function PlayerPage({
   const now = new Date();
   const monthAgo = new Date(now.getTime() - 30 * 86_400_000);
 
-  const [{ data: history }, { data: matches }, { data: boardRow }, { data: board }, { count: titles }] =
+  const [{ data: history }, { data: matches }, { data: boardRow }, { data: board }, { count: titles }, { xp, level }] =
     await Promise.all([
       supabase
         .from("rating_history")
@@ -106,6 +109,7 @@ export default async function PlayerPage({
         .eq("winner_id", id)
         .is("winner_advances_to", null)
         .eq("tournaments.status", "complete"),
+      loadXp(supabase, id),
     ]);
 
   const all = (matches ?? []) as PlayerMatch[];
@@ -257,8 +261,23 @@ export default async function PlayerPage({
         />
       )}
 
+      <Link
+        href={`/players/${id}/ladder`}
+        className="press flex flex-col gap-3"
+        aria-label={`Level ${level.level}, ${level.title}. ${level.intoLevel} of ${level.needed} XP into this level. Open the ladder.`}
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[17px] font-semibold tracking-[-0.01em]">
+            Level {level.level} <span className="text-brass font-medium">· {level.title}</span>
+          </span>
+          <span className="text-muted-foreground stat-number text-[12px]">
+            {level.intoLevel} / {level.needed} XP
+          </span>
+        </div>
+        <LevelBar value={level.intoLevel} max={level.needed} />
+      </Link>
+
       <section className="flex flex-col gap-3">
-        {/* The level line lands here once the levels spec ships. */}
         <SectionHeading>Achievements</SectionHeading>
         {achievements.length > 0 && (
           <ul className="flex flex-wrap gap-2">
@@ -318,6 +337,7 @@ export default async function PlayerPage({
               perspectiveId={id}
               meta={labelPlayedDate(m.played_at, today)}
               gameType={GAME_LABEL[m.game_type] ?? m.game_type}
+              caption={xpCaption(m.id, xp)}
             />
           );
         })}
