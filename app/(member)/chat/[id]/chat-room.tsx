@@ -43,7 +43,9 @@ export function ChatRoom({
   const [draft, setDraft] = useState("");
   const [hasMore, setHasMore] = useState(initialMessages.length === PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [live, setLive] = useState(false);
+  // null until the first subscription succeeds, so the header never says
+  // "reconnecting" before it has connected once.
+  const [live, setLive] = useState<boolean | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -287,7 +289,7 @@ export function ChatRoom({
           <p className="flex items-center gap-1 truncate text-[11px] text-white/70">
             {isGroup && <Users className="size-3" />}
             {subtitle}
-            {!live && <span className="text-gold"> · reconnecting…</span>}
+            {live === false && <span className="text-gold"> · reconnecting…</span>}
           </p>
         </div>
       </header>
