@@ -63,9 +63,9 @@ test("members DM each other and replies arrive live", async ({ browser }) => {
 
   // B sees the unread badge, finds the DM in the inbox, opens it, replies.
   await logIn(pageB, b.email);
-  await expect(pageB.getByRole("link", { name: /chat, 1 unread/i })).toBeVisible();
-  await pageB.getByRole("link", { name: /chat, 1 unread/i }).click();
-  await expect(pageB.getByRole("heading", { name: "Chat" })).toBeVisible();
+  await expect(pageB.getByRole("link", { name: /messages, 1 unread/i })).toBeVisible();
+  await pageB.getByRole("link", { name: /messages, 1 unread/i }).click();
+  await expect(pageB.getByRole("heading", { name: "Messages" })).toBeVisible();
   await expect(pageB.getByRole("link", { name: /^Everyone/ })).toBeVisible();
   const dmRow = pageB.getByRole("link", { name: new RegExp(a.name) });
   await expect(dmRow).toContainText(opener);
@@ -83,11 +83,11 @@ test("members DM each other and replies arrive live", async ({ browser }) => {
 
   // Opening the room marked it read for B.
   await pageB.goto("/chat");
-  await expect(pageB.getByRole("link", { name: /chat, \d+ unread/i })).toHaveCount(0);
+  await expect(pageB.getByRole("link", { name: /messages, \d+ unread/i })).toHaveCount(0);
 
   // And A, who has been in the room the whole time, has nothing unread either.
   await pageA.goto("/chat");
-  await expect(pageA.getByRole("link", { name: /chat, \d+ unread/i })).toHaveCount(0);
+  await expect(pageA.getByRole("link", { name: /messages, \d+ unread/i })).toHaveCount(0);
 
   await contextA.close();
   await contextB.close();

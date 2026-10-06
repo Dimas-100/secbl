@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Dialog } from "radix-ui";
 import { PenSquare } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/submit-button";
@@ -28,18 +28,17 @@ export function NewMessageSheet({ people }: { people: Person[] }) {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <Button size="sm">
-          <PenSquare className="size-4" />
-          New message
+        <Button size="icon" aria-label="New message">
+          <PenSquare className="size-[18px]" strokeWidth={1.8} />
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-20 bg-black/40" />
         <Dialog.Content
           aria-describedby={undefined}
-          className="bg-background fixed inset-x-0 bottom-0 z-30 flex max-h-[75vh] flex-col gap-3 rounded-t-2xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          className="bg-background fixed inset-x-0 bottom-0 z-30 flex max-h-[75vh] flex-col gap-3 rounded-t-[24px] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
         >
-          <Dialog.Title className="text-sm font-bold">Message a member</Dialog.Title>
+          <Dialog.Title className="text-[17px] font-semibold tracking-[-0.01em]">Message a member</Dialog.Title>
           <Input
             autoFocus
             placeholder="Search members"
@@ -53,16 +52,14 @@ export function NewMessageSheet({ people }: { people: Person[] }) {
                 <input type="hidden" name="profile_id" value={p.id} />
                 <SubmitButton
                   variant="ghost"
-                  className="h-auto min-h-12 justify-between rounded-lg px-2 text-left text-sm font-medium"
+                  className="border-hairline-row h-auto min-h-14 justify-between rounded-none border-b px-0 text-left text-[15px] font-medium shadow-none hover:bg-transparent"
                   pendingChildren={<span className="text-muted-foreground">Opening…</span>}
                 >
                   <span className="flex min-w-0 items-center gap-3">
-                    <span className="bg-accent text-accent-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold">
-                      {p.display_name[0]?.toUpperCase()}
-                    </span>
+                    <Avatar person={{ id: p.id, display_name: p.display_name }} size="sm" />
                     <span className="truncate">{p.display_name}</span>
                   </span>
-                  {p.school && <Badge variant="secondary">{p.school}</Badge>}
+                  {p.school && <span className="text-muted-foreground shrink-0 text-[12px]">{p.school}</span>}
                 </SubmitButton>
               </form>
             ))}
