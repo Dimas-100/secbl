@@ -36,7 +36,10 @@ export function buildInboxItems(
   rows: InboxRow[],
   ctx: { meId: string; now: Date; schoolsById: Record<string, SchoolRef> }
 ): InboxItem[] {
-  return sortInbox(rows).map((row) => ({
+  // A DM only exists once something was said; an empty one (created before
+  // draft rooms, or by a race) is noise in both inboxes.
+  const spoken = rows.filter((r) => r.type !== "dm" || r.last_message_id !== null);
+  return sortInbox(spoken).map((row) => ({
     ...row,
     title: inboxTitle(row),
     subtitle:

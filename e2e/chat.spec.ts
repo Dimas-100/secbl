@@ -46,20 +46,39 @@ test("members DM each other and replies arrive live", async ({ browser }) => {
   const pageA = await contextA.newPage();
   const pageB = await contextB.newPage();
 
-  // A starts the DM from B's player page.
+  // A opens B from B's player page: a draft, not a room. Backing out without
+  // sending leaves nothing behind — in the inbox or in the database.
   await logIn(pageA, a.email);
   await pageA.goto(`/players/${b.id}`);
   await pageA.getByRole("button", { name: "Message" }).click();
-  await pageA.waitForURL(/\/chat\/[0-9a-f-]{36}$/);
+  await pageA.waitForURL(new RegExp(`/chat/new\\?to=${b.id}$`));
   await expect(pageA.getByRole("heading", { name: b.name })).toBeVisible();
-  const roomUrl = pageA.url();
+  await pageA.getByRole("link", { name: "Back to chat" }).click();
+  await expect(pageA.getByRole("heading", { name: "Messages" })).toBeVisible();
+  await expect(pageA.getByRole("link", { name: new RegExp(b.name) })).toHaveCount(0);
+  const { count: emptyRooms } = await service
+    .from("channels")
+    .select("id", { count: "exact", head: true })
+    .eq("type", "dm")
+    .like("dm_key", `%${b.id}%`);
+  expect(emptyRooms).toBe(0);
 
+  // The first send creates the room and the screen becomes it.
+  await pageA.goto(`/players/${b.id}`);
+  await pageA.getByRole("button", { name: "Message" }).click();
+  await pageA.waitForURL(/\/chat\/new\?to=/);
   const opener = `rematch tonight? ${stamp}`;
   await pageA.getByLabel("Message", { exact: true }).fill(opener);
   await pageA.getByLabel("Message", { exact: true }).press("Enter");
   await expect(pageA.getByText(opener)).toBeVisible();
+  await pageA.waitForURL(/\/chat\/[0-9a-f-]{36}$/);
+  const roomUrl = pageA.url();
   // The optimistic bubble resolves to a real row (timestamp replaces "Sending…").
   await expect(pageA.getByText("Sending…")).toHaveCount(0, { timeout: 15_000 });
+  // Opening B again lands in the existing room, not another draft.
+  await pageA.goto(`/players/${b.id}`);
+  await pageA.getByRole("button", { name: "Message" }).click();
+  await expect(pageA).toHaveURL(roomUrl);
 
   // B sees the unread badge, finds the DM in the inbox, opens it, replies.
   await logIn(pageB, b.email);

@@ -31,11 +31,20 @@ describe("inboxStamp", () => {
 });
 
 describe("buildInboxItems", () => {
+  it("hides a DM that has no messages yet, but keeps quiet group rooms", () => {
+    const items = buildInboxItems(
+      [row({ id: "empty-dm" }), row({ id: "room", type: "school", name: "GSU", school_id: "s1", member_count: 9 })],
+      { meId: "me", now, schoolsById: schools }
+    );
+    expect(items.map((i) => i.id)).toEqual(["room"]);
+  });
+
   it("titles, subtitles, previews and schools, in sorted order", () => {
     const items = buildInboxItems(
       [
         row({
           id: "dm",
+          last_message_id: 1,
           last_body: "gg",
           last_sender_id: "me",
           last_sender_name: "Me",
