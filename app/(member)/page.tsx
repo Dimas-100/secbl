@@ -14,6 +14,7 @@ import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/
 import { winnerDelta } from "@/lib/form";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
 import { xpCaption } from "@/lib/levels";
+import { formatLabel, formatShort } from "@/lib/race";
 import { labelPlayedDate, overallRank, ratingChangeSince, seasonLabel, winRate } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { loadXp } from "@/lib/xp-data";
@@ -69,7 +70,7 @@ export default async function HomePage({
     supabase
       .from("matches")
       .select(
-        "id, reporter_score, opponent_score, game_type, played_at, winner_id, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball)"
+        "id, reporter_score, opponent_score, game_type, played_at, winner_id, race_to, spot, spot_to, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball)"
       )
       .eq("opponent_id", user.id)
       .eq("status", "pending")
@@ -83,7 +84,7 @@ export default async function HomePage({
     supabase
       .from("matches")
       .select(
-        "id, reporter_id, reporter_score, opponent_score, game_type, played_at, winner_id, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
+        "id, reporter_id, reporter_score, opponent_score, game_type, played_at, winner_id, race_to, spot, spot_to, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
       )
       .eq("status", "confirmed")
       .order("played_at", { ascending: false })
@@ -204,7 +205,16 @@ export default async function HomePage({
                     </span>
                   </>
                 }
-                meta={GAME_LABEL[m.game_type] ?? m.game_type}
+                meta={[
+                  GAME_LABEL[m.game_type] ?? m.game_type,
+                  formatLabel(
+                    m.race_to,
+                    m.spot,
+                    m.spot_to === user.id ? "you" : (reporter?.display_name ?? "them").split(" ")[0]
+                  ),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
                 trailing={
                   <span className="flex items-center gap-4 text-[13px]">
                     <form action={rejectMatch}>
@@ -300,6 +310,7 @@ export default async function HomePage({
               viewerId={user.id}
               perspectiveId={user.id}
               gameType={GAME_LABEL[m.game_type] ?? m.game_type}
+              format={formatShort(m.race_to, m.spot)}
               meta={labelPlayedDate(m.played_at, today)}
               caption={xpCaption(m.id, xp)}
             />

@@ -16,6 +16,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { ACHIEVEMENTS, earnedAchievements } from "@/lib/achievements";
 import { GAME_LABEL } from "@/lib/identity";
 import { xpCaption } from "@/lib/levels";
+import { formatShort } from "@/lib/race";
 import { createClient } from "@/lib/supabase/server";
 import { startDm } from "@/app/(member)/chat/actions";
 import { clubDateOf } from "@/lib/events";
@@ -45,6 +46,9 @@ interface PlayerRef {
 type PlayerMatch = StatMatch & {
   game_type: string;
   played_at: string;
+  race_to: number | null;
+  spot: number;
+  spot_to: string | null;
   rating_delta_reporter: number | null;
   rating_delta_opponent: number | null;
   reporter: PlayerRef | PlayerRef[] | null;
@@ -94,7 +98,7 @@ export default async function PlayerPage({
       supabase
         .from("matches")
         .select(
-          "id, reporter_id, opponent_id, reporter_score, opponent_score, game_type, played_at, confirmed_at, winner_id, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, rating, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, rating, avatar_url, ball)"
+          "id, reporter_id, opponent_id, reporter_score, opponent_score, game_type, played_at, confirmed_at, winner_id, race_to, spot, spot_to, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, rating, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, rating, avatar_url, ball)"
         )
         .eq("status", "confirmed")
         .or(`reporter_id.eq.${id},opponent_id.eq.${id}`)
@@ -337,6 +341,7 @@ export default async function PlayerPage({
               perspectiveId={id}
               meta={labelPlayedDate(m.played_at, today)}
               gameType={GAME_LABEL[m.game_type] ?? m.game_type}
+              format={formatShort(m.race_to, m.spot)}
               caption={xpCaption(m.id, xp)}
             />
           );
