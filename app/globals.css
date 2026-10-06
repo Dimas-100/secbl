@@ -159,7 +159,7 @@
   font-variant-numeric: tabular-nums lining-nums;
 }
 /* Tiny letterspaced caps over a block. */
-@utility overline {
+@utility eyebrow {
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.14em;

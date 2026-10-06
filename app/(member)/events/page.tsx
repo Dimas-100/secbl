@@ -81,7 +81,7 @@ function FeaturedEvent({ event, viewerId }: { event: EventRow; viewerId: string 
     <article className="bg-card flex flex-col gap-[22px] rounded-[24px] p-6 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
       <Link href={`/events/${event.id}`} className="press flex flex-col gap-[22px]">
         <div className="flex items-start justify-between gap-3">
-          <span className="overline text-brass">
+          <span className="eyebrow text-brass">
             Next up{event.source_name ? ` · ${event.source_name}` : ""}
           </span>
           <span className="flex flex-col items-end leading-none">

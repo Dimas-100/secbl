@@ -63,7 +63,7 @@ export function ReportMatchForm({
   return (
     <form action={reportMatch} className="flex flex-col gap-8 pb-36">
       <section className="flex flex-col gap-3.5">
-        <span className="overline">Opponent</span>
+        <span className="eyebrow">Opponent</span>
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
@@ -94,7 +94,7 @@ export function ReportMatchForm({
       </section>
 
       <section className="flex flex-col gap-3.5">
-        <span className="overline">Game</span>
+        <span className="eyebrow">Game</span>
         <div className="bg-card grid grid-cols-4 gap-1 rounded-full p-1">
           {GAME_TYPES.map((g) => (
             <label
@@ -115,7 +115,7 @@ export function ReportMatchForm({
       </section>
 
       <section className="flex flex-col gap-[18px]">
-        <span className="overline">Score</span>
+        <span className="eyebrow">Score</span>
         <div className="grid grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)] items-center">
           <ScoreStepper label="You" value={you} onChange={setYou} />
           <span aria-hidden="true" className="bg-hairline-divider h-[120px] w-px" />

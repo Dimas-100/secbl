@@ -155,7 +155,7 @@ export default async function HomePage({
       {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
 
       <section className="flex flex-col gap-[18px]">
-        <span className="overline">Rating · {seasonLabel(today)}</span>
+        <span className="eyebrow">Rating · {seasonLabel(today)}</span>
         <div className="flex items-end justify-between gap-4">
           <span className="hero-number">{rating}</span>
           {change !== null && (

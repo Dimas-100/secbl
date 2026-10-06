@@ -52,7 +52,7 @@ export function PageHeader({
     <header className={cn("flex flex-col gap-5 pt-3", className)}>
       <div className="flex items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1.5">
-          {overline && <span className="overline">{overline}</span>}
+          {overline && <span className="eyebrow">{overline}</span>}
           <h1 className="display truncate text-[32px] leading-none">{title}</h1>
         </div>
         {right}
