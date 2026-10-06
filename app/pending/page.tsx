@@ -22,15 +22,15 @@ export default async function PendingPage() {
   const copy =
     profile?.status === "suspended"
       ? {
-          eyebrow: "Account suspended",
-          title: "You're on the bench.",
+          eyebrow: "On the bench",
+          title: "Account suspended",
           lead: "Your match history is safe. Talk to a club admin to get it lifted.",
         }
       : profile?.status === "rejected"
         ? {
-            eyebrow: "Not approved",
-            title: "This signup wasn't approved.",
-            lead: "Talk to a club admin if you think this is a mistake.",
+            eyebrow: "Signup",
+            title: "Not approved",
+            lead: "Your signup wasn't approved. Talk to a club admin if you think this is a mistake.",
           }
         : {
             eyebrow: "Almost in",
