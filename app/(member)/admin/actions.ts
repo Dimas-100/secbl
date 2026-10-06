@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { confirmPendingMatch } from "@/lib/confirm-match";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { syncAllSources } from "@/lib/sync-sources";
+import { assertPublicFeedUrl, syncAllSources } from "@/lib/sync-sources";
 
 async function setStatus(formData: FormData, status: "approved" | "rejected") {
   const supabase = await createClient();
@@ -134,14 +134,13 @@ export async function addEventSource(formData: FormData) {
   const feedUrl = String(formData.get("feed_url") ?? "").trim();
   const schoolId = String(formData.get("school_id") ?? "") || null;
   if (!name) redirect(`/admin?error=${encodeURIComponent("Give the source a short name, like PIN.")}`);
+  // The server will fetch this URL, so it must be a public https host — no
+  // private networks, IP literals or credentials (SSRF guard).
   let parsed: URL;
   try {
-    parsed = new URL(feedUrl);
-  } catch {
-    redirect(`/admin?error=${encodeURIComponent("That feed link is not a valid URL.")}`);
-  }
-  if (parsed.protocol !== "https:") {
-    redirect(`/admin?error=${encodeURIComponent("Feed links must start with https://")}`);
+    parsed = await assertPublicFeedUrl(feedUrl);
+  } catch (err) {
+    redirect(`/admin?error=${encodeURIComponent(err instanceof Error ? err.message : "That feed link can't be used.")}`);
   }
   const { data, error } = await supabase
     .from("event_sources")

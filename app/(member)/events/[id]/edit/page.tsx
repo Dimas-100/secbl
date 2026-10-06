@@ -34,11 +34,11 @@ export default async function EditEventPage({
 
   const { data: event } = await supabase
     .from("events")
-    .select("id, title, description, location, starts_at, ends_at, status, source_id, external_url, source:event_sources(name)")
+    .select("id, title, description, location, starts_at, ends_at, status, source_id, source_name, external_url")
     .eq("id", id)
     .single();
   if (!event) notFound();
-  const source = Array.isArray(event.source) ? event.source[0] : event.source;
+  const source = event.source_name ? { name: event.source_name } : null;
 
   return (
     <main>
