@@ -1,7 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { GAME_LABEL } from "@/lib/identity";
+import { matchReportedPayload } from "@/lib/push";
+import { notify } from "@/lib/push-send";
+import { formatShort } from "@/lib/race";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 function fail(message: string): never {
   redirect(`/matches/new?error=${encodeURIComponent(message)}`);
@@ -45,18 +49,40 @@ export async function reportMatch(formData: FormData) {
     fail("A spot needs a race");
   }
 
-  const { error } = await supabase.from("matches").insert({
-    reporter_id: user.id,
-    opponent_id: opponentId,
-    winner_id: myScore > theirScore ? user.id : opponentId,
-    reporter_score: myScore,
-    opponent_score: theirScore,
-    game_type: String(formData.get("game_type") ?? "8ball"),
-    played_at: String(formData.get("played_at")),
-    race_to: raceTo,
-    spot,
-    spot_to: spotTo,
+  const gameType = String(formData.get("game_type") ?? "8ball");
+  const { data: created, error } = await supabase
+    .from("matches")
+    .insert({
+      reporter_id: user.id,
+      opponent_id: opponentId,
+      winner_id: myScore > theirScore ? user.id : opponentId,
+      reporter_score: myScore,
+      opponent_score: theirScore,
+      game_type: gameType,
+      played_at: String(formData.get("played_at")),
+      race_to: raceTo,
+      spot,
+      spot_to: spotTo,
+    })
+    .select("id")
+    .single();
+  if (error || !created) fail(error?.message ?? "Could not save the match");
+
+  // Tell the opponent there is something to confirm.
+  const service = createServiceClient();
+  const { data: reporter } = await service.from("profiles").select("display_name").eq("id", user.id).single();
+  await notify(service, {
+    candidates: [opponentId],
+    category: "matches",
+    excludeId: user.id,
+    payload: matchReportedPayload({
+      matchId: created.id,
+      reporterName: reporter?.display_name ?? "A member",
+      reporterScore: myScore,
+      opponentScore: theirScore,
+      gameLabel: GAME_LABEL[gameType] ?? gameType,
+      format: formatShort(raceTo, spot),
+    }),
   });
-  if (error) fail(error.message);
   redirect(`/?message=${encodeURIComponent("Match reported — waiting on your opponent to confirm.")}`);
 }

@@ -13,6 +13,7 @@ import {
   type ChatMessage,
 } from "@/lib/chat";
 import { cn } from "@/lib/utils";
+import { notifyMessage } from "@/app/(member)/chat/actions";
 
 export const PAGE_SIZE = 50;
 const MESSAGE_COLUMNS = "id, channel_id, sender_id, body, client_id, created_at";
@@ -250,6 +251,8 @@ export function ChatRoom({
       return;
     }
     absorb([data as ChatMessage]);
+    // Fire and forget: the push is a courtesy, never part of sending.
+    void notifyMessage((data as ChatMessage).id);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

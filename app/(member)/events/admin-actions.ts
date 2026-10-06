@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { clubTimeToISO } from "@/lib/events";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { clubTimeToISO, formatEventWhen } from "@/lib/events";
+import { eventPayload } from "@/lib/push";
+import { notify } from "@/lib/push-send";
 
 // Every export here is admin-only. RLS is the real guard; this check gives the
 // admin a redirect instead of an opaque policy failure.
@@ -68,6 +70,22 @@ export async function createEvent(formData: FormData) {
   if (error || !data) {
     redirect(`/events/new?error=${encodeURIComponent(error?.message ?? "Could not create event")}`);
   }
+
+  // Everyone who has events on hears about it; the creator does not.
+  const service = createServiceClient();
+  const { data: members } = await service.from("profiles").select("id").eq("status", "approved");
+  await notify(service, {
+    candidates: (members ?? []).map((m) => m.id as string),
+    category: "events",
+    excludeId: user.id,
+    payload: eventPayload({
+      eventId: data.id,
+      title: parsed.title,
+      when: formatEventWhen(parsed.starts_at, parsed.ends_at),
+      location: parsed.location,
+    }),
+  });
+
   revalidatePath("/events");
   revalidatePath("/");
   redirect(`/events/${data.id}`);

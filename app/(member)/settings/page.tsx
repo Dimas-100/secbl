@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/(public)/login/actions";
 import { updateDisplayName } from "./actions";
 import { LookEditor } from "./look-editor";
+import { NotificationsCard } from "./notifications-card";
 
 export default async function SettingsPage({
   searchParams,
@@ -32,6 +33,11 @@ export default async function SettingsPage({
     .eq("id", user.id)
     .single();
   const school = Array.isArray(profile?.schools) ? profile.schools[0] : profile?.schools;
+  const { data: prefs } = await supabase
+    .from("notification_prefs")
+    .select("messages, matches, events")
+    .eq("profile_id", user.id)
+    .maybeSingle();
   // Admins see how many signups are waiting without opening the queue — a
   // new member left pending for days is the fastest way to lose them.
   let pending = 0;
@@ -109,6 +115,17 @@ export default async function SettingsPage({
           <p className="text-muted-foreground text-xs">
             This is how you appear on the leaderboard and in match reports.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <SectionLabel>Notifications</SectionLabel>
+        </CardHeader>
+        <CardContent>
+          <NotificationsCard
+            initialPrefs={prefs ?? { messages: true, matches: true, events: true }}
+          />
         </CardContent>
       </Card>
 
