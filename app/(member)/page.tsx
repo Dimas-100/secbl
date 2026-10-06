@@ -13,8 +13,10 @@ import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { winnerDelta } from "@/lib/form";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
+import { xpCaption } from "@/lib/levels";
 import { labelPlayedDate, overallRank, ratingChangeSince, seasonLabel, winRate } from "@/lib/stats";
 import { cn } from "@/lib/utils";
+import { loadXp } from "@/lib/xp-data";
 import type { RsvpResponse } from "@/lib/types";
 
 type NextRsvp = {
@@ -48,6 +50,7 @@ export default async function HomePage({
     { data: awaiting },
     { data: recent },
     { data: scheduledEvents },
+    { xp, level },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -97,6 +100,7 @@ export default async function HomePage({
       .or(`ends_at.gte.${nowIso},and(ends_at.is.null,starts_at.gte.${nowIso})`)
       .order("starts_at")
       .limit(5),
+    loadXp(supabase, user.id),
   ]);
 
   const rating = me?.rating ?? 450;
@@ -168,8 +172,16 @@ export default async function HomePage({
         <Sparkline ratings={ratings} />
         <StatGrid cols={3}>
           <StatTile label="Overall rank" value={rank ? `#${rank}` : "–"} />
-          <StatTile label="Win rate" value={rate === null ? "–" : `${rate}%`} />
-          <StatTile label="Record" value={`${wins}–${losses}`} note={provisional ? "provisional" : undefined} />
+          <StatTile
+            label="Win rate"
+            value={rate === null ? "–" : `${rate}%`}
+            note={`${wins}–${losses}${provisional ? " · provisional" : ""}`}
+          />
+          <StatTile
+            label={`Level · ${level.title}`}
+            value={`Lvl ${level.level}`}
+            note={`${Math.round((level.intoLevel / level.needed) * 100)}% to ${level.level + 1}`}
+          />
         </StatGrid>
       </section>
 
@@ -288,6 +300,7 @@ export default async function HomePage({
               perspectiveId={user.id}
               gameType={GAME_LABEL[m.game_type] ?? m.game_type}
               meta={labelPlayedDate(m.played_at, today)}
+              caption={xpCaption(m.id, xp)}
             />
           );
         })}
