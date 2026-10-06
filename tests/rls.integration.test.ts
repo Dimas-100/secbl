@@ -457,4 +457,83 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
       await admin.from("matches").delete().eq("id", created!.id);
     }
   });
+
+  // Live Club (migration 0020): push, school logos, races.
+
+  it("a member manages only their own push subscriptions and prefs", async () => {
+    const me = await signIn(memberEmail);
+    const sub = { profile_id: memberId, endpoint: `https://push.example/${Date.now()}`, p256dh: "k", auth: "a" };
+    try {
+      const { error: insErr } = await me.from("push_subscriptions").insert(sub);
+      expect(insErr).toBeNull();
+      const { error: prefErr } = await me
+        .from("notification_prefs")
+        .upsert({ profile_id: memberId, messages: false });
+      expect(prefErr).toBeNull();
+      const { data: mine } = await me.from("push_subscriptions").select("endpoint");
+      expect(mine?.map((s) => s.endpoint)).toEqual([sub.endpoint]);
+      // A pending (unapproved) account sees nothing, and nobody can plant a
+      // subscription on someone else's profile.
+      const other = await signIn(pendingEmail);
+      const { data: theirs } = await other.from("push_subscriptions").select("id");
+      expect(theirs).toEqual([]);
+      const { error: forged } = await me
+        .from("push_subscriptions")
+        .insert({ ...sub, profile_id: pendingId, endpoint: `${sub.endpoint}x` });
+      expect(forged).not.toBeNull();
+    } finally {
+      await admin.from("push_subscriptions").delete().eq("profile_id", memberId);
+      await admin.from("notification_prefs").delete().eq("profile_id", memberId);
+    }
+  });
+
+  it("only admins can set a school logo, and only inside the bucket", async () => {
+    const me = await signIn(memberEmail);
+    const { data: school } = await admin.from("schools").select("id, logo_url").limit(1).single();
+    const { error } = await me.rpc("set_school_logo", {
+      p_school_id: school!.id,
+      p_url: "https://x/storage/v1/object/public/school-logos/a.png",
+    });
+    expect(error?.message).toMatch(/admin/i);
+    await admin.from("profiles").update({ role: "admin" }).eq("id", memberId);
+    try {
+      const { error: foreign } = await me.rpc("set_school_logo", {
+        p_school_id: school!.id,
+        p_url: "https://evil.example/logo.png",
+      });
+      expect(foreign?.message).toMatch(/school-logos/);
+      // The real logo is untouched by the two refusals.
+      const { data: after } = await admin.from("schools").select("logo_url").eq("id", school!.id).single();
+      expect(after?.logo_url).toBe(school!.logo_url);
+    } finally {
+      await admin.from("profiles").update({ role: "member" }).eq("id", memberId);
+    }
+  });
+
+  it("rejects a race whose scores do not reach race_to or whose spot does not fit", async () => {
+    const me = await signIn(memberEmail);
+    const base = {
+      reporter_id: memberId,
+      opponent_id: pendingId,
+      winner_id: memberId,
+      game_type: "8ball",
+      played_at: "2026-10-06",
+    };
+    const { error: short } = await me
+      .from("matches")
+      .insert({ ...base, reporter_score: 4, opponent_score: 2, race_to: 5 });
+    expect(short?.message).toMatch(/matches_race_shape/);
+    const { error: bigSpot } = await me
+      .from("matches")
+      .insert({ ...base, reporter_score: 3, opponent_score: 2, race_to: 3, spot: 3, spot_to: pendingId });
+    expect(bigSpot?.message).toMatch(/matches_spot_fits/);
+    const { error: orphanSpot } = await me
+      .from("matches")
+      .insert({ ...base, reporter_score: 3, opponent_score: 2, race_to: 3, spot: 1 });
+    expect(orphanSpot?.message).toMatch(/matches_spot_shape/);
+    const { error: okErr } = await me
+      .from("matches")
+      .insert({ ...base, reporter_score: 3, opponent_score: 2, race_to: 3, spot: 2, spot_to: pendingId });
+    expect(okErr).toBeNull();
+  });
 });
