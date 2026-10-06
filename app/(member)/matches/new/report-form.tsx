@@ -109,7 +109,7 @@ export function ReportMatchForm({
           Score
         </span>
         <div className="flex gap-3">
-          <ScoreStepper label="You" accent value={you} onChange={setYou} />
+          <ScoreStepper label="You" value={you} onChange={setYou} />
           <ScoreStepper
             label={firstName(selected) ?? "Them"}
             value={them}

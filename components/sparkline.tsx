@@ -1,60 +1,58 @@
 import { sparklinePath, sparklinePoints } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 
-// The hero's rating line: oldest → newest, drawn once on load (the single
-// page-load motion in the app; static under prefers-reduced-motion). Pure
-// SVG rendered on the server. A soft area fill under the line gives it the
-// weight of a real chart without axes or chrome.
+// The rating line: oldest → newest, a 1.6px brass stroke with an end dot over
+// a hairline baseline. Drawn once on load (the single page-load motion in the
+// app; static under prefers-reduced-motion). Pure SVG rendered on the server.
+// preserveAspectRatio="none" + non-scaling strokes let it fill any width
+// without fattening the line.
 export function Sparkline({
   ratings,
-  width = 160,
-  height = 44,
+  width = 342,
+  height = 56,
   className,
-  id = "spark",
 }: {
   ratings: number[];
   width?: number;
   height?: number;
   className?: string;
-  id?: string;
 }) {
-  const points = sparklinePoints(ratings, width - 6, height - 10).map(
-    ([x, y]) => [x + 3, y + 3] as [number, number]
+  const points = sparklinePoints(ratings, width - 6, height - 12).map(
+    ([x, y]) => [x + 3, y + 4] as [number, number]
   );
   if (points.length === 0) return null;
   const d = sparklinePath(points);
-  const first = points[0];
   const last = points[points.length - 1];
-  const area = `${d} L${last[0]} ${height} L${first[0]} ${height} Z`;
-  const gradientId = `${id}-fill`;
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      width={width}
+      width="100%"
       height={height}
+      preserveAspectRatio="none"
       role="img"
       aria-label={`Rating over your last ${ratings.length} rated matches`}
-      className={cn("overflow-visible", className)}
+      className={cn("text-brass block overflow-visible", className)}
     >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
-          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${gradientId})`} className="sparkline-area" />
+      <line
+        x1={0}
+        y1={height - 0.5}
+        x2={width}
+        y2={height - 0.5}
+        stroke="var(--hairline-divider)"
+        vectorEffect="non-scaling-stroke"
+      />
       <path
         d={d}
         fill="none"
         stroke="currentColor"
-        strokeWidth={2.25}
+        strokeWidth={1.6}
         strokeLinecap="round"
         strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
         pathLength={1}
         className="sparkline-draw"
       />
-      <circle cx={last[0]} cy={last[1]} r={3.5} fill="currentColor" className="sparkline-dot" />
-      <circle cx={last[0]} cy={last[1]} r={7} fill="currentColor" fillOpacity={0.2} className="sparkline-dot" />
+      <circle cx={last[0]} cy={last[1]} r={3} fill="currentColor" className="sparkline-dot" />
     </svg>
   );
 }
