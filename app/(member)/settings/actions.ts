@@ -80,6 +80,21 @@ export async function setAvatarUrl(url: string | null): Promise<{ error: string 
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Please log in again." };
+  // Belt and braces with the database function: the URL must point at this
+  // project's Storage and the caller's own folder — never another host.
+  if (url !== null) {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return { error: "That photo link is not valid." };
+    }
+    const storageHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname;
+    const expectedPath = `/storage/v1/object/public/avatars/${user.id}/`;
+    if (parsed.protocol !== "https:" || parsed.hostname !== storageHost || !parsed.pathname.startsWith(expectedPath)) {
+      return { error: "Photos must be uploaded through the app." };
+    }
+  }
   const { error } = await supabase.rpc("set_avatar_url", { p_url: url });
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
