@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import type { Prefs } from "@/lib/push";
+import { isKnownPushEndpoint, type Prefs } from "@/lib/push";
 import { sendPush } from "@/lib/push-send";
 
 // The member's own push rows, through their own client so RLS applies.
@@ -25,7 +25,7 @@ export async function savePushSubscription(
 ): Promise<{ error: string | null }> {
   const { supabase, user } = await me();
   if (!user) return { error: "Please log in again." };
-  if (!sub?.endpoint?.startsWith("https://") || !sub.keys?.p256dh || !sub.keys?.auth) {
+  if (!sub?.endpoint || !isKnownPushEndpoint(sub.endpoint) || !sub.keys?.p256dh || !sub.keys?.auth) {
     return { error: "That subscription is not valid." };
   }
   const { error } = await supabase.from("push_subscriptions").upsert(

@@ -20,6 +20,27 @@ export interface PushPayload {
 
 const BODY_MAX = 120;
 
+// The server POSTs to whatever endpoint a member registers, so only the
+// browsers' own push services are accepted — never an arbitrary host.
+const PUSH_HOSTS = [
+  /(^|\.)googleapis\.com$/,
+  /(^|\.)google\.com$/,
+  /(^|\.)push\.apple\.com$/,
+  /(^|\.)push\.services\.mozilla\.com$/,
+  /(^|\.)notify\.windows\.com$/,
+];
+
+export function isKnownPushEndpoint(endpoint: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  return PUSH_HOSTS.some((re) => re.test(url.hostname));
+}
+
 function first(name: string): string {
   return name.trim().split(/\s+/)[0] || name;
 }

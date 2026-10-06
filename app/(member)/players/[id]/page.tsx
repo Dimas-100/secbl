@@ -13,9 +13,10 @@ import { ShareButton } from "@/components/share-button";
 import { Sparkline } from "@/components/sparkline";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { SubmitButton } from "@/components/submit-button";
+import { TitleBadge } from "@/components/title-badge";
 import { ACHIEVEMENTS, earnedAchievements } from "@/lib/achievements";
 import { GAME_LABEL } from "@/lib/identity";
-import { xpCaption } from "@/lib/levels";
+import { nextBadge, xpCaption } from "@/lib/levels";
 import { formatShort } from "@/lib/race";
 import { createClient } from "@/lib/supabase/server";
 import { startDm } from "@/app/(member)/chat/actions";
@@ -156,6 +157,7 @@ export default async function PlayerPage({
   });
   const nextAchievement = ACHIEVEMENTS.find((a) => !achievements.some((e) => e.id === a.id));
   const firstName = profile.display_name.split(" ")[0];
+  const next = nextBadge(level, xp.total);
 
   return (
     <main className="flex flex-col gap-8">
@@ -270,15 +272,24 @@ export default async function PlayerPage({
         className="press flex flex-col gap-3"
         aria-label={`Level ${level.level}, ${level.title}. ${level.intoLevel} of ${level.needed} XP into this level. Open the ladder.`}
       >
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[17px] font-semibold tracking-[-0.01em]">
-            Level {level.level} <span className="text-brass font-medium">· {level.title}</span>
+        <div className="flex items-center justify-between gap-3">
+          <span className="flex min-w-0 items-center gap-3">
+            <TitleBadge title={level.title} size={40} decorative />
+            <span className="truncate text-[17px] font-semibold tracking-[-0.01em]">
+              Level {level.level} <span className="text-brass font-medium">· {level.title}</span>
+            </span>
           </span>
-          <span className="text-muted-foreground stat-number text-[12px]">
+          <span className="text-muted-foreground stat-number shrink-0 text-[12px]">
             {level.intoLevel} / {level.needed} XP
           </span>
         </div>
         <LevelBar value={level.intoLevel} max={level.needed} />
+        {next && (
+          <span className="text-muted-foreground flex items-center gap-2 text-[12px]">
+            <TitleBadge title={next.title} size={20} locked decorative />
+            Next: {next.title} badge at level {next.atLevel} · {next.xpToGo.toLocaleString("en-US")} XP to go
+          </span>
+        )}
       </Link>
 
       <section className="flex flex-col gap-3">

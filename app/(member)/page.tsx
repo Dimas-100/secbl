@@ -8,6 +8,7 @@ import { MessagesButton } from "@/components/messages-button";
 import { SectionHeading } from "@/components/section-heading";
 import { Sparkline } from "@/components/sparkline";
 import { StatGrid, StatTile } from "@/components/stat-tile";
+import { TitleBadge } from "@/components/title-badge";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
@@ -151,7 +152,10 @@ export default async function HomePage({
           />
           <span className="flex flex-col gap-px">
             <span className="text-muted-foreground text-[12px]">{greeting}</span>
-            <span className="text-[16px] font-medium">{first}</span>
+            <span className="flex items-center gap-1.5 text-[16px] font-medium">
+              {first}
+              <TitleBadge title={level.title} size={20} />
+            </span>
           </span>
         </Link>
         <MessagesButton />

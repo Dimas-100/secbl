@@ -107,6 +107,24 @@ export async function cleanupTracked() {
   for (const id of userIds) {
     await service.from("channels").delete().eq("type", "dm").like("dm_key", `%${id}%`);
   }
+  // matches.reporter_id / opponent_id and rating_history.profile_id reference
+  // profiles with NO cascade, so a test user who played a game cannot be
+  // deleted until their matches are gone — deleteUser would fail silently
+  // and leak the user into production (observed 2026-10-06 with the race
+  // spec). Test users only ever play each other, so nobody's rating is
+  // affected by removing these rows.
+  for (const id of userIds) {
+    const { data: played } = await service
+      .from("matches")
+      .select("id")
+      .or(`reporter_id.eq.${id},opponent_id.eq.${id}`);
+    const matchIds = (played ?? []).map((m) => m.id as string);
+    if (matchIds.length > 0) {
+      await service.from("rating_history").delete().in("match_id", matchIds);
+      await service.from("matches").delete().in("id", matchIds);
+    }
+    await service.from("rating_history").delete().eq("profile_id", id);
+  }
   for (const id of userIds) {
     await service.auth.admin.deleteUser(id);
   }

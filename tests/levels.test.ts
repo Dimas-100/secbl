@@ -6,6 +6,7 @@ import {
   XP_LOSS,
   XP_WIN,
   levelFromXp,
+  nextBadge,
   xpCaption,
   xpFromMatches,
   xpToNext,
@@ -192,5 +193,14 @@ describe("xpCaption", () => {
     expect(xpCaption("2", r)).toBe("+80 XP");
     expect(xpCaption("4", r)).toBe("No XP — weekly limit");
     expect(xpCaption("nope", r)).toBeNull();
+  });
+});
+
+describe("nextBadge", () => {
+  it("points at the next title and the XP to reach it", () => {
+    const xp = xpToReach(12) + 420;
+    expect(nextBadge(levelFromXp(xp), xp)).toEqual({ title: "Hustler", atLevel: 15, xpToGo: xpToReach(15) - xp });
+    expect(nextBadge(levelFromXp(0), 0)).toEqual({ title: "Regular", atLevel: 5, xpToGo: 700 });
+    expect(nextBadge(levelFromXp(xpToReach(41)), xpToReach(41))).toBeNull();
   });
 });

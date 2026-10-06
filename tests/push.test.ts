@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   eventPayload,
+  isKnownPushEndpoint,
   matchConfirmedPayload,
   matchDisputedPayload,
   matchReportedPayload,
@@ -24,6 +25,29 @@ describe("recipientsFor", () => {
   });
   it("never includes the actor, and dedupes", () => {
     expect(recipientsFor([c("a", null), c("me", null), c("a", null)], "events", "me")).toEqual(["a"]);
+  });
+});
+
+describe("isKnownPushEndpoint", () => {
+  it("accepts the browsers' push services and nothing else", () => {
+    for (const ok of [
+      "https://fcm.googleapis.com/fcm/send/abc",
+      "https://jmt17.google.com/fcm/send/abc",
+      "https://web.push.apple.com/QAbc",
+      "https://updates.push.services.mozilla.com/wpush/v2/abc",
+      "https://wns2-par02p.notify.windows.com/w/?token=abc",
+    ]) {
+      expect(isKnownPushEndpoint(ok)).toBe(true);
+    }
+    for (const bad of [
+      "http://fcm.googleapis.com/fcm/send/abc",
+      "https://evil.example/fcm/send/abc",
+      "https://fcm.googleapis.com.evil.example/x",
+      "https://169.254.169.254/latest",
+      "not a url",
+    ]) {
+      expect(isKnownPushEndpoint(bad)).toBe(false);
+    }
   });
 });
 
