@@ -36,7 +36,7 @@ function EventRowLink({ event }: { event: EventRow }) {
   return (
     <Link
       href={`/events/${event.id}`}
-      className="hover:bg-muted -mx-3 flex min-h-14 items-center gap-3 rounded-lg p-3"
+      className="press hover:bg-muted -mx-3 flex min-h-14 items-center gap-3 rounded-lg p-3"
     >
       <span className="bg-accent text-accent-foreground flex w-11 shrink-0 flex-col items-center rounded-lg py-1">
         <span className="text-[10px] font-bold uppercase">{weekday}</span>

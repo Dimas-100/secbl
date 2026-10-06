@@ -122,7 +122,7 @@ export default async function ChatPage({
                 <Link
                   key={row.id}
                   href={`/chat/${row.id}`}
-                  className="hover:bg-muted flex min-h-16 items-center gap-3 rounded-lg px-2 py-3"
+                  className="press hover:bg-muted flex min-h-16 items-center gap-3 rounded-lg px-2 py-3"
                 >
                   <RoomAvatar row={row} />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">

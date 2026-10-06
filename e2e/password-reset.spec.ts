@@ -50,7 +50,7 @@ test("forgot password → reset link → new password → log in", async ({ page
   await page.fill('input[name="password"]', newPassword);
   await page.fill('input[name="confirm"]', newPassword);
   await page.click('button[type="submit"]');
-  await expect(page.getByRole("heading", { name: /recent matches/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /league feed/i })).toBeVisible();
 
   // The new password works. Drop the recovery session by clearing cookies
   // rather than clicking Log out, which only exists inside the member layout.
@@ -59,7 +59,7 @@ test("forgot password → reset link → new password → log in", async ({ page
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', newPassword);
   await page.click('button[type="submit"]');
-  await expect(page.getByRole("heading", { name: /recent matches/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /league feed/i })).toBeVisible();
 
   // ...and a spent link cannot be replayed.
   await page.goto(`/auth/callback?token_hash=${tokenHash}&type=recovery&next=/reset-password`);

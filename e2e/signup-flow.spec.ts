@@ -32,5 +32,5 @@ test("signup → pending → approve → home", async ({ page }) => {
   await service.from("profiles").update({ status: "approved" }).eq("id", profile!.id);
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /recent matches/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /league feed/i })).toBeVisible();
 });

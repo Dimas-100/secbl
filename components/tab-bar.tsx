@@ -29,7 +29,7 @@ export function TabBar() {
             href={href}
             aria-current={active(href) ? "page" : undefined}
             className={cn(
-              "flex min-w-14 flex-col items-center gap-0.5 text-[10px] font-semibold",
+              "press flex min-w-14 flex-col items-center gap-0.5 text-[10px] font-semibold",
               raised
                 ? "-mt-7 text-surface-dark-foreground/70"
                 : active(href)

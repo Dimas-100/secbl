@@ -45,7 +45,7 @@ test("member renames themselves; admin suspends and reinstates them", async ({ p
 
   // The member fixes the typo in their own name.
   await logIn(memberEmail);
-  await expect(page.getByRole("heading", { name: /recent matches/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /league feed/i })).toBeVisible();
   await page.goto("/settings");
   await page.fill('input[name="display_name"]', fixedName);
   await page.click('button[type="submit"]');
@@ -78,7 +78,7 @@ test("member renames themselves; admin suspends and reinstates them", async ({ p
   await expect(memberForm.getByRole("button", { name: "Suspend" })).toBeVisible();
 
   await logIn(memberEmail);
-  await expect(page.getByRole("heading", { name: /recent matches/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /league feed/i })).toBeVisible();
 
   // Rating and history survived the suspension untouched.
   const { data: profile } = await service
