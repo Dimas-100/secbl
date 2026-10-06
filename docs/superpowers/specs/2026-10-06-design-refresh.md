@@ -1,7 +1,7 @@
 # SECBL Design Refresh — "Scoreboard You"
 
 **Date:** 2026-10-06
-**Status:** Approved direction, implementation in progress
+**Status:** Approved direction, implementation in progress — **visual layer superseded by `2026-10-06-elevated-dark-redesign-design.md`** (data features here still apply)
 **Builds on:** `2026-09-01-frontend-redesign-design.md` (Sleek Broadcast tokens, shell, report flow stay)
 
 ## 1. What we looked at and what we took

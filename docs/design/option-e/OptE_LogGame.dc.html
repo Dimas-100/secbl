@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Option E — Log a game</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#0E0F11}
+a{color:#C9A96E}a:hover{color:#E0C590}
+button{font-family:inherit;cursor:pointer}
+input::placeholder{color:#6F7278}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #0E0F11; color: #F2F1EE; font-family: 'Geist', system-ui, sans-serif; font-feature-settings: 'tnum' 1">
+
+  <div style="height: 100%; overflow-y: auto; padding: 60px 24px 150px; box-sizing: border-box; display: flex; flex-direction: column; gap: 32px">
+
+    <header style="display: flex; align-items: center; justify-content: space-between">
+      <a href="OptE_Home.dc.html" aria-label="Close" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #F2F1EE; text-decoration: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+      </a>
+      <h1 style="margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em">Log a game</h1>
+      <span style="width: 44px"></span>
+    </header>
+
+    <section style="display: flex; flex-direction: column; gap: 14px">
+      <label for="opp" style="font-size: 11px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: #8E9196">Opponent</label>
+      <div style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 16px; border-radius: 24px; background: #16181B; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8E9196" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <input id="opp" type="text" placeholder="Search players" style="flex: 1; background: transparent; border: 0; outline: none; color: #F2F1EE; font-size: 15px; font-family: inherit">
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+        <sc-for list="{{opps}}" as="o" hint-placeholder-count="4">
+          <button onClick="{{o.pick}}" aria-pressed="{{o.on}}" style="background: transparent; border: 0; padding: 4px 0; display: flex; flex-direction: column; align-items: center; gap: 8px; color: {{o.labelColor}}; font-size: 12px; font-weight: 500">
+            <span style="width: 56px; height: 56px; border-radius: 28px; background: {{o.tone}}; box-shadow: {{o.ring}}; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; color: #DCD8CF">{{o.i}}</span>
+            {{o.first}}
+          </button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 14px">
+      <span style="font-size: 11px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: #8E9196">Game</span>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 24px; background: #16181B">
+        <sc-for list="{{types}}" as="t" hint-placeholder-count="4">
+          <button onClick="{{t.pick}}" aria-pressed="{{t.on}}" style="{{t.style}}">{{t.label}}</button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 18px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <span style="font-size: 11px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: #8E9196">Score</span>
+        <span style="font-size: 12px; color: #8E9196">Race to {{raceTo}}</span>
+      </div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr); align-items: center">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 14px">
+          <span style="font-size: 13px; color: #8E9196">You</span>
+          <span style="font-size: 72px; font-weight: 500; line-height: .9; letter-spacing: -.045em">{{me}}</span>
+          <div style="display: flex; gap: 10px">
+            <button onClick="{{meDown}}" aria-label="Lower your score" style="width: 44px; height: 44px; border-radius: 22px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); color: #F2F1EE; font-size: 20px; font-weight: 300">−</button>
+            <button onClick="{{meUp}}" aria-label="Raise your score" style="width: 44px; height: 44px; border-radius: 22px; border: 0; background: #F2F1EE; color: #0E0F11; font-size: 20px; font-weight: 400">+</button>
+          </div>
+        </div>
+        <span style="width: 1px; height: 120px; background: rgba(255,255,255,.08)"></span>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 14px">
+          <span style="font-size: 13px; color: #8E9196">{{oppFirst}}</span>
+          <span style="font-size: 72px; font-weight: 500; line-height: .9; letter-spacing: -.045em">{{them}}</span>
+          <div style="display: flex; gap: 10px">
+            <button onClick="{{themDown}}" aria-label="Lower opponent score" style="width: 44px; height: 44px; border-radius: 22px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); color: #F2F1EE; font-size: 20px; font-weight: 300">−</button>
+            <button onClick="{{themUp}}" aria-label="Raise opponent score" style="width: 44px; height: 44px; border-radius: 22px; border: 0; background: #F2F1EE; color: #0E0F11; font-size: 20px; font-weight: 400">+</button>
+          </div>
+        </div>
+      </div>
+      <span style="text-align: center; font-size: 13px; color: {{resultColor}}">{{resultText}}</span>
+    </section>
+
+    <section style="display: flex; flex-direction: column; border-top: 1px solid rgba(255,255,255,.08)">
+      <button onClick="{{toggleRanked}}" role="switch" aria-checked="{{ranked}}" style="display: flex; align-items: center; gap: 12px; padding: 16px 0; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.08); color: #F2F1EE; text-align: left">
+        <span style="flex: 1; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 15px; font-weight: 500">Ranked</span><span style="font-size: 12px; color: #8E9196">Counts toward rating, XP and school points</span></span>
+        <span style="{{switchTrack}}"><span style="width: 22px; height: 22px; border-radius: 11px; background: #0E0F11; display: block"></span></span>
+      </button>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,.08)">
+        <span style="flex: 1; font-size: 15px; font-weight: 500">When</span>
+        <span style="font-size: 14px; color: #8E9196">Today, 8:42 PM</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8E9196" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+      </div>
+    </section>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 24px 34px; background: #0E0F11; border-top: 1px solid rgba(255,255,255,.07); display: flex; flex-direction: column; gap: 10px">
+    <a href="OptE_Home.dc.html" style="height: 52px; border-radius: 26px; background: #F2F1EE; color: #0E0F11; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; text-decoration: none">Send to {{oppFirst}} to confirm</a>
+    <span style="text-align: center; font-size: 12px; color: #8E9196">Ranked results post once your opponent confirms.</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { opp: 'Kevin Moss', type: '8-Ball', me: 5, them: 3, ranked: true }; }
+  renderVals() {
+    const s = this.state;
+    const race = { '8-Ball': 5, '9-Ball': 7, '10-Ball': 7, 'Straight': 50 }[s.type];
+    const clamp = (n) => Math.max(0, Math.min(race, n));
+    const seg = (on) => 'height: 40px; border: 0; border-radius: 20px; font-size: 13px; ' +
+      (on ? 'background: #F2F1EE; color: #0E0F11; font-weight: 600;' : 'background: transparent; color: #8E9196; font-weight: 500;');
+    let resultText = 'In progress', resultColor = '#8E9196';
+    if (s.me === race && s.them < race) { resultText = 'Win · about +16 rating, +120 XP'; resultColor = '#8FCBAA'; }
+    else if (s.them === race && s.me < race) { resultText = 'Loss · about −9 rating, +40 XP'; resultColor = '#E0A08A'; }
+    const people = [['Kevin Moss', '#2B3140'], ['Lena Kim', '#3A3328'], ['TJ Walker', '#2A3A33'], ['Mia Patel', '#33293A']];
+    return {
+      opps: people.map(([n, tone]) => {
+        const on = s.opp === n;
+        return {
+          on, tone, first: n.split(' ')[0], i: n.split(' ').map((w) => w[0]).join(''),
+          ring: on ? '0 0 0 2px #0E0F11, 0 0 0 3px #C9A96E' : '0 0 0 1px rgba(255,255,255,.1)',
+          labelColor: on ? '#F2F1EE' : '#8E9196',
+          pick: () => this.setState({ opp: n })
+        };
+      }),
+      types: ['8-Ball', '9-Ball', '10-Ball', 'Straight'].map((t) => ({
+        label: t, on: s.type === t, style: seg(s.type === t), pick: () => this.setState({ type: t, me: 0, them: 0 })
+      })),
+      raceTo: race, me: s.me, them: s.them, oppFirst: s.opp.split(' ')[0],
+      meUp: () => this.setState({ me: clamp(s.me + 1) }), meDown: () => this.setState({ me: clamp(s.me - 1) }),
+      themUp: () => this.setState({ them: clamp(s.them + 1) }), themDown: () => this.setState({ them: clamp(s.them - 1) }),
+      resultText, resultColor, ranked: s.ranked,
+      toggleRanked: () => this.setState({ ranked: !s.ranked }),
+      switchTrack: 'width: 48px; height: 28px; border-radius: 14px; padding: 3px; box-sizing: border-box; display: flex; flex: none; ' +
+        (s.ranked ? 'background: #C9A96E; justify-content: flex-end;' : 'background: #33363B; justify-content: flex-start;')
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Option E — Events</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#0E0F11}
+a{color:#C9A96E}a:hover{color:#E0C590}
+.tab{display:flex;flex-direction:column;align-items:center;gap:5px;width:60px;min-height:44px;color:#7D8086;text-decoration:none;font-size:10px;font-weight:500;letter-spacing:.04em}
+.tab:hover{color:#F2F1EE}
+.tab.on{color:#F2F1EE}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #0E0F11; color: #F2F1EE; font-family: 'Geist', system-ui, sans-serif; font-feature-settings: 'tnum' 1">
+
+  <div style="height: 100%; overflow-y: auto; padding: 60px 24px 120px; box-sizing: border-box; display: flex; flex-direction: column; gap: 28px">
+
+    <header style="display: flex; align-items: flex-end; justify-content: space-between">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 11px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: #8E9196">October 2026</span>
+        <h1 style="margin: 0; font-size: 32px; font-weight: 600; line-height: 1; letter-spacing: -.03em">Events</h1>
+      </div>
+      <a href="OptE_Chats.dc.html" aria-label="Messages, 3 unread" style="position: relative; width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #F2F1EE; text-decoration: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg>
+        <span style="position: absolute; top: 10px; right: 10px; width: 7px; height: 7px; border-radius: 4px; background: #C9A96E; box-shadow: 0 0 0 2px #0E0F11"></span>
+      </a>
+    </header>
+
+    <div role="tablist" aria-label="Event filter" style="display: flex; gap: 24px; border-bottom: 1px solid rgba(255,255,255,.08)">
+      <sc-for list="{{filters}}" as="f" hint-placeholder-count="4">
+        <button role="tab" aria-selected="{{f.on}}" onClick="{{f.pick}}" style="{{f.style}}">{{f.label}}</button>
+      </sc-for>
+    </div>
+
+    <article style="border-radius: 24px; background: #16181B; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); padding: 24px; display: flex; flex-direction: column; gap: 22px">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start">
+        <span style="font-size: 11px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: #C9A96E">Featured · All schools</span>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; line-height: 1">
+          <span style="font-size: 11px; font-weight: 500; letter-spacing: .1em; color: #8E9196">NOV</span>
+          <span style="font-size: 30px; font-weight: 500; letter-spacing: -.03em">15</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15">SEC Fall Invitational</h2>
+        <span style="font-size: 14px; color: #8E9196; line-height: 1.5">8-Ball, double elimination<br>Saturday, 11:00 AM · [VENUE]</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #8E9196"><span>41 of 64 spots filled</span><span>Closes Nov 8</span></div>
+        <div style="height: 2px; background: rgba(255,255,255,.08)"><div style="width: 64%; height: 100%; background: #C9A96E"></div></div>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <div style="display: flex; align-items: center">
+          <span style="width: 30px; height: 30px; border-radius: 15px; background: #2B3140; box-shadow: 0 0 0 2px #16181B; margin-right: -8px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; color: #DCD8CF">KM</span>
+          <span style="width: 30px; height: 30px; border-radius: 15px; background: #3A2F2A; box-shadow: 0 0 0 2px #16181B; margin-right: -8px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; color: #DCD8CF">RJ</span>
+          <span style="width: 30px; height: 30px; border-radius: 15px; background: #33293A; box-shadow: 0 0 0 2px #16181B; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; color: #DCD8CF">LK</span>
+        </div>
+        <button style="height: 44px; padding: 0 22px; border-radius: 22px; border: 0; background: #F2F1EE; color: #0E0F11; font-size: 14px; font-weight: 600">Register · [ENTRY FEE]</button>
+      </div>
+    </article>
+
+    <section style="display: flex; flex-direction: column">
+      <h2 style="margin: 0 0 6px; font-size: 17px; font-weight: 600; letter-spacing: -.01em">Coming up</h2>
+      <sc-for list="{{events}}" as="e" hint-placeholder-count="4">
+        <div style="display: flex; gap: 18px; padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,.06)">
+          <div style="width: 40px; flex: none; display: flex; flex-direction: column; align-items: flex-start; line-height: 1; gap: 4px">
+            <span style="font-size: 11px; font-weight: 500; letter-spacing: .1em; color: #8E9196">{{e.dow}}</span>
+            <span style="font-size: 24px; font-weight: 500; letter-spacing: -.03em">{{e.day}}</span>
+          </div>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 15px; font-weight: 500">{{e.title}}</span>
+            <span style="font-size: 12px; color: #8E9196">{{e.meta}}</span>
+          </div>
+          <span style="align-self: center; font-size: 12px; font-weight: 500; color: {{e.statusColor}}">{{e.status}}</span>
+        </div>
+      </sc-for>
+    </section>
+  </div>
+
+  <nav aria-label="Main" style="position: absolute; left: 0; right: 0; bottom: 0; height: 90px; background: #0E0F11; border-top: 1px solid rgba(255,255,255,.07); display: flex; align-items: flex-start; justify-content: space-around; padding: 12px 10px 0; box-sizing: border-box">
+    <a href="OptE_Home.dc.html" class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
+    <a href="OptE_Ranks.dc.html" class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20V11M12 20V4M18 20v-6"></path></svg>Ranks</a>
+    <a href="OptE_LogGame.dc.html" aria-label="Log a game" style="width: 50px; height: 50px; border-radius: 25px; background: #F2F1EE; color: #0E0F11; display: flex; align-items: center; justify-content: center; margin-top: -6px; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></a>
+    <a href="OptE_Events.dc.html" class="tab on" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Events</a>
+    <a href="OptE_Profile.dc.html" class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg>Profile</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const f = (this.state && this.state.filter) || 'Upcoming';
+    const tab = (on) => 'height: 44px; padding: 0; border: 0; background: transparent; font-size: 15px; margin-bottom: -1px; ' +
+      (on ? 'color: #F2F1EE; font-weight: 500; border-bottom: 1px solid #F2F1EE;' : 'color: #7D8086; font-weight: 400; border-bottom: 1px solid transparent;');
+    const all = [
+      ['THU', 9, 'League night · GSU vs Georgia Tech', '7:00 PM · [VENUE] · 15 going', 'Going', true, true],
+      ['TUE', 14, 'Open table · Georgia State', '6:00 PM · [VENUE] · 9 going', 'RSVP', false, true],
+      ['THU', 16, 'League night · Georgia vs Kennesaw St.', '7:30 PM · [VENUE] · 22 going', 'RSVP', false, false],
+      ['SAT', 25, 'Clinic · Break and position play', '2:00 PM · [VENUE] · 11 going', 'RSVP', false, true]
+    ];
+    const keep = (e) => f === 'Upcoming' || f === 'Past' ? f === 'Upcoming' : f === 'Going' ? e[5] : e[6];
+    return {
+      filters: ['Upcoming', 'Going', 'My school', 'Past'].map((label) => ({
+        label, on: f === label, style: tab(f === label), pick: () => this.setState({ filter: label })
+      })),
+      events: all.filter(keep).map(([dow, day, title, meta, status, going]) => ({
+        dow, day, title, meta, status, statusColor: going ? '#8FCBAA' : '#C9A96E'
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>
