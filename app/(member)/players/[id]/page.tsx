@@ -10,6 +10,7 @@ import { MessagesButton } from "@/components/messages-button";
 import { SchoolMark } from "@/components/school-mark";
 import { SectionHeading } from "@/components/section-heading";
 import { ShareButton } from "@/components/share-button";
+import { ShowMore } from "@/components/show-more";
 import { Sparkline } from "@/components/sparkline";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { SubmitButton } from "@/components/submit-button";
@@ -336,7 +337,9 @@ export default async function PlayerPage({
       <section className="flex flex-col gap-1.5">
         <SectionHeading>Match history</SectionHeading>
         {all.length === 0 && <p className="text-muted-foreground py-4 text-sm">No confirmed matches yet.</p>}
-        {all.slice(0, 20).map((m) => {
+        <ShowMore
+          label="Show all {total} games"
+          items={all.map((m) => {
           const reporter = one(m.reporter);
           const opponent = one(m.opponent);
           const reporterWon = m.winner_id === reporter?.id;
@@ -356,7 +359,8 @@ export default async function PlayerPage({
               caption={xpCaption(m.id, xp)}
             />
           );
-        })}
+          })}
+        />
       </section>
     </main>
   );

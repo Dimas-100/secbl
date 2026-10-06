@@ -6,6 +6,7 @@ import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
 import { MessagesButton } from "@/components/messages-button";
 import { SectionHeading } from "@/components/section-heading";
+import { ShowMore } from "@/components/show-more";
 import { Sparkline } from "@/components/sparkline";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { TitleBadge } from "@/components/title-badge";
@@ -90,7 +91,7 @@ export default async function HomePage({
       .eq("status", "confirmed")
       .order("played_at", { ascending: false })
       .order("confirmed_at", { ascending: false })
-      .limit(15),
+      .limit(30),
     // Bound the fetch, but let partitionEvents make the actual upcoming/past
     // call so the home card and the calendar can never disagree.
     supabase
@@ -299,7 +300,9 @@ export default async function HomePage({
             </Link>
           </p>
         )}
-        {(recent ?? []).map((m) => {
+        <ShowMore
+          label="Show {hidden} more games"
+          items={(recent ?? []).map((m) => {
           const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
           const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
           const reporterWon = m.winner_id === reporter?.id;
@@ -319,7 +322,8 @@ export default async function HomePage({
               caption={xpCaption(m.id, xp)}
             />
           );
-        })}
+          })}
+        />
       </section>
     </main>
   );
