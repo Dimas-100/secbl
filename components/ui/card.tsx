@@ -7,9 +7,9 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        // A hairline edge plus a soft two-layer shadow: crisp on the warm
-        // ground without reading as a drawn border.
-        "flex flex-col gap-4 rounded-2xl bg-card py-5 text-card-foreground shadow-[var(--shadow-card)] ring-1 ring-hairline",
+        // A card is a distinct object (next match, featured event): card fill
+        // plus an inset hairline, no shadow.
+        "flex flex-col gap-4 rounded-[20px] bg-card py-5 text-card-foreground shadow-[inset_0_0_0_1px_var(--hairline-row)]",
         className
       )}
       {...props}
@@ -22,7 +22,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
+        "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-5 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
         className
       )}
       {...props}
@@ -71,7 +71,7 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-content"
-      className={cn("px-6", className)}
+      className={cn("px-5", className)}
       {...props}
     />
   )
@@ -81,7 +81,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-footer"
-      className={cn("flex items-center px-6 [.border-t]:pt-6", className)}
+      className={cn("flex items-center px-5 [.border-t]:pt-6", className)}
       {...props}
     />
   )
