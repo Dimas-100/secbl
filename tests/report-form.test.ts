@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { recentOpponents, stepScore, submitState } from "@/lib/report-form";
+import { recentOpponents, resultLine, stepScore, submitState } from "@/lib/report-form";
 
 const roster = [
   { id: "a", display_name: "Ana" },
@@ -14,6 +14,7 @@ describe("recentOpponents", () => {
       "c",
       "a",
       "b",
+      "d",
     ]);
   });
 
@@ -22,11 +23,11 @@ describe("recentOpponents", () => {
   });
 
   it("pads alphabetically without duplicating history", () => {
-    expect(recentOpponents(["d"], roster).map((o) => o.id)).toEqual(["d", "a", "b"]);
+    expect(recentOpponents(["d"], roster).map((o) => o.id)).toEqual(["d", "a", "b", "c"]);
   });
 
   it("handles empty history", () => {
-    expect(recentOpponents([], roster).map((o) => o.id)).toEqual(["a", "b", "c"]);
+    expect(recentOpponents([], roster).map((o) => o.id)).toEqual(["a", "b", "c", "d"]);
   });
 
   it("returns fewer than n when the roster is small", () => {
@@ -44,20 +45,18 @@ describe("stepScore", () => {
 });
 
 describe("submitState", () => {
-  it("narrates a win", () => {
+  it("sends a valid result to the opponent to confirm", () => {
     expect(submitState(5, 3, "Priya")).toEqual({
-      label: "Report 5–3 win",
+      label: "Send to Priya to confirm",
       disabled: false,
       reason: null,
     });
-  });
-
-  it("narrates a loss with your score first", () => {
-    expect(submitState(3, 5, "Priya").label).toBe("Report 3–5 loss");
+    expect(submitState(3, 5, "Priya").disabled).toBe(false);
   });
 
   it("blocks ties, 0-0, and missing opponent", () => {
     expect(submitState(4, 4, "Priya")).toMatchObject({
+      label: "Send to confirm",
       disabled: true,
       reason: "Scores can't be equal",
     });
@@ -69,5 +68,17 @@ describe("submitState", () => {
       disabled: true,
       reason: "Pick your opponent",
     });
+  });
+});
+
+describe("resultLine", () => {
+  it("narrates the result from your side", () => {
+    expect(resultLine(5, 3)).toEqual({ text: "Win 5–3", tone: "win" });
+    expect(resultLine(3, 5)).toEqual({ text: "Loss 3–5", tone: "loss" });
+  });
+
+  it("prompts while the score is incomplete", () => {
+    expect(resultLine(0, 0)).toEqual({ text: "Enter the score", tone: "muted" });
+    expect(resultLine(4, 4)).toEqual({ text: "Scores can't be equal", tone: "muted" });
   });
 });
