@@ -180,3 +180,17 @@ export function overallRank(board: { id: string }[], id: string): number | null 
   const i = board.findIndex((r) => r.id === id);
   return i === -1 ? null : i + 1;
 }
+
+// The longest run of wins anywhere in the history (the live streak is
+// currentStreak; this is the record). Matches newest-first, confirmed only.
+export function longestWinStreak(newestFirst: StatMatch[], viewerId: string): number {
+  let best = 0;
+  let run = 0;
+  for (const m of newestFirst) {
+    if (m.winner_id === viewerId) {
+      run += 1;
+      if (run > best) best = run;
+    } else run = 0;
+  }
+  return best;
+}

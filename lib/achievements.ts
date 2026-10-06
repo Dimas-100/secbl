@@ -1,6 +1,6 @@
 // Achievements are computed from what actually happened — nothing is stored,
 // so they can never drift from the ladder. Catalogue order is display order.
-import { opponentOf, type StatMatch } from "@/lib/stats";
+import { longestWinStreak, opponentOf, type StatMatch } from "@/lib/stats";
 
 export interface Achievement {
   id: string;
@@ -102,18 +102,4 @@ export const ACHIEVEMENTS: Achievement[] = CATALOGUE.map(strip);
 
 export function earnedAchievements(input: AchievementInput): Achievement[] {
   return CATALOGUE.filter((a) => a.test(input)).map(strip);
-}
-
-// The longest run of wins anywhere in the history (the page's Streak tile
-// shows the live one; this is the record).
-function longestWinStreak(newestFirst: StatMatch[], viewerId: string): number {
-  let best = 0;
-  let run = 0;
-  for (const m of newestFirst) {
-    if (m.winner_id === viewerId) {
-      run += 1;
-      if (run > best) best = run;
-    } else run = 0;
-  }
-  return best;
 }

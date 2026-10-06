@@ -5,6 +5,7 @@ import {
   groupByPlayedDate,
   headToHead,
   labelPlayedDate,
+  longestWinStreak,
   movementSince,
   overallRank,
   peakRating,
@@ -171,5 +172,23 @@ describe("overallRank", () => {
   it("is null for a member with no row (no confirmed matches yet)", () => {
     expect(overallRank(board, "zed")).toBeNull();
     expect(overallRank([], "a")).toBeNull();
+  });
+});
+
+describe("longestWinStreak", () => {
+  it("is the longest run of wins anywhere in the history", () => {
+    const h = [
+      m("1", "x", "me", "x"),
+      m("2", "me", "me", "x"),
+      m("3", "me", "me", "x"),
+      m("4", "me", "me", "x"),
+      m("5", "x", "me", "x"),
+      m("6", "me", "me", "x"),
+    ];
+    expect(longestWinStreak(h, "me")).toBe(3);
+  });
+  it("is 0 with no matches or no wins", () => {
+    expect(longestWinStreak([], "me")).toBe(0);
+    expect(longestWinStreak([m("1", "x", "me", "x")], "me")).toBe(0);
   });
 });
