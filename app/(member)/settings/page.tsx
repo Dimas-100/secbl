@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,6 +98,20 @@ export default async function SettingsPage({
           <p className="text-muted-foreground text-xs">
             Ask a club admin if your school is wrong.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <SectionLabel>On your phone</SectionLabel>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2 text-sm">
+          <p className="text-muted-foreground">
+            Add SECBL to your home screen for a full-screen app, or print a QR card for club night.
+          </p>
+          <Button asChild variant="outline" className="self-start">
+            <Link href="/install">Install &amp; share</Link>
+          </Button>
         </CardContent>
       </Card>
 

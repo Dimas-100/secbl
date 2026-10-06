@@ -26,6 +26,16 @@ export default async function MemberLayout({
   // the count has to be right on every page, not just /chat.
   const { data: unreadRaw } = await supabase.rpc("unread_total");
   const unread = Number(unreadRaw ?? 0);
+  // Admins see how many signups are waiting without opening the queue — a
+  // new member left pending for days is the fastest way to lose them.
+  let pendingSignups = 0;
+  if (profile.role === "admin") {
+    const { count } = await supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+    pendingSignups = count ?? 0;
+  }
 
   return (
     // w-full matters: body is a flex column, and a flex child with mx-auto
@@ -40,8 +50,15 @@ export default async function MemberLayout({
         </Link>
         <div className="flex items-center gap-3">
           {profile.role === "admin" && (
-            <Badge asChild variant="outline">
-              <Link href="/admin">Admin</Link>
+            <Badge asChild variant={pendingSignups > 0 ? "default" : "outline"}>
+              <Link href="/admin" aria-label={pendingSignups > 0 ? `Admin, ${pendingSignups} waiting for approval` : "Admin"}>
+                Admin
+                {pendingSignups > 0 && (
+                  <span className="bg-gold text-gold-foreground stat-number ml-1 rounded-full px-1.5 text-[10px]">
+                    {pendingSignups}
+                  </span>
+                )}
+              </Link>
             </Badge>
           )}
           {/* Chat lives up here, not in the tab bar: a sixth tab would push

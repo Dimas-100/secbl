@@ -43,6 +43,11 @@ export default async function LoginPage({
           Forgot your password?
         </Link>
       </p>
+      <p className="text-sm text-muted-foreground">
+        <Link className="underline" href="/install">
+          Get the app on your phone
+        </Link>
+      </p>
     </main>
   );
 }
