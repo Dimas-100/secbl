@@ -51,7 +51,7 @@ export function InstallGuide() {
 
   if (standalone) {
     return (
-      <div className="rounded-xl bg-card p-5 text-center shadow-[inset_0_0_0_1px_var(--hairline-row)]">
+      <div className="bg-card rounded-[20px] p-5 text-center shadow-[inset_0_0_0_1px_var(--hairline-row)]">
         <p className="font-semibold">You&apos;re already running the installed app.</p>
         <Button asChild className="mt-3 w-full" size="lg">
           <Link href="/">Open SECBL</Link>
@@ -62,7 +62,7 @@ export function InstallGuide() {
 
   if (installed) {
     return (
-      <div className="rounded-xl bg-card p-5 text-center shadow-[inset_0_0_0_1px_var(--hairline-row)]">
+      <div className="bg-card rounded-[20px] p-5 text-center shadow-[inset_0_0_0_1px_var(--hairline-row)]">
         <p className="font-semibold">Installed. Look for the SECBL icon on your home screen.</p>
       </div>
     );
@@ -86,7 +86,7 @@ export function InstallGuide() {
         </Button>
       )}
 
-      <ol className="flex flex-col gap-3 rounded-xl bg-card p-5 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
+      <ol className="bg-card flex flex-col gap-3 rounded-[20px] p-5 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
         {platform === "ios" && (
           <>
             <Step n={1} icon={<Share className="size-5" />}>
@@ -142,7 +142,7 @@ export function InstallGuide() {
 function Step({ n, icon, children }: { n: number; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-3 text-sm">
-      <span className="bg-primary text-primary-foreground stat-number flex size-7 shrink-0 items-center justify-center rounded-full text-xs">
+      <span className="bg-brass text-background stat-number flex size-7 shrink-0 items-center justify-center rounded-full text-xs">
         {n}
       </span>
       <span className="text-muted-foreground mt-1 shrink-0">{icon}</span>

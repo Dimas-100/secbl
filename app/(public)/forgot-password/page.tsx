@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, PublicShell } from "@/components/public-shell";
 import { requestPasswordReset } from "./actions";
 
 export default async function ForgotPasswordPage({
@@ -12,28 +11,23 @@ export default async function ForgotPasswordPage({
 }) {
   const { error, message } = await searchParams;
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 px-4">
-      <BrandLogo className="h-auto w-44 self-center" />
-      <h1 className="text-center text-2xl font-bold">Reset your password</h1>
-      {message && <p className="rounded-md bg-muted p-3 text-sm">{message}</p>}
-      {error && (
-        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
-      )}
-      <form action={requestPasswordReset} className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" required autoComplete="email" />
-        </div>
-        <Button type="submit" size="lg" className="w-full">
+    <PublicShell title="Reset your password" lead="We'll email you a link that signs you in to choose a new one.">
+      {message && <p className="bg-card rounded-2xl p-3 text-sm shadow-[inset_0_0_0_1px_var(--hairline-row)]">{message}</p>}
+      {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
+      <form action={requestPasswordReset} className="flex flex-col gap-6">
+        <Field label="Email" htmlFor="email">
+          <Input id="email" name="email" type="email" required autoComplete="email" inputMode="email" />
+        </Field>
+        <Button type="submit" size="xl" className="w-full">
           Send reset link
         </Button>
       </form>
-      <p className="text-muted-foreground text-sm">
+      <p className="text-muted-foreground text-center text-[13px]">
         Remembered it?{" "}
-        <Link className="underline" href="/login">
+        <Link className="text-brass" href="/login">
           Back to log in
         </Link>
       </p>
-    </main>
+    </PublicShell>
   );
 }

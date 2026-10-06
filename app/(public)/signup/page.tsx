@@ -1,72 +1,53 @@
 import Link from "next/link";
-import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/password-input";
+import { Field, PublicShell } from "@/components/public-shell";
+import { SchoolPicker, type PickableSchool } from "@/components/school-picker";
 import { createClient } from "@/lib/supabase/server";
 import { signup } from "./actions";
 
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; school?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, school } = await searchParams;
   const supabase = await createClient();
   const { data: schools } = await supabase
     .from("schools")
-    .select("id, name")
-    .order("name");
+    .select("id, name, short_name, primary_color, logo_url")
+    .order("short_name");
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 px-4">
-      <BrandLogo className="h-auto w-48 self-center" />
-      <h1 className="text-center text-2xl font-bold">Join the league</h1>
-      {error && (
-        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
-      )}
-      <form action={signup} className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="display_name">Display name</Label>
-          <Input id="display_name" name="display_name" required maxLength={40} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="school_id">School</Label>
-          <select
-            id="school_id"
-            name="school_id"
-            required
-            defaultValue=""
-            className="border-input bg-transparent h-9 rounded-md border px-3 text-sm shadow-xs"
-          >
-            <option value="" disabled>
-              Choose your school
-            </option>
-            {(schools ?? []).map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" name="password" type="password" required minLength={8} />
-        </div>
-        <Button type="submit" size="lg" className="w-full">
+    <PublicShell
+      compact
+      eyebrow="Join the league"
+      title="Pick your school, pick a name."
+      lead="An admin approves new members, usually the same day."
+    >
+      {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
+      <form action={signup} className="flex flex-col gap-6">
+        <SchoolPicker schools={(schools ?? []) as PickableSchool[]} defaultValue={school ?? null} />
+        <Field label="Display name" htmlFor="display_name" hint="How you appear on the leaderboard.">
+          <Input id="display_name" name="display_name" required maxLength={40} autoComplete="nickname" placeholder="Dennis H." />
+        </Field>
+        <Field label="Email" htmlFor="email">
+          <Input id="email" name="email" type="email" required autoComplete="email" inputMode="email" placeholder="you@school.edu" />
+        </Field>
+        <Field label="Password" htmlFor="password" hint="At least 8 characters.">
+          <PasswordInput id="password" name="password" required minLength={8} autoComplete="new-password" />
+        </Field>
+        <Button type="submit" size="xl" className="w-full">
           Create account
         </Button>
       </form>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-muted-foreground text-center text-[13px]">
         Already a member?{" "}
-        <Link className="underline" href="/login">
+        <Link className="text-brass" href="/login">
           Log in
         </Link>
       </p>
-    </main>
+    </PublicShell>
   );
 }
