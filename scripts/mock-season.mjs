@@ -26,9 +26,14 @@ const service = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.S
   auth: { persistSession: false },
 });
 const MOCK_DOMAIN = "mock.secbl.app";
-export const MOCK_PASSWORD = "secbl-mock-2026!";
 const manifestDir = path.join(process.env.LOCALAPPDATA ?? os.homedir(), "secbl-mock");
 const manifestPath = path.join(manifestDir, "manifest.json");
+// The mock accounts can log in to production, so their shared password is
+// never in the repo: generated per seed (or taken from MOCK_PASSWORD) and
+// recorded only in the local manifest.
+const MOCK_PASSWORD =
+  process.env.MOCK_PASSWORD ??
+  `mock-${Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => "abcdefghjkmnpqrstuvwxyz23456789"[b % 31]).join("")}`;
 
 // Deterministic randomness so the season reads the same every run.
 function mulberry32(a) {
@@ -109,7 +114,15 @@ async function seed() {
   );
   const admin = real.find((p) => p.role === "admin");
   if (!admin) throw new Error("no admin profile to own events and the tournament");
-  const manifest = { createdAt: new Date().toISOString(), realSnapshot: real, mockIds: [], eventIds: [], tournamentId: null, dmChannelIds: [] };
+  const manifest = {
+    createdAt: new Date().toISOString(),
+    password: MOCK_PASSWORD,
+    realSnapshot: real,
+    mockIds: [],
+    eventIds: [],
+    tournamentId: null,
+    dmChannelIds: [],
+  };
   const save = () => {
     fs.mkdirSync(manifestDir, { recursive: true });
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
