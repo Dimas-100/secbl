@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowUp, ChevronLeft, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -13,7 +14,7 @@ import {
   type ChatMessage,
 } from "@/lib/chat";
 import { cn } from "@/lib/utils";
-import { notifyMessage } from "@/app/(member)/chat/actions";
+import { notifyMessage, sendFirstDm } from "@/app/(member)/chat/actions";
 
 export const PAGE_SIZE = 50;
 const MESSAGE_COLUMNS = "id, channel_id, sender_id, body, client_id, created_at";
@@ -21,8 +22,13 @@ const MESSAGE_COLUMNS = "id, channel_id, sender_id, body, client_id, created_at"
 // The room takes over the whole screen — header and tab bar included — so the
 // composer owns the bottom edge the way every chat app a student already uses
 // does. Server-rendered first page; everything after that is live.
+//
+// With `channelId` null this is a draft DM (`draftTo` is the other member):
+// no room exists yet, nothing subscribes, and the first send creates the room
+// and swaps the URL to it.
 export function ChatRoom({
   channelId,
+  draftTo,
   channelType,
   title,
   subtitle,
@@ -30,7 +36,8 @@ export function ChatRoom({
   initialMessages,
   initialNames,
 }: {
-  channelId: string;
+  channelId: string | null;
+  draftTo?: string;
   channelType: ChannelType;
   title: string;
   subtitle: string;
@@ -39,10 +46,12 @@ export function ChatRoom({
   initialNames: Record<string, string>;
 }) {
   const supabase = createClient();
+  const router = useRouter();
+  const isDraft = channelId === null;
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [names, setNames] = useState<Record<string, string>>(initialNames);
   const [draft, setDraft] = useState("");
-  const [hasMore, setHasMore] = useState(initialMessages.length === PAGE_SIZE);
+  const [hasMore, setHasMore] = useState(!isDraft && initialMessages.length === PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
   // null until the first subscription succeeds, so the header never says
   // "reconnecting" before it has connected once.
@@ -88,7 +97,7 @@ export function ChatRoom({
   }, [messages, names, supabase]);
 
   const markRead = useCallback(() => {
-    if (document.visibilityState !== "visible") return;
+    if (!channelId || document.visibilityState !== "visible") return;
     // A PostgREST builder only sends its request once awaited/then'd — a bare
     // `void supabase.rpc(...)` silently does nothing.
     supabase
@@ -101,6 +110,7 @@ export function ChatRoom({
   // Anything newer than what we know about: used to close the gap between the
   // server render and the subscription, and again after any reconnect.
   const refetchNewer = useCallback(async () => {
+    if (!channelId) return;
     const { data } = await supabase
       .from("messages")
       .select(MESSAGE_COLUMNS)
@@ -112,6 +122,7 @@ export function ChatRoom({
   }, [supabase, channelId, absorb]);
 
   useEffect(() => {
+    if (!channelId) return;
     let subscribedBefore = false;
     let active = true;
     const channel = supabase.channel(`room:${channelId}`);
@@ -193,7 +204,7 @@ export function ChatRoom({
   const loadEarlier = async () => {
     const el = listRef.current;
     const oldest = messages.find((m) => m.id > 0);
-    if (!oldest || loadingMore) return;
+    if (!channelId || !oldest || loadingMore) return;
     setLoadingMore(true);
     const before = el ? el.scrollHeight - el.scrollTop : 0;
     const { data } = await supabase
@@ -226,7 +237,7 @@ export function ChatRoom({
     stickToBottom.current = true;
     const optimistic: ChatMessage = {
       id: -(++tempCounter.current),
-      channel_id: channelId,
+      channel_id: channelId ?? "draft",
       sender_id: meId,
       body,
       client_id,
@@ -238,6 +249,21 @@ export function ChatRoom({
         [optimistic]
       )
     );
+    if (!channelId) {
+      // First message of a new DM: the server creates the room and posts it
+      // in one go, then this screen becomes that room.
+      const result = await sendFirstDm({ otherId: draftTo!, body, clientId: client_id });
+      if ("error" in result) {
+        setMessages((have) =>
+          have.map((m) => (m.client_id === client_id && m.id < 0 ? { ...m, failed: true } : m))
+        );
+        setSendError(result.error);
+        return;
+      }
+      absorb([result.message]);
+      router.replace(`/chat/${result.channelId}`);
+      return;
+    }
     const { data, error } = await supabase
       .from("messages")
       .insert({ channel_id: channelId, sender_id: meId, body, client_id })
