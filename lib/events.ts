@@ -102,6 +102,17 @@ export function clubDateOf(iso: string): string {
   return isoToClubTime(iso).slice(0, 10);
 }
 
+// The Monday that starts the club week (Mon 00:00 – Sun 23:59 club time)
+// containing an instant, as a club calendar date. Calendar math runs in UTC
+// on the club date so neither the server zone nor DST can shift the day.
+export function clubWeekOf(iso: string): string {
+  const date = clubDateOf(iso);
+  const day = new Date(`${date}T00:00:00Z`);
+  const sinceMonday = (day.getUTCDay() + 6) % 7;
+  day.setUTCDate(day.getUTCDate() - sinceMonday);
+  return day.toISOString().slice(0, 10);
+}
+
 // One calendar week later in CLUB terms: the same wall-clock time seven days
 // on, even when the interval crosses a DST boundary. Adding a fixed 168 hours
 // to the instant would drift by an hour twice a year.
