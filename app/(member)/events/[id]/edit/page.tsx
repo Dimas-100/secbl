@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { HeroBand } from "@/components/hero-band";
+import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { isoToClubTime } from "@/lib/events";
 import {
@@ -42,15 +42,15 @@ export default async function EditEventPage({
 
   return (
     <main>
-      <HeroBand title="Edit event" />
-      <div className="mt-4 flex flex-col gap-4">
+      <PageHeader title="Edit event" back={`/events/${id}`} trailing={null} />
+      <div className="mt-6 flex flex-col gap-6">
       {error && (
-        <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
       )}
       {event.source_id ? (
         // Imported events are owned by the school system. Editing here would
         // be overwritten by the next sync, so the form is replaced by a note.
-        <div className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-card)]">
+        <div className="rounded-xl bg-card p-4 text-sm shadow-[inset_0_0_0_1px_var(--hairline-row)]">
           <p className="font-semibold">This event comes from {source?.name ?? "a school feed"}.</p>
           <p className="text-muted-foreground mt-1">
             Its title, time, place and description update automatically from that feed, so

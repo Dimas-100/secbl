@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { HeroBand } from "@/components/hero-band";
+import { PageHeader } from "@/components/page-header";
 import { clubDateOf } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
 import { ReportMatchForm, type OpponentOption } from "./report-form";
@@ -49,12 +49,12 @@ export default async function NewMatchPage({
 
   return (
     <main>
-      <HeroBand title="Report match" />
+      <PageHeader title="Log a game" back="/" backIcon="close" backLabel="Close" trailing={null} />
       {/* No -mt-3 overlap here: the first element is a bare section label,
           not a card, and muted text on the band's green is unreadable. */}
-      <div className="mt-4 flex flex-col gap-4">
+      <div className="mt-6 flex flex-col gap-6">
         {error && (
-          <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
         )}
         <ReportMatchForm opponents={options} recentIds={recentIds} today={today} />
       </div>

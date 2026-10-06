@@ -1,22 +1,29 @@
-// Skeleton shown while a member page's data loads: the hero band and two
-// cards, in the shapes every page shares, so navigation never flashes blank.
+// Skeleton while a member page loads: a header line, a hero number, a stat
+// row and three hairline rows — the shapes every screen shares.
 export default function MemberLoading() {
   return (
-    <main aria-busy="true" aria-label="Loading">
-      <div className="hero-gradient -mx-4 rounded-b-2xl px-5 pt-4 pb-7">
-        <div className="h-5 w-32 animate-pulse rounded bg-white/25" />
-        <div className="mt-3 h-10 w-24 animate-pulse rounded bg-white/20" />
+    <main aria-busy="true" aria-label="Loading" className="flex flex-col gap-7 pt-3">
+      <div className="flex items-end justify-between">
+        <div className="flex flex-col gap-2">
+          <div className="bg-card h-3 w-24 animate-pulse rounded" />
+          <div className="bg-card h-8 w-40 animate-pulse rounded" />
+        </div>
+        <div className="bg-card size-11 animate-pulse rounded-full" />
       </div>
-      <div className="-mt-3 flex flex-col gap-4">
-        {[0, 1].map((i) => (
-          <div
-            key={i}
-            className="bg-card flex flex-col gap-3 rounded-xl p-5 shadow-[var(--shadow-card)]"
-          >
-            <div className="bg-muted h-3 w-24 animate-pulse rounded" />
-            <div className="bg-muted h-4 w-full animate-pulse rounded" />
-            <div className="bg-muted h-4 w-3/4 animate-pulse rounded" />
-            <div className="bg-muted h-4 w-1/2 animate-pulse rounded" />
+      <div className="bg-card h-16 w-32 animate-pulse rounded" />
+      <div className="border-hairline-divider grid grid-cols-3 gap-4 border-t pt-4">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="bg-card h-10 animate-pulse rounded" />
+        ))}
+      </div>
+      <div className="flex flex-col">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="border-hairline-row flex items-center gap-3.5 border-b py-3.5">
+            <div className="bg-card size-10 animate-pulse rounded-full" />
+            <div className="flex flex-1 flex-col gap-2">
+              <div className="bg-card h-3.5 w-1/2 animate-pulse rounded" />
+              <div className="bg-card h-3 w-1/3 animate-pulse rounded" />
+            </div>
           </div>
         ))}
       </div>

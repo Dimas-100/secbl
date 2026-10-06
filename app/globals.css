@@ -167,15 +167,6 @@
   color: var(--muted-foreground);
 }
 
-/* Retired with Task 3 of the redesign plan; kept until the last HeroBand
-   caller is migrated. */
-@utility hero-gradient {
-  background-color: var(--card);
-}
-@utility hero-grain {
-  position: relative;
-}
-
 /* Press feedback for anything tappable: a quick, slight shrink that answers
    the finger. Hover alone never animates. */
 @utility press {

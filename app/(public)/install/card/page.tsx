@@ -13,7 +13,7 @@ export default async function InstallCardPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col items-center justify-center gap-6 px-6 py-10 print:min-h-0 print:max-w-none print:py-0">
-      <div className="bg-card flex w-full flex-col items-center gap-5 rounded-2xl p-8 text-center shadow-[var(--shadow-card)] print:rounded-none print:shadow-none">
+      <div className="bg-card flex w-full flex-col items-center gap-5 rounded-2xl p-8 text-center shadow-[inset_0_0_0_1px_var(--hairline-row)] print:rounded-none print:shadow-none">
         <BrandLogo className="h-auto w-44" />
         <h1 className="text-2xl font-extrabold leading-tight">
           Track your matches.

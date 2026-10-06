@@ -205,10 +205,10 @@ export default async function HomePage({
         </StatGrid>
 
         {message && (
-          <p className="rounded-md bg-card p-3 text-sm shadow-[var(--shadow-card)]">{message}</p>
+          <p className="bg-card rounded-2xl p-3 text-sm shadow-[inset_0_0_0_1px_var(--hairline-row)]">{message}</p>
         )}
         {error && (
-          <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
         )}
 
         {(toConfirm ?? []).length > 0 && (
@@ -309,7 +309,7 @@ export default async function HomePage({
                   <Trophy className="size-6" />
                 </span>
                 <p className="text-sm font-semibold">No results yet this season.</p>
-                <Button asChild variant="hero" size="sm">
+                <Button asChild size="sm">
                   <Link href="/matches/new">Report the first match</Link>
                 </Button>
               </div>

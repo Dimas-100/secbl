@@ -17,9 +17,9 @@ export default async function LoginPage({
       <BrandLogo className="h-auto w-56 self-center" />
       {message && <p className="rounded-md bg-muted p-3 text-sm">{message}</p>}
       {error && (
-        <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
       )}
-      <form action={login} className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[var(--shadow-card)]">
+      <form action={login} className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">Email</Label>
           <Input id="email" name="email" type="email" required />

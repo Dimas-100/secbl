@@ -98,7 +98,7 @@ export default async function ChatPage({
 
       <div className="-mt-3 flex flex-col gap-4">
         {error && ERRORS[error] && (
-          <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{ERRORS[error]}</p>
+          <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{ERRORS[error]}</p>
         )}
         <Card className="py-2">
           <CardContent className="divide-border/60 flex flex-col divide-y px-3">

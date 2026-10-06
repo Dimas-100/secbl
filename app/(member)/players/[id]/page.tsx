@@ -175,7 +175,7 @@ export default async function PlayerPage({
         {user && !isMe && (
           <form action={startDm} className="mt-3">
             <input type="hidden" name="profile_id" value={profile.id} />
-            <SubmitButton size="sm" variant="hero" pendingChildren="Opening…">
+            <SubmitButton size="sm" pendingChildren="Opening…">
               Message
             </SubmitButton>
           </form>

@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils";
 
-// The signature move: every member page opens with a felt band. Deep
-// gradient, a soft light from the top-left, a fine grain. Pages overlap
-// their first card onto it with -mt-3.
+// TEMPORARY (redesign plan, Task 3): a token-only stand-in for the retired
+// felt band so the screens still awaiting their own pass (Home, Ranks, Chat,
+// Profile) render on the dark tokens. Deleted in Task 10 once the last caller
+// is rebuilt.
 export function HeroBand({
   title,
   children,
@@ -13,11 +14,9 @@ export function HeroBand({
   className?: string;
 }) {
   return (
-    <div className={cn("hero-gradient hero-grain -mx-4 rounded-b-[28px] px-5 pt-5 pb-8 text-white", className)}>
-      <div className="relative z-10">
-        {title && <h1 className="display text-[22px] leading-tight">{title}</h1>}
-        {children}
-      </div>
+    <div className={cn("flex flex-col gap-2 pt-3 pb-4", className)}>
+      {title && <h1 className="display text-[32px] leading-none">{title}</h1>}
+      {children}
     </div>
   );
 }

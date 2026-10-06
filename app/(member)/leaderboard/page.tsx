@@ -115,7 +115,7 @@ export default async function LeaderboardPage({
                   key={r.id}
                   href={`/players/${r.id}`}
                   className={cn(
-                    "press bg-card flex flex-col items-center gap-1.5 rounded-xl px-2 pb-3 text-center shadow-[var(--shadow-card)]",
+                    "press bg-card flex flex-col items-center gap-1.5 rounded-xl px-2 pb-3 text-center shadow-[inset_0_0_0_1px_var(--hairline-row)]",
                     rank === 1 ? "pt-4" : "pt-3",
                     isMe && "ring-primary ring-2"
                   )}

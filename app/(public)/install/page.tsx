@@ -36,7 +36,7 @@ export default async function InstallPage() {
         </Button>
       </div>
 
-      <div className="rounded-xl bg-card p-5 shadow-[var(--shadow-card)]">
+      <div className="rounded-xl bg-card p-5 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
         <p className="text-center text-sm font-semibold">Share with your team</p>
         <p className="text-muted-foreground mt-1 text-center text-xs">
           Scan to open this page, or print a card for the table.

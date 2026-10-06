@@ -97,7 +97,7 @@ export default async function EventsPage({
       <HeroBand title="Events">
         {me?.role === "admin" && (
           <div className="mt-2">
-            <Button asChild size="sm" variant="hero">
+            <Button asChild size="sm">
               <Link href="/events/new">New event</Link>
             </Button>
           </div>
@@ -106,10 +106,10 @@ export default async function EventsPage({
 
       <div className="-mt-3 flex flex-col gap-4">
         {message && (
-          <p className="rounded-md bg-card p-3 text-sm shadow-[var(--shadow-card)]">{message}</p>
+          <p className="bg-card rounded-2xl p-3 text-sm shadow-[inset_0_0_0_1px_var(--hairline-row)]">{message}</p>
         )}
         {error && (
-          <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
         )}
 
         <Card>

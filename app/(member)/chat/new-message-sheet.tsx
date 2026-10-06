@@ -28,7 +28,7 @@ export function NewMessageSheet({ people }: { people: Person[] }) {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <Button size="sm" variant="hero">
+        <Button size="sm">
           <PenSquare className="size-4" />
           New message
         </Button>

@@ -78,7 +78,7 @@ export function ReportMatchForm({
                 "flex h-16 flex-col items-center justify-center gap-1 rounded-xl",
                 o.id === opponentId
                   ? "bg-primary text-primary-foreground"
-                  : "bg-card shadow-[var(--shadow-card)]"
+                  : "bg-card shadow-[inset_0_0_0_1px_var(--hairline-row)]"
               )}
             >
               <Avatar
@@ -94,7 +94,7 @@ export function ReportMatchForm({
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="text-muted-foreground flex h-16 flex-col items-center justify-center gap-1 rounded-xl bg-card shadow-[var(--shadow-card)]"
+            className="text-muted-foreground flex h-16 flex-col items-center justify-center gap-1 rounded-xl bg-card shadow-[inset_0_0_0_1px_var(--hairline-row)]"
           >
             <span className="border-muted-foreground/40 flex size-7 items-center justify-center rounded-full border border-dashed">
               <Search className="size-3.5" />
@@ -122,7 +122,7 @@ export function ReportMatchForm({
         {GAME_TYPES.map((g) => (
           <label
             key={g.value}
-            className="flex-1 has-checked:bg-card flex h-10 cursor-pointer items-center justify-center rounded-lg text-xs font-semibold has-checked:font-bold has-checked:shadow-[var(--shadow-card)]"
+            className="flex-1 has-checked:bg-card flex h-10 cursor-pointer items-center justify-center rounded-lg text-xs font-semibold has-checked:font-bold has-checked:shadow-[inset_0_0_0_1px_var(--hairline-row)]"
           >
             <input
               type="radio"
@@ -165,7 +165,7 @@ export function ReportMatchForm({
 
       <div className="flex flex-col gap-2">
         <SubmitButton
-          variant="hero"
+         
           size="xl"
           className="w-full"
           disabled={s.disabled}

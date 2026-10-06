@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { HeroBand } from "@/components/hero-band";
+import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/server";
@@ -32,10 +32,10 @@ export default async function NewTournamentPage({
 
   return (
     <main>
-      <HeroBand title="New tournament" />
-      <div className="mt-4 flex flex-col gap-4">
+      <PageHeader title="New tournament" back="/events?tab=cups" trailing={null} />
+      <div className="mt-6 flex flex-col gap-6">
       {error && (
-        <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
       )}
       <form action={createTournament} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">

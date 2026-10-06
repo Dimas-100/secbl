@@ -51,7 +51,7 @@ export function InstallGuide() {
 
   if (standalone) {
     return (
-      <div className="rounded-xl bg-card p-5 text-center shadow-[var(--shadow-card)]">
+      <div className="rounded-xl bg-card p-5 text-center shadow-[inset_0_0_0_1px_var(--hairline-row)]">
         <p className="font-semibold">You&apos;re already running the installed app.</p>
         <Button asChild className="mt-3 w-full" size="lg">
           <Link href="/">Open SECBL</Link>
@@ -62,7 +62,7 @@ export function InstallGuide() {
 
   if (installed) {
     return (
-      <div className="rounded-xl bg-card p-5 text-center shadow-[var(--shadow-card)]">
+      <div className="rounded-xl bg-card p-5 text-center shadow-[inset_0_0_0_1px_var(--hairline-row)]">
         <p className="font-semibold">Installed. Look for the SECBL icon on your home screen.</p>
       </div>
     );
@@ -73,7 +73,6 @@ export function InstallGuide() {
       {promptEvent && (
         <Button
           size="xl"
-          variant="hero"
           className="w-full"
           onClick={async () => {
             await promptEvent.prompt();
@@ -87,7 +86,7 @@ export function InstallGuide() {
         </Button>
       )}
 
-      <ol className="flex flex-col gap-3 rounded-xl bg-card p-5 shadow-[var(--shadow-card)]">
+      <ol className="flex flex-col gap-3 rounded-xl bg-card p-5 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
         {platform === "ios" && (
           <>
             <Step n={1} icon={<Share className="size-5" />}>

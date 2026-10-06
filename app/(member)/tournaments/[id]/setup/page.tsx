@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { HeroBand } from "@/components/hero-band";
+import { PageHeader } from "@/components/page-header";
 import { SectionLabel } from "@/components/section-label";
 import { createClient } from "@/lib/supabase/server";
 import { saveEntrants, startTournament } from "@/app/(member)/tournaments/actions";
@@ -56,20 +56,17 @@ export default async function TournamentSetupPage({
 
   return (
     <main>
-      <HeroBand
-        title={
-          <span className="flex items-center gap-2">
-            {tournament.name}
-            <Badge variant="secondary">Setting up</Badge>
-          </span>
-        }
+      <PageHeader
+        title={tournament.name}
+        back="/events?tab=cups"
+        trailing={<Badge variant="secondary">Setting up</Badge>}
       />
-      <div className="-mt-3 flex flex-col gap-4">
+      <div className="mt-6 flex flex-col gap-6">
       {message && (
-        <p className="rounded-md bg-card p-3 text-sm shadow-[var(--shadow-card)]">{message}</p>
+        <p className="bg-card rounded-2xl p-3 text-sm shadow-[inset_0_0_0_1px_var(--hairline-row)]">{message}</p>
       )}
       {error && (
-        <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
       )}
 
       <form action={saveEntrants} className="flex flex-col gap-4">
@@ -109,7 +106,7 @@ export default async function TournamentSetupPage({
 
       <form action={startTournament}>
         <input type="hidden" name="tournament_id" value={id} />
-        <Button type="submit" variant="hero" size="xl" className="w-full">
+        <Button type="submit" size="xl" className="w-full">
           Start tournament ({chosen.size} entrants)
         </Button>
         <p className="text-muted-foreground mt-2 text-xs">
