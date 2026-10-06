@@ -1,8 +1,34 @@
 import { lookup } from "node:dns/promises";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Agent, fetch as undiciFetch } from "undici";
 import { parseIcs } from "@/lib/ics";
 import { planSync, type ImportedEvent } from "@/lib/event-sync";
 import { feedUrlProblem, isPrivateIp } from "@/lib/url-guard";
+
+// Every outbound connection resolves the hostname *inside* the connector and
+// refuses private answers there, so a feed host cannot pass the pre-check
+// and then rebind to an internal address for the real connection.
+const pinnedAgent = new Agent({
+  connect: {
+    lookup: (hostname, _options, callback) => {
+      lookup(hostname, { all: true })
+        .then((addresses) => {
+          const safe = addresses.filter((a) => !isPrivateIp(a.address));
+          if (safe.length === 0) {
+            callback(new Error(`${hostname} resolves to a private address`), "", 4);
+            return;
+          }
+          callback(null, safe[0].address, safe[0].family);
+        })
+        .catch((err: Error) => callback(err, "", 4));
+    },
+  },
+});
+
+// Node's global fetch ignores a foreign dispatcher, so the default client is
+// undici's own fetch bound to the pinned agent. Tests inject a stub instead.
+const guardedFetch: typeof fetch = ((input: RequestInfo | URL, init?: RequestInit) =>
+  undiciFetch(input as string, { ...(init as object), dispatcher: pinnedAgent } as Parameters<typeof undiciFetch>[1])) as unknown as typeof fetch;
 
 // Pulls every enabled feed and applies the plan with the service role. Each
 // source is isolated: one bad feed records its error and the rest continue.
@@ -55,7 +81,7 @@ async function readCapped(res: Response): Promise<string> {
     }
     chunks.push(value);
   }
-  return new TextDecoder("utf-8").decode(Buffer.concat(chunks));
+  return new TextDecoder("utf-8").decode(Buffer.concat(chunks.map((c) => Buffer.from(c))));
 }
 
 async function fetchFeed(rawUrl: string, fetchImpl: typeof fetch, resolve?: typeof lookup): Promise<string> {
@@ -91,7 +117,7 @@ export async function syncAllSources(
   options: { now?: Date; fetchImpl?: typeof fetch; resolve?: typeof lookup; onlyId?: string } = {}
 ): Promise<SourceResult[]> {
   const now = options.now ?? new Date();
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = options.fetchImpl ?? guardedFetch;
   let query = service.from("event_sources").select("id, name, feed_url, created_by, enabled").eq("enabled", true);
   if (options.onlyId) query = query.eq("id", options.onlyId);
   const { data: sources, error } = await query;
