@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { clubDateOf } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
-import { ReportMatchForm, type OpponentOption } from "./report-form";
+import type { OpponentOption } from "./report-form";
+import { ReportMatchFormLoader } from "./report-form-loader";
 
 export default async function NewMatchPage({
   searchParams,
@@ -16,12 +17,15 @@ export default async function NewMatchPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: opponents } = await supabase
-    .from("profiles")
-    .select("id, display_name, avatar_url, ball, schools(short_name)")
-    .eq("status", "approved")
-    .neq("id", user.id)
-    .order("display_name");
+  const [{ data: opponents }, { data: me }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, display_name, avatar_url, ball, rating, schools(short_name)")
+      .eq("status", "approved")
+      .neq("id", user.id)
+      .order("display_name"),
+    supabase.from("profiles").select("rating").eq("id", user.id).single(),
+  ]);
 
   // Recency drives the opponent row: whoever you actually play, any status.
   const { data: myMatches } = await supabase
@@ -42,6 +46,7 @@ export default async function NewMatchPage({
       avatar_url: o.avatar_url,
       ball: o.ball,
       school: school?.short_name ?? null,
+      rating: o.rating,
     };
   });
 
@@ -51,7 +56,13 @@ export default async function NewMatchPage({
     <main className="flex flex-col gap-8">
       <PageHeader title="Log a game" back="/" backIcon="close" backLabel="Close" trailing={null} />
       {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
-      <ReportMatchForm opponents={options} recentIds={recentIds} today={today} />
+      <ReportMatchFormLoader
+        opponents={options}
+        recentIds={recentIds}
+        today={today}
+        meId={user.id}
+        myRating={me?.rating ?? 450}
+      />
     </main>
   );
 }

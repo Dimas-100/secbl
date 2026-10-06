@@ -1,12 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
+import { SchoolMark } from "@/components/school-mark";
 import { SectionLabel } from "@/components/section-label";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function SchoolsPage() {
   const supabase = await createClient();
-  const { data: stats } = await supabase.from("school_stats").select("*");
-  const { data: h2h } = await supabase.from("school_head_to_head").select("*");
+  const [{ data: stats }, { data: h2h }, { data: schools }] = await Promise.all([
+    supabase.from("school_stats").select("*"),
+    supabase.from("school_head_to_head").select("*"),
+    supabase.from("schools").select("id, short_name, primary_color, logo_url"),
+  ]);
+  const schoolById = Object.fromEntries((schools ?? []).map((s) => [s.id, s]));
 
   return (
     <main>
@@ -16,7 +21,10 @@ export default async function SchoolsPage() {
         {(stats ?? []).map((s) => (
           <Card key={s.id}>
             <CardHeader>
-              <CardTitle>{s.short_name}</CardTitle>
+              <CardTitle className="flex items-center gap-3">
+                <SchoolMark school={schoolById[s.id]} size={40} />
+                {s.short_name}
+              </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-1 text-sm">
               <p className="text-muted-foreground">{s.name}</p>

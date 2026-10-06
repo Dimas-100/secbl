@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
-import { Check } from "lucide-react";
 import { LevelBar } from "@/components/level-bar";
 import { PageHeader } from "@/components/page-header";
 import { SectionHeading } from "@/components/section-heading";
+import { TitleBadge } from "@/components/title-badge";
 import { createClient } from "@/lib/supabase/server";
 import { TITLES, WEEKLY_PAIR_CAP, XP_FINAL_BONUS, XP_LOSS, XP_WIN, xpToReach } from "@/lib/levels";
 import { loadXp } from "@/lib/xp-data";
@@ -58,18 +58,11 @@ export default async function LadderPage({ params }: { params: Promise<{ id: str
               )}
             >
               <div className="flex items-center gap-3.5">
-                <span
-                  className={cn(
-                    "flex size-6 shrink-0 items-center justify-center rounded-full",
-                    reached ? "bg-brass text-background" : "shadow-[inset_0_0_0_1px_var(--hairline-ghost)]"
-                  )}
-                >
-                  {reached && !current && <Check className="size-3.5" strokeWidth={2.2} />}
-                  {current && <span className="bg-background size-2 rounded-full" />}
-                </span>
+                <TitleBadge title={t.name} size={40} locked={!reached} decorative />
                 <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
                   <span className={cn("text-[15px] font-medium", !reached && "text-muted-foreground")}>
                     {t.name}
+                    {current && isMe && <span className="text-brass font-normal"> · your badge</span>}
                   </span>
                   <span className="text-muted-foreground text-[12px]">Levels {range}</span>
                 </span>
@@ -82,7 +75,7 @@ export default async function LadderPage({ params }: { params: Promise<{ id: str
                 </span>
               </div>
               {current && (
-                <div className="flex flex-col gap-2 pl-[38px]">
+                <div className="flex flex-col gap-2 pl-[54px]">
                   <LevelBar value={level.intoLevel} max={level.needed} />
                   <span className="text-muted-foreground text-[12px]">
                     {level.intoLevel} / {level.needed} XP to level {level.level + 1}

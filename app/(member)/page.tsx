@@ -6,14 +6,17 @@ import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
 import { MessagesButton } from "@/components/messages-button";
 import { SectionHeading } from "@/components/section-heading";
+import { ShowMore } from "@/components/show-more";
 import { Sparkline } from "@/components/sparkline";
 import { StatGrid, StatTile } from "@/components/stat-tile";
+import { TitleBadge } from "@/components/title-badge";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { winnerDelta } from "@/lib/form";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
 import { xpCaption } from "@/lib/levels";
+import { formatLabel, formatShort } from "@/lib/race";
 import { labelPlayedDate, overallRank, ratingChangeSince, seasonLabel, winRate } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { loadXp } from "@/lib/xp-data";
@@ -69,7 +72,7 @@ export default async function HomePage({
     supabase
       .from("matches")
       .select(
-        "id, reporter_score, opponent_score, game_type, played_at, winner_id, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball)"
+        "id, reporter_score, opponent_score, game_type, played_at, winner_id, race_to, spot, spot_to, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball)"
       )
       .eq("opponent_id", user.id)
       .eq("status", "pending")
@@ -83,12 +86,12 @@ export default async function HomePage({
     supabase
       .from("matches")
       .select(
-        "id, reporter_id, reporter_score, opponent_score, game_type, played_at, winner_id, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
+        "id, reporter_id, reporter_score, opponent_score, game_type, played_at, winner_id, race_to, spot, spot_to, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
       )
       .eq("status", "confirmed")
       .order("played_at", { ascending: false })
       .order("confirmed_at", { ascending: false })
-      .limit(15),
+      .limit(30),
     // Bound the fetch, but let partitionEvents make the actual upcoming/past
     // call so the home card and the calendar can never disagree.
     supabase
@@ -150,7 +153,10 @@ export default async function HomePage({
           />
           <span className="flex flex-col gap-px">
             <span className="text-muted-foreground text-[12px]">{greeting}</span>
-            <span className="text-[16px] font-medium">{first}</span>
+            <span className="flex items-center gap-1.5 text-[16px] font-medium">
+              {first}
+              <TitleBadge title={level.title} size={20} />
+            </span>
           </span>
         </Link>
         <MessagesButton />
@@ -204,7 +210,16 @@ export default async function HomePage({
                     </span>
                   </>
                 }
-                meta={GAME_LABEL[m.game_type] ?? m.game_type}
+                meta={[
+                  GAME_LABEL[m.game_type] ?? m.game_type,
+                  formatLabel(
+                    m.race_to,
+                    m.spot,
+                    m.spot_to === user.id ? "you" : (reporter?.display_name ?? "them").split(" ")[0]
+                  ),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
                 trailing={
                   <span className="flex items-center gap-4 text-[13px]">
                     <form action={rejectMatch}>
@@ -285,7 +300,9 @@ export default async function HomePage({
             </Link>
           </p>
         )}
-        {(recent ?? []).map((m) => {
+        <ShowMore
+          label="Show {hidden} more games"
+          items={(recent ?? []).map((m) => {
           const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
           const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
           const reporterWon = m.winner_id === reporter?.id;
@@ -300,11 +317,13 @@ export default async function HomePage({
               viewerId={user.id}
               perspectiveId={user.id}
               gameType={GAME_LABEL[m.game_type] ?? m.game_type}
+              format={formatShort(m.race_to, m.spot)}
               meta={labelPlayedDate(m.played_at, today)}
               caption={xpCaption(m.id, xp)}
             />
           );
-        })}
+          })}
+        />
       </section>
     </main>
   );

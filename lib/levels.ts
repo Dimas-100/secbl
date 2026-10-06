@@ -14,6 +14,7 @@ export const TITLES = [
 ] as const;
 
 export type Title = (typeof TITLES)[number];
+export type TitleName = Title["name"];
 
 export const XP_WIN = 200;
 export const XP_LOSS = 80;
@@ -42,10 +43,10 @@ export function titleFor(level: number): Title {
 
 export interface LevelInfo {
   level: number;
-  title: string;
+  title: TitleName;
   intoLevel: number;
   needed: number;
-  nextTitle: string | null;
+  nextTitle: TitleName | null;
   levelsToNextTitle: number | null;
 }
 
@@ -62,6 +63,17 @@ export function levelFromXp(xp: number): LevelInfo {
     nextTitle: next?.name ?? null,
     levelsToNextTitle: next ? next.from - level : null,
   };
+}
+
+// The badge to chase: the next title, the level it unlocks at, and the XP
+// still to earn. Null once a member is a Legend.
+export function nextBadge(
+  level: LevelInfo,
+  xpTotal: number
+): { title: TitleName; atLevel: number; xpToGo: number } | null {
+  const next = TITLES.find((t) => t.from > level.level);
+  if (!next) return null;
+  return { title: next.name, atLevel: next.from, xpToGo: xpToReach(next.from) - xpTotal };
 }
 
 export interface XpMatch {

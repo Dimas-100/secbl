@@ -7,15 +7,18 @@ import { LevelBar } from "@/components/level-bar";
 import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
 import { MessagesButton } from "@/components/messages-button";
-import { SchoolDot } from "@/components/school-dot";
+import { SchoolMark } from "@/components/school-mark";
 import { SectionHeading } from "@/components/section-heading";
 import { ShareButton } from "@/components/share-button";
+import { ShowMore } from "@/components/show-more";
 import { Sparkline } from "@/components/sparkline";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { SubmitButton } from "@/components/submit-button";
+import { TitleBadge } from "@/components/title-badge";
 import { ACHIEVEMENTS, earnedAchievements } from "@/lib/achievements";
 import { GAME_LABEL } from "@/lib/identity";
-import { xpCaption } from "@/lib/levels";
+import { nextBadge, xpCaption } from "@/lib/levels";
+import { formatShort } from "@/lib/race";
 import { createClient } from "@/lib/supabase/server";
 import { startDm } from "@/app/(member)/chat/actions";
 import { clubDateOf } from "@/lib/events";
@@ -45,6 +48,9 @@ interface PlayerRef {
 type PlayerMatch = StatMatch & {
   game_type: string;
   played_at: string;
+  race_to: number | null;
+  spot: number;
+  spot_to: string | null;
   rating_delta_reporter: number | null;
   rating_delta_opponent: number | null;
   reporter: PlayerRef | PlayerRef[] | null;
@@ -73,7 +79,7 @@ export default async function PlayerPage({
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, display_name, rating, matches_played, created_at, avatar_url, ball, tagline, favorite_game, schools(name, short_name, primary_color)"
+      "id, display_name, rating, matches_played, created_at, avatar_url, ball, tagline, favorite_game, schools(name, short_name, primary_color, logo_url)"
     )
     .eq("id", id)
     .single();
@@ -94,7 +100,7 @@ export default async function PlayerPage({
       supabase
         .from("matches")
         .select(
-          "id, reporter_id, opponent_id, reporter_score, opponent_score, game_type, played_at, confirmed_at, winner_id, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, rating, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, rating, avatar_url, ball)"
+          "id, reporter_id, opponent_id, reporter_score, opponent_score, game_type, played_at, confirmed_at, winner_id, race_to, spot, spot_to, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, rating, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, rating, avatar_url, ball)"
         )
         .eq("status", "confirmed")
         .or(`reporter_id.eq.${id},opponent_id.eq.${id}`)
@@ -152,6 +158,7 @@ export default async function PlayerPage({
   });
   const nextAchievement = ACHIEVEMENTS.find((a) => !achievements.some((e) => e.id === a.id));
   const firstName = profile.display_name.split(" ")[0];
+  const next = nextBadge(level, xp.total);
 
   return (
     <main className="flex flex-col gap-8">
@@ -187,7 +194,7 @@ export default async function PlayerPage({
           </h1>
           <span className="text-muted-foreground flex flex-wrap items-center justify-center gap-2 text-[13px]">
             <span className="flex items-center gap-2">
-              <SchoolDot color={school?.primary_color} />
+              <SchoolMark school={school} size={16} />
               {school?.name}
             </span>
             {profile.favorite_game && (
@@ -266,15 +273,24 @@ export default async function PlayerPage({
         className="press flex flex-col gap-3"
         aria-label={`Level ${level.level}, ${level.title}. ${level.intoLevel} of ${level.needed} XP into this level. Open the ladder.`}
       >
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[17px] font-semibold tracking-[-0.01em]">
-            Level {level.level} <span className="text-brass font-medium">· {level.title}</span>
+        <div className="flex items-center justify-between gap-3">
+          <span className="flex min-w-0 items-center gap-3">
+            <TitleBadge title={level.title} size={40} decorative />
+            <span className="truncate text-[17px] font-semibold tracking-[-0.01em]">
+              Level {level.level} <span className="text-brass font-medium">· {level.title}</span>
+            </span>
           </span>
-          <span className="text-muted-foreground stat-number text-[12px]">
+          <span className="text-muted-foreground stat-number shrink-0 text-[12px]">
             {level.intoLevel} / {level.needed} XP
           </span>
         </div>
         <LevelBar value={level.intoLevel} max={level.needed} />
+        {next && (
+          <span className="text-muted-foreground flex items-center gap-2 text-[12px]">
+            <TitleBadge title={next.title} size={20} locked decorative />
+            Next: {next.title} badge at level {next.atLevel} · {next.xpToGo.toLocaleString("en-US")} XP to go
+          </span>
+        )}
       </Link>
 
       <section className="flex flex-col gap-3">
@@ -321,7 +337,9 @@ export default async function PlayerPage({
       <section className="flex flex-col gap-1.5">
         <SectionHeading>Match history</SectionHeading>
         {all.length === 0 && <p className="text-muted-foreground py-4 text-sm">No confirmed matches yet.</p>}
-        {all.slice(0, 20).map((m) => {
+        <ShowMore
+          label="Show all {total} games"
+          items={all.map((m) => {
           const reporter = one(m.reporter);
           const opponent = one(m.opponent);
           const reporterWon = m.winner_id === reporter?.id;
@@ -337,10 +355,12 @@ export default async function PlayerPage({
               perspectiveId={id}
               meta={labelPlayedDate(m.played_at, today)}
               gameType={GAME_LABEL[m.game_type] ?? m.game_type}
+              format={formatShort(m.race_to, m.spot)}
               caption={xpCaption(m.id, xp)}
             />
           );
-        })}
+          })}
+        />
       </section>
     </main>
   );

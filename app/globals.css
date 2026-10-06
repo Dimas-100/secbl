@@ -132,10 +132,44 @@
   }
   html {
     color-scheme: dark;
+    /* App framing: no rubber-band past the edges, no iOS text inflation. */
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "tnum" 1;
+  }
+  /* Controls answer the finger like native ones: no double-tap zoom, no grey
+     tap flash, no long-press callout, no accidental text selection. Text the
+     member might want to copy (messages, taglines) stays selectable. */
+  a,
+  button,
+  label,
+  input,
+  textarea,
+  select,
+  [role="tab"],
+  [role="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  a,
+  button,
+  img {
+    -webkit-touch-callout: none;
+  }
+  nav,
+  header,
+  button,
+  [role="tab"] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  input,
+  textarea {
+    user-select: text;
+    -webkit-user-select: text;
   }
 }
 
@@ -206,10 +240,54 @@
   transform-origin: center;
   animation: sparkline-dot 250ms ease-out 850ms both;
 }
+/* The scoreboard's finish: the winning numeral pops with a brass ring rolling
+   out from behind it; the losing side settles. One-shot, 600 ms. */
+@keyframes race-win {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes race-ring {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+@keyframes race-loss {
+  to {
+    transform: translateY(6px);
+    opacity: 0.5;
+  }
+}
+.race-win {
+  animation: race-win 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.race-ring {
+  animation: race-ring 600ms ease-out both;
+}
+.race-loss {
+  animation: race-loss 400ms ease-out both;
+}
 @media (prefers-reduced-motion: reduce) {
   .sparkline-draw,
-  .sparkline-dot {
+  .sparkline-dot,
+  .race-win,
+  .race-ring,
+  .race-loss {
     animation: none;
+  }
+  .race-loss {
+    opacity: 0.5;
   }
   .press {
     transition: none;

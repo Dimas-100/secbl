@@ -9,6 +9,7 @@ export interface School {
   short_name: string;
   primary_color: string;
   secondary_color: string;
+  logo_url: string | null;
 }
 
 export interface Profile {
@@ -33,6 +34,11 @@ export interface Match {
   game_type: GameType;
   status: MatchStatus;
   tournament_match_id: string | null;
+  // Format: null race_to = open play. Scores include the spot (the receiver
+  // starts at `spot`), so winner_id is always the higher score.
+  race_to: number | null;
+  spot: number;
+  spot_to: string | null;
   played_at: string;
   confirmed_at: string | null;
   rating_delta_reporter: number | null;

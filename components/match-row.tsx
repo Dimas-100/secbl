@@ -28,6 +28,7 @@ export function MatchRow({
   perspectiveId,
   meta,
   gameType,
+  format,
   caption,
 }: {
   winner: MatchRowPlayer | null | undefined;
@@ -39,9 +40,11 @@ export function MatchRow({
   perspectiveId?: string;
   meta?: string;
   gameType?: string;
+  // "race to 5 · 2 spot" from lib/race formatShort; absent for open play.
+  format?: string | null;
   caption?: React.ReactNode;
 }) {
-  const sub = [gameType, meta].filter(Boolean).join(" · ");
+  const sub = [gameType, format, meta].filter(Boolean).join(" · ");
   const won = perspectiveId !== undefined && winner?.id === perspectiveId;
   const lost = perspectiveId !== undefined && loser?.id === perspectiveId;
   const rowClass = "border-hairline-row flex min-h-[68px] items-center gap-3.5 border-b py-3.5";

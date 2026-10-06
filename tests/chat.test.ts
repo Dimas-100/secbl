@@ -44,21 +44,34 @@ describe("sortInbox", () => {
     ...over,
   });
 
-  it("pins Everyone, then the school room, then DMs by latest activity", () => {
+  it("orders by latest activity, newest first, regardless of room type", () => {
     const rows = [
       row({ id: "dm-old", last_at: "2026-10-01T00:00:00Z" }),
       row({ id: "school", type: "school", name: "GSU", last_at: "2026-10-05T00:00:00Z" }),
-      row({ id: "dm-new", last_at: "2026-10-04T00:00:00Z" }),
-      row({ id: "everyone", type: "everyone", name: "Everyone", last_at: null }),
-      row({ id: "dm-quiet", last_at: null }),
+      row({ id: "dm-new", last_at: "2026-10-06T00:00:00Z" }),
+      row({ id: "everyone", type: "everyone", name: "Everyone", last_at: "2026-10-03T00:00:00Z" }),
     ];
-    expect(sortInbox(rows).map((r) => r.id)).toEqual([
-      "everyone",
-      "school",
-      "dm-new",
-      "dm-old",
-      "dm-quiet",
-    ]);
+    expect(sortInbox(rows).map((r) => r.id)).toEqual(["dm-new", "school", "everyone", "dm-old"]);
+  });
+
+  it("puts rooms with no messages last: group rooms first, then DMs, by name", () => {
+    const rows = [
+      row({ id: "dm-b", other_name: "Bea", last_at: null }),
+      row({ id: "school", type: "school", name: "GSU", last_at: null }),
+      row({ id: "dm-a", other_name: "Al", last_at: null }),
+      row({ id: "everyone", type: "everyone", name: "Everyone", last_at: null }),
+      row({ id: "active", last_at: "2026-10-01T00:00:00Z" }),
+    ];
+    expect(sortInbox(rows).map((r) => r.id)).toEqual(["active", "everyone", "school", "dm-a", "dm-b"]);
+  });
+
+  it("is deterministic for equal timestamps", () => {
+    const rows = [
+      row({ id: "b", other_name: "B", last_at: "2026-10-01T00:00:00Z" }),
+      row({ id: "a", other_name: "A", last_at: "2026-10-01T00:00:00Z" }),
+    ];
+    expect(sortInbox(rows).map((r) => r.id)).toEqual(["a", "b"]);
+    expect(sortInbox([...rows].reverse()).map((r) => r.id)).toEqual(["a", "b"]);
   });
 
   it("does not mutate its input", () => {

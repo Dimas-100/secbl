@@ -10,9 +10,10 @@ import { SectionLabel } from "@/components/section-label";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/server";
-import { logout } from "@/app/(public)/login/actions";
 import { updateDisplayName } from "./actions";
 import { LookEditor } from "./look-editor";
+import { LogoutButton } from "./logout-button";
+import { NotificationsCard } from "./notifications-card";
 
 export default async function SettingsPage({
   searchParams,
@@ -32,6 +33,11 @@ export default async function SettingsPage({
     .eq("id", user.id)
     .single();
   const school = Array.isArray(profile?.schools) ? profile.schools[0] : profile?.schools;
+  const { data: prefs } = await supabase
+    .from("notification_prefs")
+    .select("messages, matches, events")
+    .eq("profile_id", user.id)
+    .maybeSingle();
   // Admins see how many signups are waiting without opening the queue — a
   // new member left pending for days is the fastest way to lose them.
   let pending = 0;
@@ -114,6 +120,17 @@ export default async function SettingsPage({
 
       <Card>
         <CardHeader>
+          <SectionLabel>Notifications</SectionLabel>
+        </CardHeader>
+        <CardContent>
+          <NotificationsCard
+            initialPrefs={prefs ?? { messages: true, matches: true, events: true }}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <SectionLabel>Account</SectionLabel>
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
@@ -146,11 +163,7 @@ export default async function SettingsPage({
       </Card>
 
       {/* Moved out of the header when it slimmed down to the avatar chip. */}
-      <form action={logout}>
-        <Button variant="ghost" className="text-destructive w-full">
-          Log out
-        </Button>
-      </form>
+      <LogoutButton />
       </div>
     </main>
   );

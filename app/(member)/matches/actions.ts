@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { confirmPendingMatch } from "@/lib/confirm-match";
+import { matchConfirmedPayload, matchDisputedPayload } from "@/lib/push";
+import { notify } from "@/lib/push-send";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import type { Match } from "@/lib/types";
 
@@ -29,11 +31,32 @@ export async function confirmMatch(formData: FormData) {
   if (!match) {
     redirect(`/?error=${encodeURIComponent("That match can no longer be confirmed.")}`);
   }
+  const service = createServiceClient();
   try {
-    await confirmPendingMatch(createServiceClient(), match);
+    await confirmPendingMatch(service, match);
   } catch {
     redirect(`/?error=${encodeURIComponent("Could not confirm the match — please try again.")}`);
   }
+
+  // Tell the reporter: the result is in and the rating moved.
+  const [{ data: after }, { data: opponent }] = await Promise.all([
+    service.from("matches").select("rating_delta_reporter").eq("id", match.id).single(),
+    service.from("profiles").select("display_name").eq("id", match.opponent_id).single(),
+  ]);
+  await notify(service, {
+    candidates: [match.reporter_id],
+    category: "matches",
+    excludeId: match.opponent_id,
+    payload: matchConfirmedPayload({
+      matchId: match.id,
+      opponentName: opponent?.display_name ?? "Your opponent",
+      won: match.winner_id === match.reporter_id,
+      myScore: match.reporter_score,
+      theirScore: match.opponent_score,
+      delta: after?.rating_delta_reporter ?? null,
+    }),
+  });
+
   revalidatePath("/");
   redirect(`/?message=${encodeURIComponent("Match confirmed — ratings updated.")}`);
 }
@@ -50,6 +73,15 @@ export async function rejectMatch(formData: FormData) {
     .eq("id", match.id)
     .eq("status", "pending");
   if (error) redirect(`/?error=${encodeURIComponent(error.message)}`);
+
+  const { data: opponent } = await service.from("profiles").select("display_name").eq("id", match.opponent_id).single();
+  await notify(service, {
+    candidates: [match.reporter_id],
+    category: "matches",
+    excludeId: match.opponent_id,
+    payload: matchDisputedPayload({ matchId: match.id, opponentName: opponent?.display_name ?? "Your opponent" }),
+  });
+
   revalidatePath("/");
   redirect(`/?message=${encodeURIComponent("Sent to the admins to sort out.")}`);
 }
