@@ -60,15 +60,19 @@ export function dmKey(a: string, b: string): string {
 
 const TYPE_RANK: Record<ChannelType, number> = { everyone: 0, school: 1, dm: 2 };
 
-// Group rooms are pinned (Everyone, then the school room); DMs follow by most
-// recent activity, with never-used DMs last.
+// Newest activity on top, like every chat app a student already uses. Rooms
+// that have never had a message sit at the bottom: group rooms first (they
+// are the ones to break the silence in), then DMs, alphabetically.
 export function sortInbox(rows: InboxRow[]): InboxRow[] {
   return [...rows].sort((a, b) => {
+    const at = a.last_at ? Date.parse(a.last_at) : null;
+    const bt = b.last_at ? Date.parse(b.last_at) : null;
+    if (at !== null && bt !== null && at !== bt) return bt - at;
+    if (at !== null && bt === null) return -1;
+    if (at === null && bt !== null) return 1;
     const rank = TYPE_RANK[a.type] - TYPE_RANK[b.type];
     if (rank !== 0) return rank;
-    const at = a.last_at ? Date.parse(a.last_at) : -Infinity;
-    const bt = b.last_at ? Date.parse(b.last_at) : -Infinity;
-    return bt - at;
+    return inboxTitle(a).localeCompare(inboxTitle(b)) || a.id.localeCompare(b.id);
   });
 }
 

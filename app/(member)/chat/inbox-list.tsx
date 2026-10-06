@@ -1,21 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Search, Users } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { SchoolDot } from "@/components/school-dot";
+import { createClient } from "@/lib/supabase/client";
 import { filterInbox, type InboxRow, type InboxTab } from "@/lib/chat";
+import { buildInboxItems, type InboxItem, type SchoolRef } from "@/lib/inbox";
 import { cn } from "@/lib/utils";
 
-// A row with its display strings already computed on the server.
-export type InboxItem = InboxRow & {
-  title: string;
-  subtitle: string;
-  preview: string | null;
-  stamp: string | null;
-  color: string | null;
-};
+export type { InboxItem } from "@/lib/inbox";
 
 const TABS: { value: InboxTab; label: string }[] = [
   { value: "all", label: "All" },
@@ -24,11 +19,61 @@ const TABS: { value: InboxTab; label: string }[] = [
 ];
 
 // Search + tabs are client state (no URL): the inbox is one screen and the
-// filter should not survive a back navigation.
-export function InboxList({ rows }: { rows: InboxItem[] }) {
+// filter should not survive a back navigation. The list itself is live: any
+// message landing in one of your rooms re-fetches the inbox and the room
+// moves to the top, like every chat app a student already uses.
+export function InboxList({
+  rows,
+  meId,
+  schoolsById,
+}: {
+  rows: InboxItem[];
+  meId: string;
+  schoolsById: Record<string, SchoolRef>;
+}) {
+  const [items, setItems] = useState<InboxItem[]>(rows);
   const [tab, setTab] = useState<InboxTab>("all");
   const [query, setQuery] = useState("");
-  const visible = filterInbox(rows, tab, query) as InboxItem[];
+
+  useEffect(() => {
+    const supabase = createClient();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Debounced: a burst in a busy room costs one round trip, not ten.
+    const refresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        supabase.rpc("list_my_channels").then(({ data }) => {
+          if (data) setItems(buildInboxItems(data as InboxRow[], { meId, now: new Date(), schoolsById }));
+        });
+      }, 400);
+    };
+    // No filter on purpose: Realtime applies this subscriber's RLS, so only
+    // rooms you are a member of ever arrive.
+    const channel = supabase.channel("inbox");
+    let active = true;
+    (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!active) return;
+      if (session) await supabase.realtime.setAuth(session.access_token);
+      channel
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, refresh)
+        .subscribe();
+    })();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      void supabase.removeChannel(channel);
+    };
+  }, [meId, schoolsById]);
+
+  const visible = filterInbox(items, tab, query) as InboxItem[];
   return (
     <div className="flex flex-col gap-6">
       <label className="bg-card text-muted-foreground flex h-12 items-center gap-2.5 rounded-full px-4 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
@@ -62,7 +107,11 @@ export function InboxList({ rows }: { rows: InboxItem[] }) {
       <ul className="-mt-2 flex flex-col">
         {visible.length === 0 && (
           <li className="text-muted-foreground py-6 text-sm">
-            {rows.length === 0 ? "No rooms yet — an admin needs to approve your account first." : "Nothing matches."}
+            {items.length === 0
+              ? "No rooms yet — an admin needs to approve your account first."
+              : tab === "direct" && query.trim() === ""
+                ? "No direct messages yet. Start one from a player's profile or the pen icon."
+                : "Nothing matches."}
           </li>
         )}
         {visible.map((row) => {
@@ -137,7 +186,7 @@ function RoomAvatar({ row }: { row: InboxItem }) {
       )}
       {row.type === "school" && (
         <span className="ring-background absolute -right-0.5 -bottom-0.5 flex rounded-full ring-[3px]">
-          <SchoolDot color={row.color} size={12} />
+          <SchoolDot color={row.school?.primary_color} size={12} />
         </span>
       )}
     </span>
