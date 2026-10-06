@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Agent, fetch as undiciFetch } from "undici";
+import { Agent, buildConnector, fetch as undiciFetch } from "undici";
 import { parseIcs } from "@/lib/ics";
 import { planSync, type ImportedEvent } from "@/lib/event-sync";
 import { feedUrlProblem, isPrivateIp } from "@/lib/url-guard";
@@ -10,25 +11,36 @@ import { feedUrlProblem, isPrivateIp } from "@/lib/url-guard";
 // and then rebind to an internal address for the real connection.
 type LookupCallback = (err: Error | null, address: string | { address: string; family: number }[], family?: number) => void;
 
-const pinnedAgent = new Agent({
-  connect: {
-    // net.connect calls this with { all: true } when autoSelectFamily is on
-    // (Node 20+) and then expects an array; otherwise a single address.
-    lookup: ((hostname: string, options: { all?: boolean }, callback: LookupCallback) => {
-      lookup(hostname, { all: true })
-        .then((addresses) => {
-          const safe = addresses.filter((a) => !isPrivateIp(a.address));
-          if (safe.length === 0) {
-            callback(new Error(`${hostname} resolves to a private address`), "", 4);
-            return;
-          }
-          if (options?.all) callback(null, safe.map((a) => ({ address: a.address, family: a.family })));
-          else callback(null, safe[0].address, safe[0].family);
-        })
-        .catch((err: Error) => callback(err, "", 4));
-    }) as never,
-  },
-});
+// net.connect calls this with { all: true } when autoSelectFamily is on
+// (Node 20+) and then expects an array; otherwise a single address.
+const safeLookup = ((hostname: string, options: { all?: boolean }, callback: LookupCallback) => {
+  lookup(hostname, { all: true })
+    .then((addresses) => {
+      const safe = addresses.filter((a) => !isPrivateIp(a.address));
+      if (safe.length === 0) {
+        callback(new Error(`${hostname} resolves to a private address`), "", 4);
+        return;
+      }
+      if (options?.all) callback(null, safe.map((a) => ({ address: a.address, family: a.family })));
+      else callback(null, safe[0].address, safe[0].family);
+    })
+    .catch((err: Error) => callback(err, "", 4));
+}) as never;
+
+// Node never consults the lookup hook for an IP-literal host, so the
+// connector itself also refuses private literals. The static URL check
+// rejects literals earlier; this is the belt to that pair of braces.
+const baseConnector = buildConnector({ lookup: safeLookup });
+const guardedConnector: buildConnector.connector = (options, callback) => {
+  const host = options.hostname.replace(/^\[|\]$/g, "");
+  if (isIP(host) && isPrivateIp(host)) {
+    callback(new Error(`${host} is a private address`), null);
+    return;
+  }
+  baseConnector(options, callback);
+};
+
+const pinnedAgent = new Agent({ connect: guardedConnector });
 
 // Node's global fetch ignores a foreign dispatcher, so the default client is
 // undici's own fetch bound to the pinned agent. Tests inject a stub instead.
