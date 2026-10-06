@@ -16,7 +16,9 @@ test("signup → pending → approve → home", async ({ page }) => {
   await page.goto("/signup");
   // display_name doubles as a unique lookup key for this test run.
   await page.fill('input[name="display_name"]', displayName);
-  await page.selectOption('select[name="school_id"]', { index: 1 });
+  // Schools are picked by tapping a tile (a radio group under the hood).
+  await page.getByRole("radio", { name: /University|Institute/ }).first().check({ force: true });
+  await expect(page.getByRole("radio", { checked: true })).toHaveCount(1);
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', "e2e-password-123!");
   await page.click('button[type="submit"]');

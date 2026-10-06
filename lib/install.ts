@@ -12,12 +12,15 @@ export function siteOrigin(): string {
 }
 
 // A QR code as a data URI for a plain <img>, so no markup is injected.
-export async function qrDataUri(url: string, size = 220): Promise<string> {
+// "screen" draws light modules for the dark app ground; "print" draws ink
+// on paper. Both are the app's own neutrals, never a brand colour, because
+// a scanner wants contrast, not personality.
+export async function qrDataUri(url: string, size = 220, mode: "screen" | "print" = "screen"): Promise<string> {
   const svg = await QRCode.toString(url, {
     type: "svg",
     margin: 1,
     width: size,
-    color: { dark: "#03600c", light: "#ffffff00" },
+    color: mode === "print" ? { dark: "#0E0F11", light: "#ffffff00" } : { dark: "#F2F1EE", light: "#ffffff00" },
     errorCorrectionLevel: "M",
   });
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;

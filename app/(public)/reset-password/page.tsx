@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/password-input";
+import { Field, PublicShell } from "@/components/public-shell";
 import { createClient } from "@/lib/supabase/server";
 import { updatePassword } from "./actions";
 
@@ -29,39 +28,19 @@ export default async function ResetPasswordPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-6 px-4">
-      <BrandLogo className="h-auto w-44 self-center" />
-      <h1 className="text-center text-2xl font-bold">Choose a new password</h1>
-      {error && (
-        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
-      )}
-      <form action={updatePassword} className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="password">New password</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="confirm">Confirm new password</Label>
-          <Input
-            id="confirm"
-            name="confirm"
-            type="password"
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
-        </div>
-        <Button type="submit" size="lg" className="w-full">
+    <PublicShell title="Choose a new password" lead="At least 8 characters. You'll be logged in straight after.">
+      {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
+      <form action={updatePassword} className="flex flex-col gap-6">
+        <Field label="New password" htmlFor="password">
+          <PasswordInput id="password" name="password" required minLength={8} autoComplete="new-password" />
+        </Field>
+        <Field label="Confirm new password" htmlFor="confirm">
+          <PasswordInput id="confirm" name="confirm" required minLength={8} autoComplete="new-password" />
+        </Field>
+        <Button type="submit" size="xl" className="w-full">
           Update password
         </Button>
       </form>
-    </main>
+    </PublicShell>
   );
 }
