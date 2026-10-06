@@ -78,14 +78,16 @@ export async function updateNotificationPrefs(prefs: Prefs): Promise<{ error: st
   return { error: error?.message ?? null };
 }
 
-// To yourself only, so the setup can be checked at the table.
+// To yourself only, so the setup can be checked at the table. It points at
+// Home, not Settings: the service worker suppresses a notification for the
+// page you are already looking at, and you tap this from Settings.
 export async function sendTestPush(): Promise<{ error: string | null }> {
   const { user } = await me();
   if (!user) return { error: "Please log in again." };
   await sendPush(createServiceClient(), [user.id], {
     title: "SECBL",
-    body: "Notifications are on.",
-    url: "/settings",
+    body: "Notifications are on. Tap to open the app.",
+    url: "/",
     tag: "test",
     category: "messages",
   });
