@@ -16,12 +16,18 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SECBL",
   description: "Stats, ratings, brackets, and events for the SEC billiards group",
+  // Installed on an iPhone, run full-screen under the status bar.
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "SECBL" },
 };
 
 // Near-black app ground; matches --background in app/globals.css and
 // theme_color in app/manifest.ts.
 export const viewport: Viewport = {
   themeColor: "#0E0F11",
+  // App framing (spec 2026-10-06-live-club §3): no pinch or double-tap zoom,
+  // by the owner's explicit choice — the screens are sized for a phone.
+  maximumScale: 1,
+  userScalable: false,
   // Lets the fixed tab bar extend under the iPhone home indicator; its
   // bottom padding uses env(safe-area-inset-bottom), which only reports
   // non-zero when the viewport covers the inset.

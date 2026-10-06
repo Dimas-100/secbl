@@ -190,7 +190,7 @@ export function ReportMatchForm({
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Search members"
             />
-            <div className="flex flex-col overflow-y-auto">
+            <div className="flex flex-col overflow-y-auto overscroll-contain">
               {filtered.map((o) => (
                 <button
                   key={o.id}

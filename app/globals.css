@@ -132,10 +132,44 @@
   }
   html {
     color-scheme: dark;
+    /* App framing: no rubber-band past the edges, no iOS text inflation. */
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "tnum" 1;
+  }
+  /* Controls answer the finger like native ones: no double-tap zoom, no grey
+     tap flash, no long-press callout, no accidental text selection. Text the
+     member might want to copy (messages, taglines) stays selectable. */
+  a,
+  button,
+  label,
+  input,
+  textarea,
+  select,
+  [role="tab"],
+  [role="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  a,
+  button,
+  img {
+    -webkit-touch-callout: none;
+  }
+  nav,
+  header,
+  button,
+  [role="tab"] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  input,
+  textarea {
+    user-select: text;
+    -webkit-user-select: text;
   }
 }
 

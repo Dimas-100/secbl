@@ -39,7 +39,7 @@ export function InboxList({ rows }: { rows: InboxItem[] }) {
           onChange={(e) => setQuery(e.target.value)}
           aria-label="Search messages"
           placeholder="Search people and groups"
-          className="text-foreground placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+          className="text-foreground placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-base outline-none"
         />
       </label>
       <div role="tablist" aria-label="Chat filter" className="border-hairline-divider flex gap-6 border-b">

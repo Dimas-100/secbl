@@ -46,7 +46,7 @@ export function NewMessageSheet({ people }: { people: Person[] }) {
             onChange={(e) => setQuery(e.target.value)}
             aria-label="Search members"
           />
-          <div className="flex flex-col overflow-y-auto">
+          <div className="flex flex-col overflow-y-auto overscroll-contain">
             {filtered.map((p) => (
               <form key={p.id} action={startDm} className="contents">
                 <input type="hidden" name="profile_id" value={p.id} />
