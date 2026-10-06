@@ -4,7 +4,7 @@
 export function recentOpponents<T extends { id: string; display_name: string }>(
   matchOpponentIds: string[],
   all: T[],
-  n = 3
+  n = 4
 ): T[] {
   const byId = new Map(all.map((o) => [o.id, o]));
   const picked: T[] = [];
@@ -33,12 +33,23 @@ export function submitState(
   opponentName: string | null
 ): { label: string; disabled: boolean; reason: string | null } {
   if (!opponentName)
-    return { label: "Report match", disabled: true, reason: "Pick your opponent" };
+    return { label: "Send to confirm", disabled: true, reason: "Pick your opponent" };
   if (you === 0 && them === 0)
-    return { label: "Report match", disabled: true, reason: "Enter the score" };
+    return { label: "Send to confirm", disabled: true, reason: "Enter the score" };
   if (you === them)
-    return { label: "Report match", disabled: true, reason: "Scores can't be equal" };
-  const outcome = you > them ? "win" : "loss";
-  // U+2013 en dash between scores, matching how scores render app-wide.
-  return { label: `Report ${you}–${them} ${outcome}`, disabled: false, reason: null };
+    return { label: "Send to confirm", disabled: true, reason: "Scores can't be equal" };
+  return { label: `Send to ${opponentName} to confirm`, disabled: false, reason: null };
+}
+
+// The line under the scores. U+2013 en dash between scores, matching how
+// scores render app-wide.
+export function resultLine(
+  you: number,
+  them: number
+): { text: string; tone: "win" | "loss" | "muted" } {
+  if (you === 0 && them === 0) return { text: "Enter the score", tone: "muted" };
+  if (you === them) return { text: "Scores can't be equal", tone: "muted" };
+  return you > them
+    ? { text: `Win ${you}–${them}`, tone: "win" }
+    : { text: `Loss ${you}–${them}`, tone: "loss" };
 }

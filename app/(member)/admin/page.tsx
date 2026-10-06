@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { HeroBand } from "@/components/hero-band";
+import { PageHeader } from "@/components/page-header";
 import { SectionLabel } from "@/components/section-label";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/server";
@@ -101,13 +101,13 @@ export default async function AdminPage({
 
   return (
     <main>
-      <HeroBand title="Admin" />
-      <div className="-mt-3 flex flex-col gap-4">
+      <PageHeader title="Admin" back="/settings" trailing={null} />
+      <div className="mt-6 flex flex-col gap-6">
       {message && (
-        <p className="rounded-md bg-card p-3 text-sm shadow-[var(--shadow-card)]">{message}</p>
+        <p className="bg-card rounded-2xl p-3 text-sm shadow-[inset_0_0_0_1px_var(--hairline-row)]">{message}</p>
       )}
       {error && (
-        <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
       )}
       <Card>
         <CardHeader>

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  clubWeekOf,
+  eventMentionsSchool,
   addClubWeek,
   clubDateOf,
   CLUB_TIMEZONE,
@@ -183,5 +185,46 @@ describe("clubDateOf", () => {
   it("handles standard time in winter", () => {
     // 2026-01-15T02:00Z is 9:00 PM EST on Jan 14.
     expect(clubDateOf("2026-01-15T02:00:00Z")).toBe("2026-01-14");
+  });
+});
+
+describe("eventMentionsSchool", () => {
+  const gsu = { name: "Georgia State", short_name: "GSU" };
+  it("matches the school's name or short name anywhere in the event", () => {
+    expect(eventMentionsSchool({ title: "League night · GSU vs GT", location: null, source_name: null }, gsu)).toBe(true);
+    expect(
+      eventMentionsSchool({ title: "Open table", location: "Georgia State Student Center", source_name: null }, gsu)
+    ).toBe(true);
+    expect(eventMentionsSchool({ title: "Clinic", location: null, source_name: "Georgia State PIN" }, gsu)).toBe(true);
+  });
+  it("ignores other schools", () => {
+    expect(eventMentionsSchool({ title: "League night · UGA vs GT", location: "Athens", source_name: null }, gsu)).toBe(false);
+  });
+});
+
+describe("clubWeekOf", () => {
+  it("is the Monday of the club week, as a club calendar date", () => {
+    // Wed Oct 7 2026, 19:00 ET
+    expect(clubWeekOf("2026-10-07T23:00:00Z")).toBe("2026-10-05");
+    // Monday itself
+    expect(clubWeekOf("2026-10-05T12:00:00Z")).toBe("2026-10-05");
+  });
+  it("keeps Sunday 23:30 ET in that week although it is already Monday in UTC", () => {
+    expect(clubWeekOf("2026-10-12T03:30:00Z")).toBe("2026-10-05");
+  });
+  it("rolls to the new week at Monday 00:00 ET", () => {
+    expect(clubWeekOf("2026-10-12T04:00:00Z")).toBe("2026-10-12");
+  });
+  it("holds across the fall-back DST change (Nov 1 2026)", () => {
+    // Sun Nov 1 2026 23:30 EST = 04:30Z Mon
+    expect(clubWeekOf("2026-11-02T04:30:00Z")).toBe("2026-10-26");
+    // Mon Nov 2 2026 00:00 EST = 05:00Z
+    expect(clubWeekOf("2026-11-02T05:00:00Z")).toBe("2026-11-02");
+  });
+  it("holds across the spring-forward DST change (Mar 8 2026)", () => {
+    // Sun Mar 8 2026 23:30 EDT = 03:30Z Mon
+    expect(clubWeekOf("2026-03-09T03:30:00Z")).toBe("2026-03-02");
+    // Mon Mar 9 2026 00:00 EDT = 04:00Z
+    expect(clubWeekOf("2026-03-09T04:00:00Z")).toBe("2026-03-09");
   });
 });

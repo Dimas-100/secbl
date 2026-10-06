@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { HeroBand } from "@/components/hero-band";
-import { SectionLabel } from "@/components/section-label";
+import { ListRow } from "@/components/list-row";
+import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<string, string> = {
   setup: "Setting up",
@@ -13,6 +12,8 @@ const STATUS_LABEL: Record<string, string> = {
   complete: "Complete",
 };
 
+// The full tournament list. The everyday entry point is the Cups tab on
+// Events; this route stays for links and the admin flow.
 export default async function TournamentsPage({
   searchParams,
 }: {
@@ -37,63 +38,39 @@ export default async function TournamentsPage({
 
   return (
     <main>
-      <HeroBand title="Tournaments">
+      <PageHeader title="Tournaments" back="/events?tab=cups" trailing={null}>
         {me?.role === "admin" && (
-          <div className="mt-2">
-            <Button asChild size="sm" variant="hero">
+          <div>
+            <Button asChild size="sm" variant="ghost">
               <Link href="/tournaments/new">New tournament</Link>
             </Button>
           </div>
         )}
-      </HeroBand>
-      <div className="-mt-3 flex flex-col gap-4">
-      {message && (
-        <p className="rounded-md bg-card p-3 text-sm shadow-[var(--shadow-card)]">{message}</p>
-      )}
-      {error && (
-        <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
-      )}
-      <Card>
-        <CardHeader>
-          <SectionLabel>All tournaments</SectionLabel>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-1">
+      </PageHeader>
+      <div className="mt-6 flex flex-col gap-6">
+        {message && <p className="bg-card rounded-2xl p-3 text-sm">{message}</p>}
+        {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
+        <div className="flex flex-col">
           {(tournaments ?? []).length === 0 && (
-            <p className="text-muted-foreground text-sm">Nothing run yet.</p>
+            <p className="text-muted-foreground py-6 text-sm">Nothing run yet.</p>
           )}
           {(tournaments ?? []).map((t) => {
-            const badge =
-              t.status === "live" ? (
-                <Badge className="bg-gold text-gold-foreground">{STATUS_LABEL[t.status]}</Badge>
-              ) : (
-                <Badge variant="secondary">{STATUS_LABEL[t.status]}</Badge>
-              );
+            const status = (
+              <span className={cn("text-[12px] font-medium", t.status === "live" ? "text-brass" : "text-muted-foreground")}>
+                {STATUS_LABEL[t.status]}
+              </span>
+            );
             // A tournament still being set up has nothing to show a member yet,
             // and its only page is admin-only — so don't offer them the click.
-            if (t.status === "setup" && me?.role !== "admin") {
-              return (
-                <div
-                  key={t.id}
-                  className="-mx-3 flex items-center justify-between p-3"
-                >
-                  <span className="text-muted-foreground">{t.name}</span>
-                  {badge}
-                </div>
-              );
-            }
-            return (
-              <Link
-                key={t.id}
-                href={t.status === "setup" ? `/tournaments/${t.id}/setup` : `/tournaments/${t.id}`}
-                className="hover:bg-muted -mx-3 flex items-center justify-between rounded-md p-3"
-              >
-                <span className="font-medium">{t.name}</span>
-                {badge}
-              </Link>
-            );
+            const href =
+              t.status === "setup"
+                ? me?.role === "admin"
+                  ? `/tournaments/${t.id}/setup`
+                  : undefined
+                : `/tournaments/${t.id}`;
+            return <ListRow key={t.id} href={href} title={t.name} trailing={status} />;
           })}
-        </CardContent>
-      </Card>
+        </div>
       </div>
     </main>
   );

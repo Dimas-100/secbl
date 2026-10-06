@@ -1,16 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MessageCircle } from "lucide-react";
-import { Avatar } from "@/components/avatar";
-import { Badge } from "@/components/ui/badge";
 import { TabBar } from "@/components/tab-bar";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function MemberLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// The member shell is the auth gate plus the tab bar. Each screen renders
+// its own header (PageHeader / MessagesButton), so there is no shared one.
+export default async function MemberLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -18,72 +12,17 @@ export default async function MemberLayout({
   if (!user) redirect("/login");
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, display_name, role, status, avatar_url, ball")
+    .select("id, status")
     .eq("id", user.id)
     .single();
   if (!profile || profile.status !== "approved") redirect("/pending");
-  // Header badge. One cheap RPC; the inbox icon is the chat entry point, so
-  // the count has to be right on every page, not just /chat.
-  const { data: unreadRaw } = await supabase.rpc("unread_total");
-  const unread = Number(unreadRaw ?? 0);
-  // Admins see how many signups are waiting without opening the queue — a
-  // new member left pending for days is the fastest way to lose them.
-  let pendingSignups = 0;
-  if (profile.role === "admin") {
-    const { count } = await supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending");
-    pendingSignups = count ?? 0;
-  }
 
   return (
     // w-full matters: body is a flex column, and a flex child with mx-auto
-    // shrink-wraps its content instead of stretching — every page would size
-    // to its longest text line without it.
-    <div className="mx-auto w-full max-w-3xl px-4 pb-28">
-      <header className="flex items-center justify-between py-3">
-        {/* Text, not the logo image: the wordmark's ball letterforms smear at
-            header size. --primary carries the brand here instead. */}
-        <Link href="/" className="display text-primary text-[20px] tracking-[-0.03em]">
-          SECBL
-        </Link>
-        <div className="flex items-center gap-3">
-          {profile.role === "admin" && (
-            <Badge asChild variant={pendingSignups > 0 ? "default" : "outline"}>
-              <Link href="/admin" aria-label={pendingSignups > 0 ? `Admin, ${pendingSignups} waiting for approval` : "Admin"}>
-                Admin
-                {pendingSignups > 0 && (
-                  <span className="bg-gold text-gold-foreground stat-number ml-1 rounded-full px-1.5 text-[10px]">
-                    {pendingSignups}
-                  </span>
-                )}
-              </Link>
-            </Badge>
-          )}
-          {/* Chat lives up here, not in the tab bar: a sixth tab would push
-              the raised Report button off center, and a top-right inbox icon
-              with a badge is the convention students already know. */}
-          <Link
-            href="/chat"
-            aria-label={unread > 0 ? `Chat, ${unread} unread` : "Chat"}
-            className="text-primary relative flex size-10 items-center justify-center rounded-full hover:bg-accent"
-          >
-            <MessageCircle className="size-6" />
-            {unread > 0 && (
-              <span className="bg-gold text-gold-foreground stat-number absolute -top-0.5 -right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] ring-2 ring-background">
-                {unread > 99 ? "99+" : unread}
-              </span>
-            )}
-          </Link>
-          {/* Settings (and Log out, which lives there now) behind the avatar. */}
-          <Link href="/settings" aria-label="Settings" className="press flex items-center">
-            <Avatar person={profile} size="md" />
-          </Link>
-        </div>
-      </header>
+    // shrink-wraps its content instead of stretching.
+    <div className="mx-auto w-full max-w-3xl px-6 pb-32">
       {children}
-      <TabBar />
+      <TabBar profileHref={`/players/${profile.id}`} />
     </div>
   );
 }

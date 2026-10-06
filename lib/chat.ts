@@ -35,6 +35,24 @@ export interface InboxRow {
   last_at: string | null;
 }
 
+export type InboxTab = "all" | "direct" | "schools";
+
+// What a row is called in the inbox: the other person for a DM, the room name otherwise.
+export function inboxTitle(row: InboxRow): string {
+  return row.type === "dm" ? (row.other_name ?? "Member") : row.name;
+}
+
+// Underline tabs + search on the inbox. "Schools" is every room (the league
+// room and the school rooms); "Direct" is DMs. An empty query keeps all.
+export function filterInbox(rows: InboxRow[], tab: InboxTab, query: string): InboxRow[] {
+  const q = query.trim().toLowerCase();
+  return rows.filter((r) => {
+    if (tab === "direct" && r.type !== "dm") return false;
+    if (tab === "schools" && r.type === "dm") return false;
+    return q === "" || inboxTitle(r).toLowerCase().includes(q);
+  });
+}
+
 // Mirrors get_or_create_dm's key so the client can predict a DM's identity.
 export function dmKey(a: string, b: string): string {
   return a < b ? `${a}:${b}` : `${b}:${a}`;

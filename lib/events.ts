@@ -102,6 +102,17 @@ export function clubDateOf(iso: string): string {
   return isoToClubTime(iso).slice(0, 10);
 }
 
+// The Monday that starts the club week (Mon 00:00 – Sun 23:59 club time)
+// containing an instant, as a club calendar date. Calendar math runs in UTC
+// on the club date so neither the server zone nor DST can shift the day.
+export function clubWeekOf(iso: string): string {
+  const date = clubDateOf(iso);
+  const day = new Date(`${date}T00:00:00Z`);
+  const sinceMonday = (day.getUTCDay() + 6) % 7;
+  day.setUTCDate(day.getUTCDate() - sinceMonday);
+  return day.toISOString().slice(0, 10);
+}
+
 // One calendar week later in CLUB terms: the same wall-clock time seven days
 // on, even when the interval crosses a DST boundary. Adding a fixed 168 hours
 // to the instant would drift by an hour twice a year.
@@ -163,4 +174,14 @@ export function tallyRsvps(rsvps: RsvpLike[], viewerId: string): RsvpTally {
     if (rsvp.profile_id === viewerId) tally.mine = rsvp.response;
   }
   return tally;
+}
+
+// "My school" filter on the calendar. Events carry no school id, so this is a
+// name match across the fields a school would show up in.
+export function eventMentionsSchool(
+  event: { title: string; location: string | null; source_name: string | null },
+  school: { name: string; short_name: string }
+): boolean {
+  const hay = [event.title, event.location, event.source_name].filter(Boolean).join(" ").toLowerCase();
+  return hay.includes(school.name.toLowerCase()) || hay.includes(school.short_name.toLowerCase());
 }

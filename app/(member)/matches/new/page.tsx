@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { HeroBand } from "@/components/hero-band";
+import { PageHeader } from "@/components/page-header";
 import { clubDateOf } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
 import { ReportMatchForm, type OpponentOption } from "./report-form";
@@ -23,7 +23,7 @@ export default async function NewMatchPage({
     .neq("id", user.id)
     .order("display_name");
 
-  // Recency drives the opponent chips: whoever you actually play, any status.
+  // Recency drives the opponent row: whoever you actually play, any status.
   const { data: myMatches } = await supabase
     .from("matches")
     .select("reporter_id, opponent_id, created_at")
@@ -48,16 +48,10 @@ export default async function NewMatchPage({
   const today = clubDateOf(new Date().toISOString());
 
   return (
-    <main>
-      <HeroBand title="Report match" />
-      {/* No -mt-3 overlap here: the first element is a bare section label,
-          not a card, and muted text on the band's green is unreadable. */}
-      <div className="mt-4 flex flex-col gap-4">
-        {error && (
-          <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
-        )}
-        <ReportMatchForm opponents={options} recentIds={recentIds} today={today} />
-      </div>
+    <main className="flex flex-col gap-8">
+      <PageHeader title="Log a game" back="/" backIcon="close" backLabel="Close" trailing={null} />
+      {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
+      <ReportMatchForm opponents={options} recentIds={recentIds} today={today} />
     </main>
   );
 }

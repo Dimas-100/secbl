@@ -158,7 +158,7 @@ export function LookEditor({
         </div>
       </div>
       {photoError && (
-        <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+        <p role="alert" className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">
           {photoError}
         </p>
       )}
@@ -190,7 +190,7 @@ export function LookEditor({
                     onChange={() => setChosenBall(b.number)}
                     className="sr-only"
                   />
-                  <span className="bg-white/90 text-foreground flex size-4 items-center justify-center rounded-full text-[9px]">
+                  <span className="bg-foreground text-background flex size-4 items-center justify-center rounded-full text-[9px]">
                     {b.number}
                   </span>
                 </label>
@@ -235,7 +235,7 @@ export function LookEditor({
             {[["", "None"], ...Object.entries(GAME_LABEL)].map(([value, label]) => (
               <label
                 key={value}
-                className="press has-checked:bg-card flex h-10 flex-1 cursor-pointer items-center justify-center rounded-lg text-xs font-semibold has-checked:font-bold has-checked:shadow-[var(--shadow-card)]"
+                className="press has-checked:bg-card flex h-10 flex-1 cursor-pointer items-center justify-center rounded-lg text-xs font-semibold has-checked:font-bold has-checked:shadow-[inset_0_0_0_1px_var(--hairline-row)]"
               >
                 <input
                   type="radio"

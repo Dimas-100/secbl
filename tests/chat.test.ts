@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   dmKey,
+  filterInbox,
   formatMessageTime,
   groupByDay,
   mergeMessages,
@@ -128,5 +129,39 @@ describe("previewOf", () => {
 
   it("collapses newlines so one row stays one line", () => {
     expect(previewOf({ body: "a\nb\n\nc", senderName: "D", mine: false, group: false })).toBe("a b c");
+  });
+});
+
+describe("filterInbox", () => {
+  const row = (over: Partial<InboxRow>): InboxRow => ({
+    id: "x",
+    type: "dm",
+    name: "",
+    school_id: null,
+    other_id: null,
+    other_name: null,
+    member_count: 2,
+    unread: 0,
+    last_message_id: null,
+    last_body: null,
+    last_sender_id: null,
+    last_sender_name: null,
+    last_at: null,
+    ...over,
+  });
+  const rows = [
+    row({ id: "e", type: "everyone", name: "Everyone" }),
+    row({ id: "s", type: "school", name: "GSU" }),
+    row({ id: "d", type: "dm", name: "", other_name: "Kevin Moss" }),
+  ];
+  it("splits direct from rooms", () => {
+    expect(filterInbox(rows, "direct", "").map((r) => r.id)).toEqual(["d"]);
+    expect(filterInbox(rows, "schools", "").map((r) => r.id)).toEqual(["e", "s"]);
+    expect(filterInbox(rows, "all", "").map((r) => r.id)).toEqual(["e", "s", "d"]);
+  });
+  it("searches the visible title, case-insensitively", () => {
+    expect(filterInbox(rows, "all", "kev").map((r) => r.id)).toEqual(["d"]);
+    expect(filterInbox(rows, "all", "gsu").map((r) => r.id)).toEqual(["s"]);
+    expect(filterInbox(rows, "all", "zzz")).toEqual([]);
   });
 });

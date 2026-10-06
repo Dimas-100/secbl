@@ -36,8 +36,9 @@ export function ResultForm({
       <input type="hidden" name="player2_score" value={s2} />
       {winnerId && <input type="hidden" name="winner_id" value={winnerId} />}
 
-      <div className="flex gap-3">
-        <ScoreStepper label={player1.label} accent value={s1} onChange={setS1} />
+      <div className="grid grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)] items-center">
+        <ScoreStepper label={player1.label} value={s1} onChange={setS1} />
+        <span aria-hidden="true" className="bg-hairline-divider h-[120px] w-px" />
         <ScoreStepper label={player2.label} value={s2} onChange={setS2} />
       </div>
 

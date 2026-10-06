@@ -33,9 +33,9 @@ export default async function ResetPasswordPage({
       <BrandLogo className="h-auto w-44 self-center" />
       <h1 className="text-center text-2xl font-bold">Choose a new password</h1>
       {error && (
-        <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
       )}
-      <form action={updatePassword} className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[var(--shadow-card)]">
+      <form action={updatePassword} className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
         <div className="flex flex-col gap-2">
           <Label htmlFor="password">New password</Label>
           <Input

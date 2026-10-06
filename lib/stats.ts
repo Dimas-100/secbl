@@ -166,3 +166,31 @@ export function movementSince(
   }
   return out;
 }
+
+// "Fall 2026" / "Spring 2027" / "Summer 2027" from a club calendar date
+// (YYYY-MM-DD from lib/events clubDateOf). Semesters, not quarters.
+export function seasonLabel(clubDate: string): string {
+  const [year, month] = clubDate.split("-").map(Number);
+  const name = month >= 8 ? "Fall" : month <= 5 ? "Spring" : "Summer";
+  return `${name} ${year}`;
+}
+
+// 1-based position in a rating-ordered board; null when the member has no row.
+export function overallRank(board: { id: string }[], id: string): number | null {
+  const i = board.findIndex((r) => r.id === id);
+  return i === -1 ? null : i + 1;
+}
+
+// The longest run of wins anywhere in the history (the live streak is
+// currentStreak; this is the record). Matches newest-first, confirmed only.
+export function longestWinStreak(newestFirst: StatMatch[], viewerId: string): number {
+  let best = 0;
+  let run = 0;
+  for (const m of newestFirst) {
+    if (m.winner_id === viewerId) {
+      run += 1;
+      if (run > best) best = run;
+    } else run = 0;
+  }
+  return best;
+}

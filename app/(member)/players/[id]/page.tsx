@@ -1,31 +1,38 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Camera, ChevronLeft, SlidersHorizontal } from "lucide-react";
 import { Avatar } from "@/components/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { HeroBand } from "@/components/hero-band";
-import { ACHIEVEMENTS, earnedAchievements } from "@/lib/achievements";
-import { GAME_LABEL } from "@/lib/identity";
+import { Button } from "@/components/ui/button";
+import { LevelBar } from "@/components/level-bar";
+import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
-import { SectionLabel } from "@/components/section-label";
+import { MessagesButton } from "@/components/messages-button";
+import { SchoolDot } from "@/components/school-dot";
+import { SectionHeading } from "@/components/section-heading";
+import { ShareButton } from "@/components/share-button";
 import { Sparkline } from "@/components/sparkline";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { SubmitButton } from "@/components/submit-button";
+import { ACHIEVEMENTS, earnedAchievements } from "@/lib/achievements";
+import { GAME_LABEL } from "@/lib/identity";
+import { xpCaption } from "@/lib/levels";
 import { createClient } from "@/lib/supabase/server";
 import { startDm } from "@/app/(member)/chat/actions";
 import { clubDateOf } from "@/lib/events";
 import { winnerDelta } from "@/lib/form";
 import {
   bestWin,
-  currentStreak,
   headToHead,
   labelPlayedDate,
+  longestWinStreak,
+  overallRank,
   peakRating,
   ratingChangeSince,
   winRate,
   type StatMatch,
 } from "@/lib/stats";
 import { cn } from "@/lib/utils";
+import { loadXp } from "@/lib/xp-data";
 
 interface PlayerRef {
   id: string;
@@ -45,6 +52,9 @@ type PlayerMatch = StatMatch & {
 };
 
 const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+
+const iconButton =
+  "press flex size-11 items-center justify-center rounded-full shadow-[inset_0_0_0_1px_var(--hairline-strong)]";
 
 export default async function PlayerPage({
   params,
@@ -73,37 +83,41 @@ export default async function PlayerPage({
   const now = new Date();
   const monthAgo = new Date(now.getTime() - 30 * 86_400_000);
 
-  const [{ data: history }, { data: matches }, { data: boardRow }, { count: titles }] = await Promise.all([
-    supabase
-      .from("rating_history")
-      .select("rating_before, rating_after, created_at")
-      .eq("profile_id", id)
-      .order("created_at", { ascending: false })
-      .limit(60),
-    supabase
-      .from("matches")
-      .select(
-        "id, reporter_id, opponent_id, reporter_score, opponent_score, game_type, played_at, confirmed_at, winner_id, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, rating, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, rating, avatar_url, ball)"
-      )
-      .eq("status", "confirmed")
-      .or(`reporter_id.eq.${id},opponent_id.eq.${id}`)
-      .order("confirmed_at", { ascending: false })
-      .limit(50),
-    supabase.from("leaderboard").select("wins, losses").eq("id", id).maybeSingle(),
-    // Tournament titles: finals are the matches whose winner advances nowhere.
-    supabase
-      .from("tournament_matches")
-      .select("id, tournaments!inner(status)", { count: "exact", head: true })
-      .eq("winner_id", id)
-      .is("winner_advances_to", null)
-      .eq("tournaments.status", "complete"),
-  ]);
+  const [{ data: history }, { data: matches }, { data: boardRow }, { data: board }, { count: titles }, { xp, level }] =
+    await Promise.all([
+      supabase
+        .from("rating_history")
+        .select("rating_before, rating_after, created_at")
+        .eq("profile_id", id)
+        .order("created_at", { ascending: false })
+        .limit(60),
+      supabase
+        .from("matches")
+        .select(
+          "id, reporter_id, opponent_id, reporter_score, opponent_score, game_type, played_at, confirmed_at, winner_id, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, rating, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, rating, avatar_url, ball)"
+        )
+        .eq("status", "confirmed")
+        .or(`reporter_id.eq.${id},opponent_id.eq.${id}`)
+        .order("confirmed_at", { ascending: false })
+        .limit(50),
+      supabase.from("leaderboard").select("wins, losses").eq("id", id).maybeSingle(),
+      supabase.from("leaderboard").select("id"),
+      // Tournament titles: finals are the matches whose winner advances nowhere.
+      supabase
+        .from("tournament_matches")
+        .select("id, tournaments!inner(status)", { count: "exact", head: true })
+        .eq("winner_id", id)
+        .is("winner_advances_to", null)
+        .eq("tournaments.status", "complete"),
+      loadXp(supabase, id),
+    ]);
 
   const all = (matches ?? []) as PlayerMatch[];
   const wins = Number(boardRow?.wins ?? 0);
   const losses = Number(boardRow?.losses ?? 0);
   const rate = winRate(wins, losses);
-  const streak = currentStreak(all, id);
+  const rank = overallRank(board ?? [], id);
+  const bestStreak = longestWinStreak(all, id);
   const peak = peakRating(history ?? [], profile.rating);
   const change = ratingChangeSince(history ?? [], monthAgo, profile.rating);
   const chronological = [...(history ?? [])].reverse().slice(-30);
@@ -136,173 +150,198 @@ export default async function PlayerPage({
     opponentRatings: ratingsById,
     tournamentsWon: titles ?? 0,
   });
+  const nextAchievement = ACHIEVEMENTS.find((a) => !achievements.some((e) => e.id === a.id));
+  const firstName = profile.display_name.split(" ")[0];
 
   return (
-    <main>
-      <HeroBand>
-        <div className="flex items-center gap-3">
-          <Avatar person={profile} size="xl" ring={school?.primary_color} />
-          <div className="min-w-0">
-            <h1 className="flex flex-wrap items-center gap-2 text-lg font-extrabold">
-              <span className="truncate">{profile.display_name}</span>
-              <Badge variant="secondary">{school?.short_name}</Badge>
-            </h1>
-            {profile.tagline && <p className="mt-0.5 text-sm text-white/85">{profile.tagline}</p>}
+    <main className="flex flex-col gap-8">
+      <header className="flex items-center justify-between pt-3">
+        {isMe ? (
+          <Link href="/settings" aria-label="Settings" className={iconButton}>
+            <SlidersHorizontal className="size-5" strokeWidth={1.6} />
+          </Link>
+        ) : (
+          <Link href="/leaderboard" aria-label="Back" className={iconButton}>
+            <ChevronLeft className="size-5" strokeWidth={1.7} />
+          </Link>
+        )}
+        <MessagesButton />
+      </header>
+
+      <section className="-mt-4 flex flex-col items-center gap-[18px]">
+        <div className="relative size-32">
+          <Avatar person={profile} size="2xl" ring="var(--brass)" />
+          {isMe && (
+            <Link
+              href="/settings"
+              aria-label={profile.avatar_url ? "Change profile photo" : "Add a profile photo"}
+              className="bg-primary text-primary-foreground ring-background press absolute right-0.5 bottom-0.5 flex size-[38px] items-center justify-center rounded-full ring-4"
+            >
+              <Camera className="size-[18px]" strokeWidth={1.8} />
+            </Link>
+          )}
+        </div>
+        <div className="flex max-w-full flex-col items-center gap-1.5 text-center">
+          <h1 className="max-w-full truncate text-[28px] leading-[1.1] font-semibold tracking-[-0.025em]">
+            {profile.display_name}
+          </h1>
+          <span className="text-muted-foreground flex flex-wrap items-center justify-center gap-2 text-[13px]">
+            <span className="flex items-center gap-2">
+              <SchoolDot color={school?.primary_color} />
+              {school?.name}
+            </span>
             {profile.favorite_game && (
-              <p className="mt-1 text-[11px] text-white/60">
-                Plays {GAME_LABEL[profile.favorite_game] ?? profile.favorite_game}
-              </p>
+              <>
+                <span aria-hidden="true" className="bg-muted-foreground/60 size-[3px] rounded-full" />
+                <span>Plays {GAME_LABEL[profile.favorite_game] ?? profile.favorite_game}</span>
+              </>
             )}
-          </div>
+          </span>
+          {profile.tagline && <p className="text-[14px]">{profile.tagline}</p>}
         </div>
-        <div className="mt-3 flex items-end justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-baseline gap-x-3">
-              <span className="stat-number text-gold text-[44px] leading-none">{profile.rating}</span>
-              {change !== null && (
-                <span className={cn("stat-number text-sm", change >= 0 ? "text-gold" : "text-white/80")}>
-                  {change >= 0 ? "▲" : "▼"} {Math.abs(change)}
-                  <span className="ml-1 font-medium text-white/60">this month</span>
-                </span>
-              )}
-            </div>
-            <div className="mt-1 text-[11px] text-white/60">
-              {profile.matches_played} matches{profile.matches_played < 10 && " · provisional"}
-            </div>
-          </div>
-          <Sparkline ratings={ratings} width={128} height={40} className="text-gold shrink-0" />
+        <div className="flex gap-2.5">
+          {isMe ? (
+            <>
+              <Button asChild variant="ghost">
+                <Link href="/settings">Edit profile</Link>
+              </Button>
+              <ShareButton title={`${profile.display_name} · SECBL`} />
+            </>
+          ) : user ? (
+            <>
+              <form action={startDm}>
+                <input type="hidden" name="profile_id" value={profile.id} />
+                <SubmitButton pendingChildren="Opening…">Message</SubmitButton>
+              </form>
+              <ShareButton title={`${profile.display_name} · SECBL`} />
+            </>
+          ) : null}
         </div>
-        {user && !isMe && (
-          <form action={startDm} className="mt-3">
-            <input type="hidden" name="profile_id" value={profile.id} />
-            <SubmitButton size="sm" variant="hero" pendingChildren="Opening…">
-              Message
-            </SubmitButton>
-          </form>
+      </section>
+
+      <StatGrid
+        cols={4}
+        className="border-hairline-divider border-b pb-[18px] [&>*]:items-center [&>*]:text-center [&>*+*]:pl-2"
+      >
+        <StatTile
+          label="Rating"
+          value={profile.rating}
+          note={
+            change !== null
+              ? `${change >= 0 ? "+" : "−"}${Math.abs(change)} this month`
+              : profile.matches_played < 10
+                ? "provisional"
+                : undefined
+          }
+        />
+        <StatTile label="Rank" value={rank ? `#${rank}` : "–"} />
+        <StatTile label="Record" value={`${wins}–${losses}`} note={rate === null ? undefined : `${rate}%`} />
+        <StatTile label="Best streak" value={bestStreak || "–"} note={peak.at ? `peak ${peak.rating}` : undefined} />
+      </StatGrid>
+
+      <Sparkline ratings={ratings} height={44} />
+
+      {h2h && (
+        <ListRow
+          title={`You vs ${firstName}`}
+          meta={
+            h2h.wins + h2h.losses === 0
+              ? "You haven't played each other yet."
+              : lastMeeting
+                ? `Last played ${labelPlayedDate(lastMeeting.played_at, today).toLowerCase()}`
+                : undefined
+          }
+          trailing={
+            <span className="stat-number text-[20px]">
+              <span className="text-win">{h2h.wins}</span>
+              <span className="text-muted-foreground mx-1">–</span>
+              <span className="text-loss">{h2h.losses}</span>
+            </span>
+          }
+        />
+      )}
+
+      <Link
+        href={`/players/${id}/ladder`}
+        className="press flex flex-col gap-3"
+        aria-label={`Level ${level.level}, ${level.title}. ${level.intoLevel} of ${level.needed} XP into this level. Open the ladder.`}
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[17px] font-semibold tracking-[-0.01em]">
+            Level {level.level} <span className="text-brass font-medium">· {level.title}</span>
+          </span>
+          <span className="text-muted-foreground stat-number text-[12px]">
+            {level.intoLevel} / {level.needed} XP
+          </span>
+        </div>
+        <LevelBar value={level.intoLevel} max={level.needed} />
+      </Link>
+
+      <section className="flex flex-col gap-3">
+        <SectionHeading>Achievements</SectionHeading>
+        {achievements.length > 0 && (
+          <ul className="flex flex-wrap gap-2">
+            {achievements.map((a) => (
+              <li
+                key={a.id}
+                title={a.description}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full py-1 pr-3 pl-2 text-[12px] font-medium shadow-[inset_0_0_0_1px_var(--hairline-ghost)]",
+                  a.id === "champion" && "bg-gold text-gold-foreground shadow-none"
+                )}
+              >
+                <span aria-hidden="true">{a.emoji}</span>
+                {a.label}
+              </li>
+            ))}
+          </ul>
         )}
-      </HeroBand>
+        <p className="text-muted-foreground text-[12px]">
+          {achievements.length} of {ACHIEVEMENTS.length} earned
+          {nextAchievement && ` · next: ${nextAchievement.label}`}
+          {achievements.length === 0 && isMe && " · win a confirmed match to earn your first"}
+        </p>
+      </section>
 
-      <div className="-mt-3 flex flex-col gap-4">
-        <StatGrid>
-          <StatTile label="Record" value={`${wins}–${losses}`} />
-          <StatTile label="Win rate" value={rate === null ? "–" : `${rate}%`} />
-          <StatTile
-            label="Peak"
-            value={peak.rating}
-            note={peak.at ? labelPlayedDate(clubDateOf(peak.at), today) : "so far"}
-          />
-          <StatTile
-            label="Streak"
-            value={streak ? `${streak.kind}${streak.length}` : "–"}
-            tone={streak ? (streak.kind === "W" ? "win" : "loss") : "default"}
-          />
-        </StatGrid>
+      {best && (
+        <ListRow
+          title="Best win"
+          meta={
+            <>
+              over{" "}
+              <Link href={`/players/${best.opponentId}`} className="text-foreground">
+                {namesById[best.opponentId]}
+              </Link>
+            </>
+          }
+          trailing={<span className="text-muted-foreground stat-number text-[13px]">rated {best.rating}</span>}
+        />
+      )}
 
-        {h2h && (
-          <Card>
-            <CardHeader>
-              <SectionLabel>Head to head</SectionLabel>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between gap-3 text-sm">
-              <div>
-                <div className="font-semibold">You vs {profile.display_name.split(" ")[0]}</div>
-                <div className="text-muted-foreground text-xs">
-                  {h2h.wins + h2h.losses === 0
-                    ? "You haven't played each other yet."
-                    : lastMeeting
-                      ? `Last played ${labelPlayedDate(lastMeeting.played_at, today).toLowerCase()}`
-                      : ""}
-                </div>
-              </div>
-              <div className="stat-number text-2xl">
-                <span className="text-win">{h2h.wins}</span>
-                <span className="text-muted-foreground mx-1">–</span>
-                <span className="text-loss">{h2h.losses}</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <SectionLabel>Achievements</SectionLabel>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {achievements.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                {isMe ? "Win a confirmed match to earn your first one." : "Nothing earned yet."}
-              </p>
-            ) : (
-              <ul className="flex flex-wrap gap-2">
-                {achievements.map((a) => (
-                  <li
-                    key={a.id}
-                    title={a.description}
-                    className="bg-accent text-accent-foreground flex items-center gap-1.5 rounded-full py-1 pr-3 pl-2 text-xs font-semibold"
-                  >
-                    <span aria-hidden="true">{a.emoji}</span>
-                    {a.label}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="text-muted-foreground text-[11px]">
-              {achievements.length} of {ACHIEVEMENTS.length} earned
-              {achievements.length < ACHIEVEMENTS.length &&
-                ` · next: ${ACHIEVEMENTS.find((a) => !achievements.some((e) => e.id === a.id))?.label}`}
-            </p>
-          </CardContent>
-        </Card>
-
-        {best && (
-          <Card>
-            <CardHeader>
-              <SectionLabel>Best win</SectionLabel>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between gap-3 text-sm">
-              <span>
-                over{" "}
-                <Link
-                  href={`/players/${best.opponentId}`}
-                  className="font-semibold underline-offset-2 hover:underline"
-                >
-                  {namesById[best.opponentId]}
-                </Link>
-              </span>
-              <span className="stat-number text-muted-foreground">rated {best.rating}</span>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <SectionLabel>Recent matches</SectionLabel>
-          </CardHeader>
-          <CardContent className="divide-border/60 flex flex-col divide-y">
-            {all.length === 0 && (
-              <p className="text-muted-foreground py-2 text-sm">No confirmed matches yet.</p>
-            )}
-            {all.slice(0, 15).map((m) => {
-              const reporter = one(m.reporter);
-              const opponent = one(m.opponent);
-              const reporterWon = m.winner_id === reporter?.id;
-              return (
-                <MatchRow
-                  key={m.id}
-                  winner={reporterWon ? reporter : opponent}
-                  loser={reporterWon ? opponent : reporter}
-                  winnerScore={Math.max(m.reporter_score, m.opponent_score)}
-                  loserScore={Math.min(m.reporter_score, m.opponent_score)}
-                  delta={winnerDelta(m)}
-                  viewerId={viewerId}
-                  meta={labelPlayedDate(m.played_at, today)}
-                  gameType={GAME_LABEL[m.game_type] ?? m.game_type}
-                />
-              );
-            })}
-          </CardContent>
-        </Card>
-      </div>
+      <section className="flex flex-col gap-1.5">
+        <SectionHeading>Match history</SectionHeading>
+        {all.length === 0 && <p className="text-muted-foreground py-4 text-sm">No confirmed matches yet.</p>}
+        {all.slice(0, 20).map((m) => {
+          const reporter = one(m.reporter);
+          const opponent = one(m.opponent);
+          const reporterWon = m.winner_id === reporter?.id;
+          return (
+            <MatchRow
+              key={m.id}
+              winner={reporterWon ? reporter : opponent}
+              loser={reporterWon ? opponent : reporter}
+              winnerScore={Math.max(m.reporter_score, m.opponent_score)}
+              loserScore={Math.min(m.reporter_score, m.opponent_score)}
+              delta={winnerDelta(m)}
+              viewerId={viewerId}
+              perspectiveId={id}
+              meta={labelPlayedDate(m.played_at, today)}
+              gameType={GAME_LABEL[m.game_type] ?? m.game_type}
+              caption={xpCaption(m.id, xp)}
+            />
+          );
+        })}
+      </section>
     </main>
   );
 }

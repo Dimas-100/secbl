@@ -9,10 +9,15 @@ export interface MatchRowPlayer {
   ball?: number | null;
 }
 
-// One confirmed match as a scoreboard line. Two text lines so names never
-// truncate: the winner on top in bold, "def. loser · game" underneath; the
-// race score as display numerals on the right with the winner's rating gain
-// beneath it.
+// One confirmed match as a hairline row.
+//   perspective given (your games on Home, a player's history on Profile):
+//     [opponent avatar]  Opponent name          Won 5–3
+//                        game · date               +16
+//   no perspective (league-wide feed):
+//     [winner][loser]    Winner name            5–3
+//                        def. Loser · game         +16
+// Win/loss by weight, not colour: the result reads primary for a win and muted
+// for a loss. `delta` is the winner's gain; a loss shows it negated.
 export function MatchRow({
   winner,
   loser,
@@ -20,8 +25,10 @@ export function MatchRow({
   loserScore,
   delta,
   viewerId,
+  perspectiveId,
   meta,
   gameType,
+  caption,
 }: {
   winner: MatchRowPlayer | null | undefined;
   loser: MatchRowPlayer | null | undefined;
@@ -29,62 +36,82 @@ export function MatchRow({
   loserScore: number;
   delta: number | null;
   viewerId?: string;
+  perspectiveId?: string;
   meta?: string;
   gameType?: string;
+  caption?: React.ReactNode;
 }) {
-  const winnerIsMe = winner?.id === viewerId;
-  const loserIsMe = loser?.id === viewerId;
-  const sub = [meta, gameType].filter(Boolean).join(" · ");
+  const sub = [gameType, meta].filter(Boolean).join(" · ");
+  const won = perspectiveId !== undefined && winner?.id === perspectiveId;
+  const lost = perspectiveId !== undefined && loser?.id === perspectiveId;
+  const rowClass = "border-hairline-row flex min-h-[68px] items-center gap-3.5 border-b py-3.5";
+
+  if (won || lost) {
+    const opponent = won ? loser : winner;
+    const signed = delta === null ? null : won ? `+${delta}` : `−${delta}`;
+    return (
+      <div className={rowClass}>
+        <Avatar person={opponent ?? { id: "unknown", display_name: null }} size="md" />
+        <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+          <span className="truncate text-[15px] leading-tight font-medium">
+            <PlayerName player={opponent} me={opponent?.id === viewerId} />
+          </span>
+          {sub && <span className="text-muted-foreground truncate text-[12px] leading-tight">{sub}</span>}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-[3px] text-right">
+          <span className={cn("stat-number text-[15px] leading-tight", lost && "text-muted-foreground")}>
+            {won ? "Won" : "Lost"} {won ? winnerScore : loserScore}–{won ? loserScore : winnerScore}
+          </span>
+          {signed && (
+            <span className="text-muted-foreground stat-number text-[12px] leading-tight">{signed}</span>
+          )}
+          {caption && <span className="text-muted-foreground text-[11px] leading-tight">{caption}</span>}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-16 items-center gap-3 py-2.5">
-      <div className="flex shrink-0 -space-x-2.5">
+    <div className={rowClass}>
+      <div className="flex shrink-0">
         <Avatar
           person={winner ?? { id: "unknown", display_name: null }}
           size="md"
-          className="ring-card relative z-10 ring-2"
+          className="ring-background relative z-10 ring-2"
         />
         <Avatar
           person={loser ?? { id: "unknown", display_name: null }}
           size="md"
-          className="ring-card ring-2 opacity-60 grayscale-[35%]"
+          className="ring-background -ml-3 ring-2 opacity-60"
         />
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[15px] leading-tight">
-          <PlayerName player={winner} me={winnerIsMe} bold />
-        </div>
-        <div className="text-muted-foreground mt-0.5 truncate text-[13px] leading-tight">
-          <span>def. </span>
-          <PlayerName player={loser} me={loserIsMe} />
-          {sub && <span> · {sub}</span>}
-        </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+        <span className="truncate text-[15px] leading-tight font-medium">
+          <PlayerName player={winner} me={winner?.id === viewerId} />
+        </span>
+        <span className="text-muted-foreground truncate text-[12px] leading-tight">
+          def. <PlayerName player={loser} me={loser?.id === viewerId} />
+          {sub && ` · ${sub}`}
+        </span>
       </div>
-      <div className="flex shrink-0 flex-col items-end leading-none">
-        <span className="stat-number text-[19px]">
+      <div className="flex shrink-0 flex-col items-end gap-[3px] text-right">
+        <span className="stat-number text-[15px] leading-tight">
           {winnerScore}–{loserScore}
         </span>
         {delta !== null && (
-          <span className="stat-number text-win mt-1 text-[11px]">+{delta}</span>
+          <span className="text-muted-foreground stat-number text-[12px] leading-tight">+{delta}</span>
         )}
+        {caption && <span className="text-muted-foreground text-[11px] leading-tight">{caption}</span>}
       </div>
     </div>
   );
 }
 
-function PlayerName({
-  player,
-  me,
-  bold = false,
-}: {
-  player: MatchRowPlayer | null | undefined;
-  me: boolean;
-  bold?: boolean;
-}) {
+function PlayerName({ player, me }: { player: MatchRowPlayer | null | undefined; me: boolean }) {
   const label = me ? "You" : (player?.display_name ?? "Member");
-  const classes = cn(bold ? "font-semibold" : "font-medium", me && "text-primary");
-  if (!player) return <span className={classes}>{label}</span>;
+  if (!player) return <span>{label}</span>;
   return (
-    <Link href={`/players/${player.id}`} className={cn(classes, "underline-offset-2 hover:underline")}>
+    <Link href={`/players/${player.id}`} className="underline-offset-2 hover:underline">
       {label}
     </Link>
   );

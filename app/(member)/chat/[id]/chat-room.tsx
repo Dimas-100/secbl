@@ -276,20 +276,20 @@ export function ChatRoom({
           : { top: 0, height: "100dvh" }
       }
     >
-      <header className="hero-gradient flex items-center gap-2 px-2 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-2 text-white">
+      <header className="bg-background border-hairline-divider flex items-center gap-2 border-b px-2 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-2">
         <Link
           href="/chat"
           aria-label="Back to chat"
-          className="flex size-11 items-center justify-center rounded-full hover:bg-white/10"
+          className="flex size-11 items-center justify-center rounded-full hover:bg-accent"
         >
           <ChevronLeft className="size-6" />
         </Link>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-base font-extrabold">{title}</h1>
-          <p className="flex items-center gap-1 truncate text-[11px] text-white/70">
+          <h1 className="truncate text-base font-semibold">{title}</h1>
+          <p className="text-muted-foreground flex items-center gap-1 truncate text-[11px]">
             {isGroup && <Users className="size-3" />}
             {subtitle}
-            {live === false && <span className="text-gold"> · reconnecting…</span>}
+            {live === false && <span className="text-brass"> · reconnecting…</span>}
           </p>
         </div>
       </header>
@@ -301,7 +301,7 @@ export function ChatRoom({
               type="button"
               onClick={loadEarlier}
               disabled={loadingMore}
-              className="bg-card text-muted-foreground rounded-full px-4 py-2 text-xs font-semibold shadow-[var(--shadow-card)] disabled:opacity-50"
+              className="bg-card text-muted-foreground rounded-full px-4 py-2 text-xs font-semibold shadow-[inset_0_0_0_1px_var(--hairline-row)] disabled:opacity-50"
             >
               {loadingMore ? "Loading…" : "Load earlier messages"}
             </button>
@@ -344,7 +344,7 @@ export function ChatRoom({
                       "max-w-[82%] rounded-2xl px-3.5 py-2 text-left text-[15px] leading-snug break-words whitespace-pre-wrap",
                       mine
                         ? "bg-primary text-primary-foreground rounded-br-md"
-                        : "bg-card text-card-foreground rounded-bl-md shadow-[var(--shadow-card)]",
+                        : "bg-card text-card-foreground rounded-bl-md shadow-[inset_0_0_0_1px_var(--hairline-row)]",
                       pending && "opacity-60",
                       m.failed && "ring-destructive ring-2"
                     )}
@@ -390,7 +390,7 @@ export function ChatRoom({
           type="submit"
           disabled={!canSend}
           aria-label="Send"
-          className="bg-gold text-gold-foreground flex size-11 shrink-0 items-center justify-center rounded-full shadow-[var(--shadow-raised)] transition-opacity disabled:opacity-40 disabled:shadow-none"
+          className="bg-primary text-primary-foreground flex size-11 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-40"
         >
           <ArrowUp className="size-5" strokeWidth={3} />
         </button>

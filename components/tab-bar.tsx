@@ -2,51 +2,71 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarDays, Home, Plus, Trophy } from "lucide-react";
+import { BarChart3, CalendarDays, Home, Plus, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const TABS = [
-  { href: "/", label: "Home", icon: Home, raised: false },
-  { href: "/events", label: "Events", icon: CalendarDays, raised: false },
-  // Report is the raised gold center action — the reason the bar exists.
-  { href: "/matches/new", label: "Report", icon: Plus, raised: true },
-  { href: "/tournaments", label: "Cups", icon: Trophy, raised: false },
-  { href: "/leaderboard", label: "Ranks", icon: BarChart3, raised: false },
-] as const;
-
-export function TabBar() {
+// Home · Ranks · ＋ · Events · Profile. The ＋ sits in the bar (not floating);
+// Cups lives under Events; Profile is the viewer's own player page. Hidden on
+// Log a game, whose sticky footer takes the bar's place.
+export function TabBar({ profileHref }: { profileHref: string }) {
   const pathname = usePathname();
-  // Section prefixes keep the tab lit on detail pages (/events/123 → Events).
-  const active = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+  if (pathname.startsWith("/matches/new")) return null;
+
+  const tabs = [
+    { href: "/", label: "Home", icon: Home, match: (p: string) => p === "/" },
+    {
+      href: "/leaderboard",
+      label: "Ranks",
+      icon: BarChart3,
+      match: (p: string) => p.startsWith("/leaderboard") || p.startsWith("/schools"),
+    },
+    { href: "/matches/new", label: "Log a game", icon: Plus, raised: true, match: () => false },
+    {
+      href: "/events",
+      label: "Events",
+      icon: CalendarDays,
+      match: (p: string) => p.startsWith("/events") || p.startsWith("/tournaments"),
+    },
+    {
+      href: profileHref,
+      label: "Profile",
+      icon: User,
+      match: (p: string) => p === profileHref || p.startsWith("/settings"),
+    },
+  ];
 
   return (
-    <nav className="bg-surface-dark fixed inset-x-0 bottom-0 z-10">
-      <div className="mx-auto flex max-w-3xl items-center justify-around pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-        {TABS.map(({ href, label, icon: Icon, raised }) => (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active(href) ? "page" : undefined}
-            className={cn(
-              "press flex min-w-14 flex-col items-center gap-0.5 text-[10px] font-semibold",
-              raised
-                ? "-mt-7 text-surface-dark-foreground/70"
-                : active(href)
-                  ? "text-gold"
-                  : "text-surface-dark-foreground/50"
-            )}
-          >
-            {raised ? (
-              <span className="bg-gold text-gold-foreground flex size-14 items-center justify-center rounded-full shadow-[var(--shadow-raised)]">
-                <Icon className="size-7" />
-              </span>
-            ) : (
-              <Icon className="size-5" />
-            )}
-            <span>{label}</span>
-          </Link>
-        ))}
+    <nav aria-label="Main" className="bg-background border-hairline fixed inset-x-0 bottom-0 z-10 border-t">
+      <div className="mx-auto flex max-w-3xl items-start justify-around px-2.5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        {tabs.map(({ href, label, icon: Icon, raised, match }) => {
+          if (raised) {
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-label={label}
+                className="press bg-primary text-primary-foreground -mt-1.5 flex size-[50px] items-center justify-center rounded-full"
+              >
+                <Icon className="size-[22px]" strokeWidth={2} />
+              </Link>
+            );
+          }
+          const active = match(pathname);
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "press flex min-h-11 w-[60px] flex-col items-center gap-[5px] text-[10px] font-medium tracking-[0.04em]",
+                active ? "text-foreground" : "text-tab-inactive"
+              )}
+            >
+              <Icon className="size-[22px]" strokeWidth={1.6} />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
       </div>
     </nav>
   );

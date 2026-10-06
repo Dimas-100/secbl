@@ -39,7 +39,7 @@ test("member personalises their profile: ball, tagline, favourite game and photo
     page.waitForURL((url) => !url.pathname.startsWith("/login")),
     page.click('button[type="submit"]'),
   ]);
-  await expect(page.getByRole("heading", { name: /league feed/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^recent$/i })).toBeVisible();
 
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: /your look/i })).toBeVisible();

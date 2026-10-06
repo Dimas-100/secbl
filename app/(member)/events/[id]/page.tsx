@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { HeroBand } from "@/components/hero-band";
+import { PageHeader } from "@/components/page-header";
 import { SectionLabel } from "@/components/section-label";
 import { SubmitButton } from "@/components/submit-button";
 import { createClient } from "@/lib/supabase/server";
@@ -75,49 +75,46 @@ export default async function EventPage({
 
   return (
     <main>
-      <HeroBand
-        title={
-          <span className="flex items-center gap-2">
-            {event.title}
-            {event.status === "cancelled" && <Badge variant="destructive">Cancelled</Badge>}
-          </span>
-        }
+      <PageHeader
+        title={event.title}
+        back="/events"
+        trailing={event.status === "cancelled" ? <Badge variant="destructive">Cancelled</Badge> : null}
       >
-        <p className="mt-1 text-sm text-white/70">
+        <p className="text-muted-foreground text-sm">
           {formatEventWhen(event.starts_at, event.ends_at)}
           {event.location && ` · ${event.location}`}
         </p>
         {event.source_id && (
-          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-white/80">
-            <span className="rounded-full bg-white/15 px-2 py-0.5 font-semibold">
+          <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+            <span className="bg-secondary rounded-full px-2 py-0.5 font-medium">
               From {sourceName ?? "school feed"}
             </span>
             {event.external_url && (
-              <a href={event.external_url} target="_blank" rel="noreferrer" className="underline">
+              <a href={event.external_url} target="_blank" rel="noreferrer" className="text-brass underline">
                 View on {sourceName ?? "the school site"}
               </a>
             )}
           </p>
         )}
         {me?.role === "admin" && (
-          <div className="mt-2 flex gap-3 text-sm text-white/80">
-            <Link href={`/events/${event.id}/edit`} className="underline">
+          <div className="flex gap-4 text-sm">
+            <Link href={`/events/${event.id}/edit`} className="text-brass underline">
               {event.source_id ? "Manage" : "Edit"}
             </Link>
-            <Link href={`/events/new?from=${event.id}`} className="underline">
+            <Link href={`/events/new?from=${event.id}`} className="text-brass underline">
               Duplicate
             </Link>
           </div>
         )}
-      </HeroBand>
+      </PageHeader>
 
-      <div className="-mt-3 flex flex-col gap-4">
+      <div className="mt-6 flex flex-col gap-6">
       {error && (
-        <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
       )}
 
       {event.description && (
-        <p className="rounded-xl bg-card p-4 text-sm whitespace-pre-line shadow-[var(--shadow-card)]">
+        <p className="rounded-xl bg-card p-4 text-sm whitespace-pre-line shadow-[inset_0_0_0_1px_var(--hairline-row)]">
           {event.description}
         </p>
       )}

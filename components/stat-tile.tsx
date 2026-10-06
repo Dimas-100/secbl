@@ -1,10 +1,24 @@
 import { cn } from "@/lib/utils";
 
-// The at-a-glance layer under a hero. One card, numbers side by side,
-// separated by hairlines: an editorial stats strip rather than four boxes.
-export function StatStrip({ children }: { children: React.ReactNode }) {
+// The at-a-glance layer: N cells divided by hairlines, a divider above. No
+// card, no fill — the numbers carry it.
+export function StatGrid({
+  children,
+  cols = 4,
+  className,
+}: {
+  children: React.ReactNode;
+  cols?: 3 | 4;
+  className?: string;
+}) {
   return (
-    <div className="bg-card grid grid-cols-2 overflow-hidden rounded-2xl shadow-[var(--shadow-card)] ring-1 ring-hairline min-[400px]:grid-cols-4">
+    <div
+      className={cn(
+        "border-hairline-divider grid border-t pt-[18px] [&>*+*]:border-l [&>*+*]:border-hairline-divider [&>*+*]:pl-4",
+        cols === 3 ? "grid-cols-3" : "grid-cols-4",
+        className
+      )}
+    >
       {children}
     </div>
   );
@@ -20,35 +34,23 @@ export function StatTile({
   label: string;
   value: React.ReactNode;
   note?: React.ReactNode;
-  tone?: "default" | "win" | "loss" | "gold";
+  tone?: "default" | "win" | "loss" | "brass";
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        // Hairline between cells on both axes; the strip's overflow-hidden
-        // trims the outer edges so no stray rule shows.
-        "flex min-w-0 flex-col gap-1 px-4 py-4 -ml-px -mt-px border-l border-t border-hairline",
-        className
-      )}
-    >
-      <span className="text-muted-foreground truncate text-xs">{label}</span>
+    <div className={cn("flex min-w-0 flex-col gap-1", className)}>
       <span
         className={cn(
-          "stat-number truncate text-[26px] leading-none",
+          "stat-number truncate text-[22px] leading-none font-normal",
           tone === "win" && "text-win",
           tone === "loss" && "text-loss",
-          tone === "gold" && "text-brass-deep"
+          tone === "brass" && "text-brass"
         )}
       >
         {value}
       </span>
+      <span className="text-muted-foreground truncate text-[12px]">{label}</span>
       {note && <span className="text-muted-foreground truncate text-[11px]">{note}</span>}
     </div>
   );
-}
-
-// Kept for callers that still lay tiles out as separate cards.
-export function StatGrid({ children }: { children: React.ReactNode }) {
-  return <StatStrip>{children}</StatStrip>;
 }

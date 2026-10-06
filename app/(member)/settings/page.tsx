@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ChevronRight } from "lucide-react";
+import { ListRow } from "@/components/list-row";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { HeroBand } from "@/components/hero-band";
+import { PageHeader } from "@/components/page-header";
 import { SectionLabel } from "@/components/section-label";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,18 +28,46 @@ export default async function SettingsPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, rating, matches_played, avatar_url, ball, tagline, favorite_game, schools(short_name, name)")
+    .select("display_name, role, rating, matches_played, avatar_url, ball, tagline, favorite_game, schools(short_name, name)")
     .eq("id", user.id)
     .single();
   const school = Array.isArray(profile?.schools) ? profile.schools[0] : profile?.schools;
+  // Admins see how many signups are waiting without opening the queue — a
+  // new member left pending for days is the fastest way to lose them.
+  let pending = 0;
+  if (profile?.role === "admin") {
+    const { count } = await supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+    pending = count ?? 0;
+  }
 
   return (
     <main>
-      <HeroBand title="Settings" />
-      <div className="-mt-3 flex flex-col gap-4">
-      {message && <p className="rounded-md bg-card p-3 text-sm shadow-[var(--shadow-card)]">{message}</p>}
+      <PageHeader title="Settings" back={`/players/${user.id}`} trailing={null} />
+      <div className="mt-6 flex flex-col gap-6">
+      {message && <p className="bg-card rounded-2xl p-3 text-sm">{message}</p>}
       {error && (
-        <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
+      )}
+
+      {profile?.role === "admin" && (
+        <ListRow
+          href="/admin"
+          title="Admin"
+          meta="Approvals, event sources, tournaments"
+          ariaLabel={pending > 0 ? `Admin, ${pending} waiting for approval` : "Admin"}
+          trailing={
+            pending > 0 ? (
+              <span className="bg-brass text-background stat-number rounded-full px-2 py-0.5 text-[11px]">
+                {pending}
+              </span>
+            ) : (
+              <ChevronRight className="text-muted-foreground size-4" strokeWidth={1.7} />
+            )
+          }
+        />
       )}
 
       <Card>
@@ -117,7 +147,7 @@ export default async function SettingsPage({
 
       {/* Moved out of the header when it slimmed down to the avatar chip. */}
       <form action={logout}>
-        <Button variant="outline" className="text-destructive w-full">
+        <Button variant="ghost" className="text-destructive w-full">
           Log out
         </Button>
       </form>
