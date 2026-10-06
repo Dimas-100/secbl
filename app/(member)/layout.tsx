@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MessageCircle } from "lucide-react";
+import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { TabBar } from "@/components/tab-bar";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +18,7 @@ export default async function MemberLayout({
   if (!user) redirect("/login");
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, role, status")
+    .select("id, display_name, role, status, avatar_url, ball")
     .eq("id", user.id)
     .single();
   if (!profile || profile.status !== "approved") redirect("/pending");
@@ -59,12 +60,8 @@ export default async function MemberLayout({
             )}
           </Link>
           {/* Settings (and Log out, which lives there now) behind the avatar. */}
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-full text-sm font-bold"
-          >
-            {(profile.display_name ?? "?")[0]?.toUpperCase()}
+          <Link href="/settings" aria-label="Settings" className="press flex items-center">
+            <Avatar person={profile} size="md" />
           </Link>
         </div>
       </header>

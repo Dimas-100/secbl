@@ -37,6 +37,18 @@ Rejected on purpose: dark-mode-first "sleek dark" (OrbPot) — students report m
 - **Interactions:** every tappable row, chip and button gets `active:scale-[0.98]` press feedback and a 120ms transition; nothing animates on hover alone. The sparkline draw is the single page-load motion.
 - **Components:** `Avatar` (initials, size variants), `StatTile`, `Sparkline` (pure SVG, server component), `MatchRow` (shared by Home, Player), `Segmented` (link-based, no JS).
 
+## 2b. Personalization layer (added 2026-10-06, migration `0016_personalization.sql`)
+
+The owner's brief: members should feel the app is *theirs*. What shipped:
+
+- **Profile photo.** Chosen in Settings → Your look; cropped square and resized to 512px in the browser (`createImageBitmap` + canvas → JPEG) before upload to the public `avatars` Storage bucket, under `<profile id>/`. Storage RLS limits writes to the caller's own folder; `set_avatar_url()` refuses any URL outside it. Old files are removed best-effort on replace/remove.
+- **Your ball.** With no photo, the avatar is the member's ball from the real rack — solids 1–7, the 8, stripes 9–15 (stripes draw the white band). Chosen in Settings, or derived stably from the profile id (`lib/identity.ts`). This replaces the grey initial disc everywhere: header, feed rows, podium, inbox, opponent chips, picker.
+- **Tagline (≤60) and favourite game.** Shown in the player hero ("Plays 9-ball").
+- **School colours.** Real primaries set on `schools`; used only as a 2px ring on avatars where school identity matters (leaderboard, player hero).
+- **Achievements.** Computed, never stored (`lib/achievements.ts`): First win, Regular (10), Veteran (25), Heater (5 straight), Shutout, Giant killer (beat someone 50+ above), 500 club, 600 club, Champion (tournament final won). Player page shows earned chips and "n of 9 · next: …".
+- **Greeting.** Home hero opens "Good evening, Avery" on the club clock.
+- Self-service writes go through `update_profile_prefs()` / `set_avatar_url()` (SECURITY DEFINER, own row only) — `profiles` still has no member UPDATE policy.
+
 ## 3. Pure logic (`lib/stats.ts`, test-first)
 
 `sparklinePath`, `currentStreak`, `winRate`, `ratingChangeSince`, `peakRating`, `bestWin`, `headToHead`, `movementSince`. All date math stays in `lib/events.ts` conventions (UTC instants in, club-zone formatting out).

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/(public)/login/actions";
 import { updateDisplayName } from "./actions";
+import { LookEditor } from "./look-editor";
 
 export default async function SettingsPage({
   searchParams,
@@ -24,7 +25,7 @@ export default async function SettingsPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, rating, matches_played, schools(short_name, name)")
+    .select("display_name, rating, matches_played, avatar_url, ball, tagline, favorite_game, schools(short_name, name)")
     .eq("id", user.id)
     .single();
   const school = Array.isArray(profile?.schools) ? profile.schools[0] : profile?.schools;
@@ -33,10 +34,26 @@ export default async function SettingsPage({
     <main>
       <HeroBand title="Settings" />
       <div className="-mt-3 flex flex-col gap-4">
-      {message && <p className="rounded-md bg-muted p-3 text-sm">{message}</p>}
+      {message && <p className="rounded-md bg-card p-3 text-sm shadow-[var(--shadow-card)]">{message}</p>}
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
+
+      <Card>
+        <CardHeader>
+          <SectionLabel>Your look</SectionLabel>
+        </CardHeader>
+        <CardContent>
+          <LookEditor
+            profileId={user.id}
+            displayName={profile?.display_name ?? ""}
+            avatarUrl={profile?.avatar_url ?? null}
+            ball={profile?.ball ?? null}
+            tagline={profile?.tagline ?? null}
+            favoriteGame={profile?.favorite_game ?? null}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

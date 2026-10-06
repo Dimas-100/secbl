@@ -24,6 +24,8 @@ export interface InboxRow {
   school_id: string | null;
   other_id: string | null;
   other_name: string | null;
+  other_avatar_url?: string | null;
+  other_ball?: number | null;
   member_count: number;
   unread: number;
   last_message_id: number | null;

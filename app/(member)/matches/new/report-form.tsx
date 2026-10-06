@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Dialog } from "radix-ui";
 import { Search } from "lucide-react";
+import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScoreStepper } from "@/components/score-stepper";
@@ -21,6 +22,8 @@ const GAME_TYPES = [
 export interface OpponentOption {
   id: string;
   display_name: string;
+  avatar_url?: string | null;
+  ball?: number | null;
   school: string | null;
 }
 
@@ -78,16 +81,11 @@ export function ReportMatchForm({
                   : "bg-card shadow-[var(--shadow-card)]"
               )}
             >
-              <span
-                className={cn(
-                  "flex size-7 items-center justify-center rounded-full text-xs font-bold",
-                  o.id === opponentId
-                    ? "bg-gold text-gold-foreground"
-                    : "bg-muted text-muted-foreground"
-                )}
-              >
-                {o.display_name[0]?.toUpperCase()}
-              </span>
+              <Avatar
+                person={o}
+                size="sm"
+                className={cn(o.id === opponentId && "ring-gold ring-2")}
+              />
               <span className="max-w-full truncate px-1 text-[11px] font-semibold">
                 {firstName(o)}
               </span>
@@ -208,9 +206,12 @@ export function ReportMatchForm({
                     setPickerOpen(false);
                     setQuery("");
                   }}
-                  className="hover:bg-accent flex min-h-12 items-center justify-between gap-2 rounded-lg px-2 text-left text-sm font-medium"
+                  className="press hover:bg-accent flex min-h-12 items-center justify-between gap-2 rounded-lg px-2 text-left text-sm font-medium"
                 >
-                  <span className="truncate">{o.display_name}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Avatar person={o} size="sm" />
+                    <span className="truncate">{o.display_name}</span>
+                  </span>
                   {o.school && <Badge variant="secondary">{o.school}</Badge>}
                 </button>
               ))}

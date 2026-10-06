@@ -48,7 +48,8 @@ test("member renames themselves; admin suspends and reinstates them", async ({ p
   await expect(page.getByRole("heading", { name: /league feed/i })).toBeVisible();
   await page.goto("/settings");
   await page.fill('input[name="display_name"]', fixedName);
-  await page.click('button[type="submit"]');
+  // Settings now has two forms (Your look above Your name): name the button.
+  await page.getByRole("button", { name: "Save name" }).click();
   await expect(page.getByText(/name updated/i)).toBeVisible();
   await page.goto("/leaderboard");
   await expect(page.getByText(fixedName)).toBeVisible();

@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 export interface MatchRowPlayer {
   id: string;
   display_name: string;
+  avatar_url?: string | null;
+  ball?: number | null;
 }
 
 // One confirmed match, the way a scoreboard app lists a result: winner first
@@ -35,8 +37,16 @@ export function MatchRow({
   return (
     <div className="flex min-h-14 items-center gap-3 py-2">
       <div className="flex shrink-0 -space-x-2">
-        <Avatar name={winner?.display_name} size="md" me={winnerIsMe} className="ring-2 ring-card" />
-        <Avatar name={loser?.display_name} size="md" me={loserIsMe} className="ring-2 ring-card opacity-70" />
+        <Avatar
+          person={winner ?? { id: "unknown", display_name: null }}
+          size="md"
+          className="ring-card ring-2"
+        />
+        <Avatar
+          person={loser ?? { id: "unknown", display_name: null }}
+          size="md"
+          className="ring-card ring-2 opacity-70"
+        />
       </div>
       <div className="min-w-0 flex-1 leading-tight">
         <div className="truncate text-sm">

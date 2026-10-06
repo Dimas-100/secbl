@@ -18,7 +18,7 @@ export default async function NewMatchPage({
 
   const { data: opponents } = await supabase
     .from("profiles")
-    .select("id, display_name, schools(short_name)")
+    .select("id, display_name, avatar_url, ball, schools(short_name)")
     .eq("status", "approved")
     .neq("id", user.id)
     .order("display_name");
@@ -36,7 +36,13 @@ export default async function NewMatchPage({
 
   const options: OpponentOption[] = (opponents ?? []).map((o) => {
     const school = Array.isArray(o.schools) ? o.schools[0] : o.schools;
-    return { id: o.id, display_name: o.display_name, school: school?.short_name ?? null };
+    return {
+      id: o.id,
+      display_name: o.display_name,
+      avatar_url: o.avatar_url,
+      ball: o.ball,
+      school: school?.short_name ?? null,
+    };
   });
 
   const today = clubDateOf(new Date().toISOString());

@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { formStrip, winnerDelta } from "@/lib/form";
+import { GAME_LABEL, greetingFor } from "@/lib/identity";
 import {
   currentStreak,
   groupByPlayedDate,
@@ -21,13 +22,6 @@ import {
 } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import type { RsvpResponse } from "@/lib/types";
-
-const GAME_LABEL: Record<string, string> = {
-  "8ball": "8-ball",
-  "9ball": "9-ball",
-  "10ball": "10-ball",
-  other: "Other",
-};
 
 export default async function HomePage({
   searchParams,
@@ -94,7 +88,7 @@ export default async function HomePage({
     supabase
       .from("matches")
       .select(
-        "id, reporter_id, reporter_score, opponent_score, game_type, played_at, winner_id, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name), opponent:profiles!matches_opponent_id_fkey(id, display_name)"
+        "id, reporter_id, reporter_score, opponent_score, game_type, played_at, winner_id, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
       )
       .eq("status", "confirmed")
       .order("played_at", { ascending: false })
@@ -137,13 +131,10 @@ export default async function HomePage({
 
   return (
     <main>
-      <HeroBand
-        title={
-          <span className="text-[11px] font-bold tracking-[0.12em] text-white/70 uppercase">
-            Your rating
-          </span>
-        }
-      >
+      <HeroBand title={greetingFor(now, me?.display_name ?? "")}>
+        <span className="mt-2 block text-[11px] font-bold tracking-[0.12em] text-white/70 uppercase">
+          Your rating
+        </span>
         <div className="mt-1 flex items-end justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">

@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { HeroBand } from "@/components/hero-band";
+import { ACHIEVEMENTS, earnedAchievements } from "@/lib/achievements";
+import { GAME_LABEL } from "@/lib/identity";
 import { MatchRow } from "@/components/match-row";
 import { SectionLabel } from "@/components/section-label";
 import { Sparkline } from "@/components/sparkline";
@@ -24,17 +27,12 @@ import {
 } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 
-const GAME_LABEL: Record<string, string> = {
-  "8ball": "8-ball",
-  "9ball": "9-ball",
-  "10ball": "10-ball",
-  other: "Other",
-};
-
 interface PlayerRef {
   id: string;
   display_name: string;
   rating: number;
+  avatar_url: string | null;
+  ball: number | null;
 }
 
 type PlayerMatch = StatMatch & {
@@ -64,7 +62,9 @@ export default async function PlayerPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, display_name, rating, matches_played, created_at, schools(name, short_name)")
+    .select(
+      "id, display_name, rating, matches_played, created_at, avatar_url, ball, tagline, favorite_game, schools(name, short_name, primary_color)"
+    )
     .eq("id", id)
     .single();
   if (!profile) notFound();
@@ -73,7 +73,7 @@ export default async function PlayerPage({
   const now = new Date();
   const monthAgo = new Date(now.getTime() - 30 * 86_400_000);
 
-  const [{ data: history }, { data: matches }, { data: boardRow }] = await Promise.all([
+  const [{ data: history }, { data: matches }, { data: boardRow }, { count: titles }] = await Promise.all([
     supabase
       .from("rating_history")
       .select("rating_before, rating_after, created_at")
@@ -83,13 +83,20 @@ export default async function PlayerPage({
     supabase
       .from("matches")
       .select(
-        "id, reporter_id, opponent_id, reporter_score, opponent_score, game_type, played_at, confirmed_at, winner_id, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, rating), opponent:profiles!matches_opponent_id_fkey(id, display_name, rating)"
+        "id, reporter_id, opponent_id, reporter_score, opponent_score, game_type, played_at, confirmed_at, winner_id, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, rating, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, rating, avatar_url, ball)"
       )
       .eq("status", "confirmed")
       .or(`reporter_id.eq.${id},opponent_id.eq.${id}`)
       .order("confirmed_at", { ascending: false })
       .limit(50),
     supabase.from("leaderboard").select("wins, losses").eq("id", id).maybeSingle(),
+    // Tournament titles: finals are the matches whose winner advances nowhere.
+    supabase
+      .from("tournament_matches")
+      .select("id, tournaments!inner(status)", { count: "exact", head: true })
+      .eq("winner_id", id)
+      .is("winner_advances_to", null)
+      .eq("tournaments.status", "complete"),
   ]);
 
   const all = (matches ?? []) as PlayerMatch[];
@@ -121,18 +128,34 @@ export default async function PlayerPage({
   const lastMeeting =
     viewerId && !isMe ? all.find((m) => [m.reporter_id, m.opponent_id].includes(viewerId)) : undefined;
   const today = clubDateOf(now.toISOString());
+  const achievements = earnedAchievements({
+    viewerId: id,
+    rating: profile.rating,
+    peak: peak.rating,
+    matches: all,
+    opponentRatings: ratingsById,
+    tournamentsWon: titles ?? 0,
+  });
 
   return (
     <main>
-      <HeroBand
-        title={
-          <span className="flex items-center gap-2">
-            {profile.display_name}
-            <Badge variant="secondary">{school?.short_name}</Badge>
-          </span>
-        }
-      >
-        <div className="mt-2 flex items-end justify-between gap-4">
+      <HeroBand>
+        <div className="flex items-center gap-3">
+          <Avatar person={profile} size="xl" ring={school?.primary_color} />
+          <div className="min-w-0">
+            <h1 className="flex flex-wrap items-center gap-2 text-lg font-extrabold">
+              <span className="truncate">{profile.display_name}</span>
+              <Badge variant="secondary">{school?.short_name}</Badge>
+            </h1>
+            {profile.tagline && <p className="mt-0.5 text-sm text-white/85">{profile.tagline}</p>}
+            {profile.favorite_game && (
+              <p className="mt-1 text-[11px] text-white/60">
+                Plays {GAME_LABEL[profile.favorite_game] ?? profile.favorite_game}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="mt-3 flex items-end justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-x-3">
               <span className="stat-number text-gold text-[44px] leading-none">{profile.rating}</span>
@@ -199,6 +222,37 @@ export default async function PlayerPage({
             </CardContent>
           </Card>
         )}
+
+        <Card>
+          <CardHeader>
+            <SectionLabel>Achievements</SectionLabel>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {achievements.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                {isMe ? "Win a confirmed match to earn your first one." : "Nothing earned yet."}
+              </p>
+            ) : (
+              <ul className="flex flex-wrap gap-2">
+                {achievements.map((a) => (
+                  <li
+                    key={a.id}
+                    title={a.description}
+                    className="bg-accent text-accent-foreground flex items-center gap-1.5 rounded-full py-1 pr-3 pl-2 text-xs font-semibold"
+                  >
+                    <span aria-hidden="true">{a.emoji}</span>
+                    {a.label}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-muted-foreground text-[11px]">
+              {achievements.length} of {ACHIEVEMENTS.length} earned
+              {achievements.length < ACHIEVEMENTS.length &&
+                ` · next: ${ACHIEVEMENTS.find((a) => !achievements.some((e) => e.id === a.id))?.label}`}
+            </p>
+          </CardContent>
+        </Card>
 
         {best && (
           <Card>

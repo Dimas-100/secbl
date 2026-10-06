@@ -17,6 +17,9 @@ interface Row {
   matches_played: number;
   wins: number;
   losses: number;
+  avatar_url: string | null;
+  ball: number | null;
+  school_color: string | null;
 }
 
 function Movement({ value }: { value: number | undefined }) {
@@ -118,7 +121,7 @@ export default async function LeaderboardPage({
                   )}
                 >
                   <span className="relative">
-                    <Avatar name={r.display_name} size={rank === 1 ? "lg" : "md"} me={isMe} />
+                    <Avatar person={r} size={rank === 1 ? "lg" : "md"} ring={r.school_color} />
                     <span
                       className={cn(
                         "stat-number absolute -right-1.5 -bottom-1 flex size-5 items-center justify-center rounded-full text-[10px] ring-2 ring-card",
@@ -162,7 +165,7 @@ export default async function LeaderboardPage({
                     <span className="stat-number text-muted-foreground w-6 shrink-0 text-center text-sm">
                       {i + 4}
                     </span>
-                    <Avatar name={r.display_name} size="md" me={isMe} />
+                    <Avatar person={r} size="md" ring={r.school_color} />
                     <span className="min-w-0 flex-1 leading-tight">
                       <span className="block truncate text-sm font-semibold">
                         {r.display_name}

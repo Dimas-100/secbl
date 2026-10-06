@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MessageCircle, Users } from "lucide-react";
+import { Avatar } from "@/components/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { HeroBand } from "@/components/hero-band";
 import { createClient } from "@/lib/supabase/server";
@@ -44,9 +45,15 @@ function RoomAvatar({ row }: { row: InboxRow }) {
     );
   }
   return (
-    <span className="bg-accent text-accent-foreground flex size-11 shrink-0 items-center justify-center rounded-full text-base font-bold">
-      {(row.other_name ?? "?")[0]?.toUpperCase()}
-    </span>
+    <Avatar
+      person={{
+        id: row.other_id ?? row.id,
+        display_name: row.other_name,
+        avatar_url: row.other_avatar_url,
+        ball: row.other_ball,
+      }}
+      size="lg"
+    />
   );
 }
 
