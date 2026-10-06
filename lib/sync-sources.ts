@@ -8,9 +8,13 @@ import { feedUrlProblem, isPrivateIp } from "@/lib/url-guard";
 // Every outbound connection resolves the hostname *inside* the connector and
 // refuses private answers there, so a feed host cannot pass the pre-check
 // and then rebind to an internal address for the real connection.
+type LookupCallback = (err: Error | null, address: string | { address: string; family: number }[], family?: number) => void;
+
 const pinnedAgent = new Agent({
   connect: {
-    lookup: (hostname, _options, callback) => {
+    // net.connect calls this with { all: true } when autoSelectFamily is on
+    // (Node 20+) and then expects an array; otherwise a single address.
+    lookup: ((hostname: string, options: { all?: boolean }, callback: LookupCallback) => {
       lookup(hostname, { all: true })
         .then((addresses) => {
           const safe = addresses.filter((a) => !isPrivateIp(a.address));
@@ -18,10 +22,11 @@ const pinnedAgent = new Agent({
             callback(new Error(`${hostname} resolves to a private address`), "", 4);
             return;
           }
-          callback(null, safe[0].address, safe[0].family);
+          if (options?.all) callback(null, safe.map((a) => ({ address: a.address, family: a.family })));
+          else callback(null, safe[0].address, safe[0].family);
         })
         .catch((err: Error) => callback(err, "", 4));
-    },
+    }) as never,
   },
 });
 

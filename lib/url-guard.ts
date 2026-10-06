@@ -1,5 +1,9 @@
 // Guards for admin-supplied feed URLs the server will fetch. Pure checks live
-// here (tested); the DNS resolution step is in lib/sync-sources.
+// here (tested). They are a first filter with friendly messages, not the
+// security boundary: the authoritative control is the pinned connector in
+// lib/sync-sources, which resolves the host at connect time and refuses any
+// private, loopback, link-local or reserved answer — so URL-parser quirks or
+// DNS tricks (nip.io-style names, rebinding) cannot reach an internal address.
 
 const FORBIDDEN_HOST = /^(localhost|.*\.localhost|.*\.local|.*\.internal|.*\.lan|metadata\.google\.internal)$/i;
 
