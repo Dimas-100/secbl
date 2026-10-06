@@ -16,6 +16,12 @@ interface EventRow {
   ends_at: string | null;
   status: "scheduled" | "cancelled";
   rsvps: { response: string }[];
+  source: { name: string } | { name: string }[] | null;
+}
+
+function sourceName(event: EventRow): string | null {
+  const s = Array.isArray(event.source) ? event.source[0] : event.source;
+  return s?.name ?? null;
 }
 
 function goingCount(event: EventRow): number {
@@ -45,6 +51,11 @@ function EventRowLink({ event }: { event: EventRow }) {
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="flex items-center gap-2">
           <span className="truncate font-semibold">{event.title}</span>
+          {sourceName(event) && (
+            <Badge variant="outline" className="text-[10px]">
+              {sourceName(event)}
+            </Badge>
+          )}
           {event.status === "cancelled" && <Badge variant="destructive">Cancelled</Badge>}
         </span>
         <span className="text-muted-foreground truncate text-sm">
@@ -77,7 +88,7 @@ export default async function EventsPage({
 
   const { data: events } = await supabase
     .from("events")
-    .select("id, title, location, starts_at, ends_at, status, rsvps(response)")
+    .select("id, title, location, starts_at, ends_at, status, rsvps(response), source:event_sources(name)")
     .order("starts_at");
 
   const { upcoming, past } = partitionEvents((events ?? []) as EventRow[], new Date());

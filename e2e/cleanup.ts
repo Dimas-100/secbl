@@ -19,6 +19,12 @@ const userIds = new Set<string>();
 const displayNames = new Set<string>();
 const eventTitles = new Set<string>();
 const tournamentNames = new Set<string>();
+const sourceNames = new Set<string>();
+
+/** Delete any event source with this (unique per run) name, and the events it imported. */
+export function trackSourceName(name: string) {
+  sourceNames.add(name);
+}
 
 /** Delete this auth user during teardown. profiles cascade from auth.users. */
 export function trackUser(id: string) {
@@ -87,6 +93,15 @@ export async function cleanupTracked() {
     }
     await service.from("tournaments").delete().eq("name", name);
   }
+  // Imported events survive a source delete (source_id → null), so remove
+  // them first; the source references the admin who created it.
+  for (const name of sourceNames) {
+    const { data: sources } = await service.from("event_sources").select("id").eq("name", name);
+    for (const s of sources ?? []) {
+      await service.from("events").delete().eq("source_id", s.id);
+      await service.from("event_sources").delete().eq("id", s.id);
+    }
+  }
   // Messages and memberships cascade from the user, but a DM channel does
   // not (it belongs to the pair), so it would survive as an empty room.
   for (const id of userIds) {
@@ -100,4 +115,5 @@ export async function cleanupTracked() {
   displayNames.clear();
   eventTitles.clear();
   tournamentNames.clear();
+  sourceNames.clear();
 }

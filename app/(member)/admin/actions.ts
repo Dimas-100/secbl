@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { confirmPendingMatch } from "@/lib/confirm-match";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { syncAllSources } from "@/lib/sync-sources";
 
 async function setStatus(formData: FormData, status: "approved" | "rejected") {
   const supabase = await createClient();
@@ -123,6 +124,73 @@ export async function adminResolveMatch(formData: FormData) {
     );
   }
   revalidatePath("/admin");
+}
+
+// --- Event sources (PIN / Engage iCal feeds) -------------------------------
+
+export async function addEventSource(formData: FormData) {
+  const { supabase, user } = await requireAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  const feedUrl = String(formData.get("feed_url") ?? "").trim();
+  const schoolId = String(formData.get("school_id") ?? "") || null;
+  if (!name) redirect(`/admin?error=${encodeURIComponent("Give the source a short name, like PIN.")}`);
+  let parsed: URL;
+  try {
+    parsed = new URL(feedUrl);
+  } catch {
+    redirect(`/admin?error=${encodeURIComponent("That feed link is not a valid URL.")}`);
+  }
+  if (parsed.protocol !== "https:") {
+    redirect(`/admin?error=${encodeURIComponent("Feed links must start with https://")}`);
+  }
+  const { data, error } = await supabase
+    .from("event_sources")
+    .insert({ name: name.slice(0, 40), feed_url: parsed.toString(), school_id: schoolId, created_by: user.id })
+    .select("id")
+    .single();
+  if (error || !data) {
+    const message = /unique|duplicate/i.test(error?.message ?? "")
+      ? "That feed is already connected."
+      : (error?.message ?? "Could not add the source.");
+    redirect(`/admin?error=${encodeURIComponent(message)}`);
+  }
+  // First sync right away so the admin sees whether the feed works.
+  const [result] = await syncAllSources(createServiceClient(), { onlyId: data.id });
+  revalidatePath("/admin");
+  revalidatePath("/events");
+  revalidatePath("/");
+  if (result && !result.ok) {
+    redirect(`/admin?error=${encodeURIComponent(`Connected, but the first sync failed: ${result.error}`)}`);
+  }
+  redirect(`/admin?message=${encodeURIComponent(`Connected ${name}. Imported ${result?.imported ?? 0} event(s).`)}`);
+}
+
+export async function removeEventSource(formData: FormData) {
+  const { supabase } = await requireAdmin();
+  const id = String(formData.get("source_id") ?? "");
+  // Events already imported stay as ordinary events (source_id goes null).
+  const { error } = await supabase.from("event_sources").delete().eq("id", id);
+  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/admin");
+  revalidatePath("/events");
+}
+
+export async function syncEventSourcesNow() {
+  await requireAdmin();
+  const results = await syncAllSources(createServiceClient());
+  revalidatePath("/admin");
+  revalidatePath("/events");
+  revalidatePath("/");
+  const failed = results.filter((r) => !r.ok);
+  if (failed.length > 0) {
+    redirect(`/admin?error=${encodeURIComponent(`${failed.map((f) => f.name).join(", ")}: ${failed[0].error}`)}`);
+  }
+  const imported = results.reduce((n, r) => n + r.imported, 0);
+  const updated = results.reduce((n, r) => n + r.updated, 0);
+  const cancelled = results.reduce((n, r) => n + r.cancelled, 0);
+  redirect(
+    `/admin?message=${encodeURIComponent(`Synced ${results.length} source(s): ${imported} new, ${updated} updated, ${cancelled} cancelled.`)}`
+  );
 }
 
 export async function adminRejectMatch(formData: FormData) {

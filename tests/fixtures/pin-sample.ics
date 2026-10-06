@@ -1,0 +1,92 @@
+BEGIN:VCALENDAR
+PRODID:-//github.com/rianjs/ical.net//NONSGML ical.net 4.0//EN
+VERSION:2.0
+BEGIN:VEVENT
+CATEGORIES:Social
+DESCRIPTION:Tuesday\, October 6 | 11:00 AM–12:00 PM25 Park Place | Room 26
+ 08Bring Your friends: Get Fair Ready Game Day turns career preparation in
+ to a fast-paced\, interactive competition where students team up\, comple
+ te challenges\, earn points\, and compete for prizes—all while building t
+ he skills needed to stand out to employers.Forget sitting through another
+  lecture. This is career prep turned into a game. Students will work in t
+ eams through a series of challenges designed to test their career fair kn
+ owledge\, communication skills\, employer research\, networking abilities
+ \, and elevator pitches. Each round gives teams the opportunity to earn p
+ oints\, sharpen their skills\, and move one step closer to becoming Game 
+ Day champions.Challenges include:Company Intel Challenge – Put your resea
+ rch skills to the test and learn how to quickly find the information you 
+ need to confidently approach an employer.Employer Engagement Simulation –
+  Practice approaching recruiters\, starting conversations\, asking strong
+  questions\, and making a memorable first impression.Elevator Pitch Showd
+ own – Step up and deliver your best introduction while learning how to cl
+ early communicate your experience\, interests\, and goals.Career Fair Tri
+ via – Test your knowledge of career fair do’s and don’ts\, networking str
+ ategies\, employer expectations\, and more.And yes there are prizes on th
+ e line! Compete to see who can rack up the most points while becoming mor
+ e confident and career-fair ready.This event is designed to prepare stude
+ nts for the All-Majors Career & Internship Fair on October 8\, giving you
+  a chance to practice before it counts. Whether this is your first career
+  fair or you simply want to strengthen your networking skills\, you’ll le
+ ave with practical experience you can immediately put to use.Play the gam
+ e. Win prizes. Level up your career fair skills. Then put them to the tes
+ t on October 8!\n\nHosted by: POUNCE Rewards Program\, University Career 
+ Services\n\nAdditional Information can be found at: https://pin.gsu.edu/e
+ vent/12698357
+DTEND:20261006T160000Z
+DTSTAMP:20261006T132441Z
+DTSTART:20261006T150000Z
+LOCATION:25 Park Place\, Room 2608
+SEQUENCE:0
+STATUS:CONFIRMED
+SUMMARY:Get Fair Ready
+UID:https://pin.gsu.edu/event/12698357
+URL:https://pin.gsu.edu/event/12698357
+X-HOSTS:University Career Services
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:ThoughtfulLearning
+CATEGORIES:*Off Campus / Online
+DESCRIPTION:This workshop explores formulas\, functions\, and built-in too
+ ls in Excel that are useful when analyzing and extracting information fro
+ m data. We’ll cover features used in both the PC and Mac versions.\nWorks
+ hop Topics\n\nWorking Across Sheets\nWriting formulas\nUsing Functions\nV
+ LookUp\nData Tables\nGoal Seek\n\nPrerequisites: Excel: Getting Started o
+ r equivalent experience\n\nHosted by: CATLab - Creation and Technology La
+ b\, Instructional Innovation & Technology\, POUNCE Rewards Program\n\nOnl
+ ine Location: https://gsu-edu.zoom.us/j/82066272339?pwd=uyc5jEk6xPyejRF4z
+ TumFWatfAl2ah.1\n\nAdditional Information can be found at: https://pin.gs
+ u.edu/event/12778123
+DTEND:20261006T160000Z
+DTSTAMP:20261006T132441Z
+DTSTART:20261006T143000Z
+LOCATION:Online
+SEQUENCE:0
+STATUS:CONFIRMED
+SUMMARY:Excel: Formulas and Functions
+UID:https://pin.gsu.edu/event/12778123
+URL:https://pin.gsu.edu/event/12778123
+X-HOSTS:POUNCE Rewards Program
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Cultural
+CATEGORIES:*Newton Campus
+DESCRIPTION:Student Life invites you to celebrate the Hidden Gems of the H
+ ispanic World. This event honors the histories and cultures of Spanish-sp
+ eaking communities and Hispanic and Latino Americans.  \nActivities:\n\nT
+ raditional games (Mexican bingo and Dominoes)\nKahoot Trivia game\nCanvas
+  Painting\nArts & Crafts\nRefreshments will be served\n\n\nHosted by: Per
+ imeter College Student Life\, POUNCE Rewards Program\n\nAdditional Inform
+ ation can be found at: https://pin.gsu.edu/event/12296930
+DTEND:20261006T170000Z
+DTSTAMP:20261006T132441Z
+DTSTART:20261006T150000Z
+GEO:33.607860;-83.759080
+LOCATION:2N Lobby
+SEQUENCE:0
+STATUS:CONFIRMED
+SUMMARY:Newton's Hidden Gems of the Hispanic World
+UID:https://pin.gsu.edu/event/12296930
+URL:https://pin.gsu.edu/event/12296930
+X-HOSTS:POUNCE Rewards Program
+END:VEVENT
+END:VCALENDAR

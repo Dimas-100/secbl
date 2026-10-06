@@ -34,10 +34,11 @@ export default async function EditEventPage({
 
   const { data: event } = await supabase
     .from("events")
-    .select("id, title, description, location, starts_at, ends_at, status")
+    .select("id, title, description, location, starts_at, ends_at, status, source_id, external_url, source:event_sources(name)")
     .eq("id", id)
     .single();
   if (!event) notFound();
+  const source = Array.isArray(event.source) ? event.source[0] : event.source;
 
   return (
     <main>
@@ -46,6 +47,27 @@ export default async function EditEventPage({
       {error && (
         <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
+      {event.source_id ? (
+        // Imported events are owned by the school system. Editing here would
+        // be overwritten by the next sync, so the form is replaced by a note.
+        <div className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-card)]">
+          <p className="font-semibold">This event comes from {source?.name ?? "a school feed"}.</p>
+          <p className="text-muted-foreground mt-1">
+            Its title, time, place and description update automatically from that feed, so
+            they can&apos;t be edited here. Change it where it was posted
+            {event.external_url && (
+              <>
+                {" "}
+                (<a href={event.external_url} target="_blank" rel="noreferrer" className="underline">
+                  open it
+                </a>
+                )
+              </>
+            )}
+            . You can still cancel or delete it in SECBL.
+          </p>
+        </div>
+      ) : (
       <EventForm
         action={updateEvent}
         eventId={event.id}
@@ -58,6 +80,7 @@ export default async function EditEventPage({
           endsAtLocal: event.ends_at ? isoToClubTime(event.ends_at) : "",
         }}
       />
+      )}
 
       <div className="flex flex-col gap-3 border-t pt-6">
         <p className="text-muted-foreground text-sm">

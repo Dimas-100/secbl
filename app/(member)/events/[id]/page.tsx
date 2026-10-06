@@ -50,7 +50,7 @@ export default async function EventPage({
 
   const { data: event } = await supabase
     .from("events")
-    .select("id, title, description, location, starts_at, ends_at, status")
+    .select("id, title, description, location, starts_at, ends_at, status, source_id, external_url, source:event_sources(name)")
     .eq("id", id)
     .single();
   if (!event) notFound();
@@ -66,6 +66,8 @@ export default async function EventPage({
     .select("profile_id, response, profile:profiles(display_name)")
     .eq("event_id", id);
 
+  const sourceRow = Array.isArray(event.source) ? event.source[0] : event.source;
+  const sourceName = sourceRow?.name ?? null;
   const attendees = (rsvps ?? []) as AttendeeRow[];
   const tally = tallyRsvps(attendees, user.id);
   // new Date() rather than Date.now(): same instant, but the React compiler's
@@ -86,10 +88,22 @@ export default async function EventPage({
           {formatEventWhen(event.starts_at, event.ends_at)}
           {event.location && ` · ${event.location}`}
         </p>
+        {event.source_id && (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-white/80">
+            <span className="rounded-full bg-white/15 px-2 py-0.5 font-semibold">
+              From {sourceName ?? "school feed"}
+            </span>
+            {event.external_url && (
+              <a href={event.external_url} target="_blank" rel="noreferrer" className="underline">
+                View on {sourceName ?? "the school site"}
+              </a>
+            )}
+          </p>
+        )}
         {me?.role === "admin" && (
           <div className="mt-2 flex gap-3 text-sm text-white/80">
             <Link href={`/events/${event.id}/edit`} className="underline">
-              Edit
+              {event.source_id ? "Manage" : "Edit"}
             </Link>
             <Link href={`/events/new?from=${event.id}`} className="underline">
               Duplicate
