@@ -1,14 +1,11 @@
-// Seed-order helpers for tournament setup. Pure, so the editor's buttons are
+// Seed-order helpers for tournament setup. Pure, so the editor's behaviour is
 // tested without a browser. The seed list is the bracket: lib/bracket.ts
 // seats players by their position in it.
 
-// Swap the seed at `index` with its neighbour in `dir` (-1 up, +1 down).
-export function moveSeed(ids: string[], index: number, dir: -1 | 1): string[] {
-  const target = index + dir;
-  if (index < 0 || index >= ids.length || target < 0 || target >= ids.length) return [...ids];
-  const out = [...ids];
-  [out[index], out[target]] = [out[target], out[index]];
-  return out;
+// Tap in order: a player not yet seeded joins as the last seed; a seeded
+// player leaves and everyone below moves up one.
+export function toggleSeed(ids: string[], id: string): string[] {
+  return ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
 }
 
 // Fisher–Yates over a copy, with the random source injected for tests.

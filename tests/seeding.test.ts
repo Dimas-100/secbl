@@ -1,18 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { byRating, moveSeed, shuffleSeeds } from "@/lib/seeding";
+import { byRating, shuffleSeeds, toggleSeed } from "@/lib/seeding";
 
 const ids = ["a", "b", "c", "d"];
 
-describe("moveSeed", () => {
-  it("swaps a seed with its neighbour and clamps at the ends", () => {
-    expect(moveSeed(ids, 2, -1)).toEqual(["a", "c", "b", "d"]);
-    expect(moveSeed(ids, 2, 1)).toEqual(["a", "b", "d", "c"]);
-    expect(moveSeed(ids, 0, -1)).toEqual(ids);
-    expect(moveSeed(ids, 3, 1)).toEqual(ids);
+describe("toggleSeed", () => {
+  it("appends a new player as the last seed and removes a seeded one, closing the gap", () => {
+    expect(toggleSeed(["a", "b"], "c")).toEqual(["a", "b", "c"]);
+    expect(toggleSeed(["a", "b", "c"], "a")).toEqual(["b", "c"]);
+    expect(toggleSeed([], "a")).toEqual(["a"]);
   });
   it("does not mutate its input", () => {
     const copy = [...ids];
-    moveSeed(ids, 1, 1);
+    toggleSeed(ids, "b");
     expect(ids).toEqual(copy);
   });
 });

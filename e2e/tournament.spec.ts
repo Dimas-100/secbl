@@ -61,11 +61,14 @@ test("admin runs a 4-player tournament to a champion", async ({ page }) => {
   await page.getByRole("button", { name: "Save entrants" }).click();
   await expect(page.getByText(/entrants saved/i)).toBeVisible();
 
-  // Manual seeding: the admin ticked themselves first, so they are seed 1.
-  // Move p1 to the top and start — Start submits the order as shown.
+  // Tap-in-order seeding: the admin tapped themselves first, so they are
+  // seed 1. Tap them out and back in — they drop to the last seed and p1
+  // becomes seed 1. Start submits the order as shown.
   const p1Name = `Cup p1 ${stamp}`;
-  await page.getByRole("button", { name: `Move ${p1Name} up` }).click();
-  await expect(page.locator("ol li").first()).toContainText(p1Name);
+  const adminBox = page.locator(`input[type="checkbox"][value="${admin.id}"]`);
+  await adminBox.uncheck();
+  await adminBox.check();
+  await expect(page.getByText(new RegExp(`${p1Name} is seed 1`))).toBeVisible();
   await page.getByRole("button", { name: /start tournament/i }).click();
   await expect(page.getByRole("heading", { name: "Round 1" })).toBeVisible();
   await expect(page.getByText(`${p1Name} (1)`).first()).toBeVisible();
