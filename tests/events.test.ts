@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  eventMentionsSchool,
   addClubWeek,
   clubDateOf,
   CLUB_TIMEZONE,
@@ -183,5 +184,19 @@ describe("clubDateOf", () => {
   it("handles standard time in winter", () => {
     // 2026-01-15T02:00Z is 9:00 PM EST on Jan 14.
     expect(clubDateOf("2026-01-15T02:00:00Z")).toBe("2026-01-14");
+  });
+});
+
+describe("eventMentionsSchool", () => {
+  const gsu = { name: "Georgia State", short_name: "GSU" };
+  it("matches the school's name or short name anywhere in the event", () => {
+    expect(eventMentionsSchool({ title: "League night · GSU vs GT", location: null, source_name: null }, gsu)).toBe(true);
+    expect(
+      eventMentionsSchool({ title: "Open table", location: "Georgia State Student Center", source_name: null }, gsu)
+    ).toBe(true);
+    expect(eventMentionsSchool({ title: "Clinic", location: null, source_name: "Georgia State PIN" }, gsu)).toBe(true);
+  });
+  it("ignores other schools", () => {
+    expect(eventMentionsSchool({ title: "League night · UGA vs GT", location: "Athens", source_name: null }, gsu)).toBe(false);
   });
 });

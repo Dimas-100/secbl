@@ -164,3 +164,13 @@ export function tallyRsvps(rsvps: RsvpLike[], viewerId: string): RsvpTally {
   }
   return tally;
 }
+
+// "My school" filter on the calendar. Events carry no school id, so this is a
+// name match across the fields a school would show up in.
+export function eventMentionsSchool(
+  event: { title: string; location: string | null; source_name: string | null },
+  school: { name: string; short_name: string }
+): boolean {
+  const hay = [event.title, event.location, event.source_name].filter(Boolean).join(" ").toLowerCase();
+  return hay.includes(school.name.toLowerCase()) || hay.includes(school.short_name.toLowerCase());
+}
