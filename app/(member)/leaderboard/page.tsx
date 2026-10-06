@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { ListRow } from "@/components/list-row";
 import { PageHeader } from "@/components/page-header";
-import { SchoolDot } from "@/components/school-dot";
+import { SchoolMark, type SchoolMarkSchool } from "@/components/school-mark";
 import { Segmented } from "@/components/segmented";
 import { TitleBadge } from "@/components/title-badge";
 import { UnderlineTabs } from "@/components/underline-tabs";
@@ -16,6 +16,7 @@ import { levelOf, loadAllLevels } from "@/lib/xp-data";
 interface Row {
   id: string;
   display_name: string;
+  school_id: string;
   school_short_name: string;
   rating: number;
   matches_played: number;
@@ -81,7 +82,7 @@ export default async function LeaderboardPage({
         .select("profile_id, rating_before, rating_after, created_at")
         .gte("created_at", weekAgo),
       supabase.from("school_stats").select("id, name, short_name, member_count, avg_rating, wins, losses"),
-      supabase.from("schools").select("id, short_name, primary_color"),
+      supabase.from("schools").select("id, short_name, primary_color, logo_url"),
       loadAllLevels(supabase),
     ]);
   const mySchool = (Array.isArray(me?.schools) ? me.schools[0] : me?.schools)?.short_name;
@@ -98,7 +99,9 @@ export default async function LeaderboardPage({
   const podiumOrder = [podium[1], podium[0], podium[2]];
 
   const schoolRows = (schoolStats ?? []) as SchoolRow[];
-  const colorOf = Object.fromEntries((schools ?? []).map((s) => [s.id, s.primary_color as string | null]));
+  const schoolById: Record<string, SchoolMarkSchool & { id: string }> = Object.fromEntries(
+    ((schools ?? []) as (SchoolMarkSchool & { id: string })[]).map((s) => [s.id, s])
+  );
   const maxAvg = Math.max(1, ...schoolRows.map((s) => s.avg_rating));
 
   return (
@@ -193,7 +196,7 @@ export default async function LeaderboardPage({
                       }
                       meta={
                         <span className="flex items-center gap-1.5">
-                          <SchoolDot color={r.school_color} />
+                          <SchoolMark school={schoolById[r.school_id]} size={16} />
                           {r.school_short_name}
                           <span aria-hidden="true">·</span>
                           <Movement value={moves[r.id]} />
@@ -239,7 +242,7 @@ export default async function LeaderboardPage({
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="flex min-w-0 items-center gap-2 text-[16px] font-medium">
-                      <SchoolDot color={colorOf[s.id]} size={8} />
+                      <SchoolMark school={schoolById[s.id]} size={28} />
                       <span className="truncate">{s.name}</span>
                     </span>
                     <span className="stat-number shrink-0 text-[15px]">{s.avg_rating}</span>

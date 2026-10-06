@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Search, Users } from "lucide-react";
 import { Avatar } from "@/components/avatar";
-import { SchoolDot } from "@/components/school-dot";
+import { SchoolMark } from "@/components/school-mark";
 import { createClient } from "@/lib/supabase/client";
 import { filterInbox, type InboxRow, type InboxTab } from "@/lib/chat";
 import { buildInboxItems, type InboxItem, type SchoolRef } from "@/lib/inbox";
@@ -161,9 +161,17 @@ export function InboxList({
   );
 }
 
-// People are round; rooms are 14px-radius squares, school rooms with the
-// school's colour dot bottom-right.
+// People are round; rooms are 14px-radius squares. A school room with a
+// logo shows the logo itself; without one, the square carries the school's
+// colour dot bottom-right.
 function RoomAvatar({ row }: { row: InboxItem }) {
+  if (row.type === "school" && row.school?.logo_url) {
+    return (
+      <span className="flex size-12 shrink-0 items-center justify-center">
+        <SchoolMark school={row.school} size={44} />
+      </span>
+    );
+  }
   if (row.type === "dm") {
     return (
       <Avatar
@@ -186,7 +194,7 @@ function RoomAvatar({ row }: { row: InboxItem }) {
       )}
       {row.type === "school" && (
         <span className="ring-background absolute -right-0.5 -bottom-0.5 flex rounded-full ring-[3px]">
-          <SchoolDot color={row.school?.primary_color} size={12} />
+          <SchoolMark school={row.school ? { ...row.school, logo_url: null } : null} size={12} />
         </span>
       )}
     </span>

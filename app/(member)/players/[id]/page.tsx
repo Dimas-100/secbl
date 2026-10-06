@@ -7,7 +7,7 @@ import { LevelBar } from "@/components/level-bar";
 import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
 import { MessagesButton } from "@/components/messages-button";
-import { SchoolDot } from "@/components/school-dot";
+import { SchoolMark } from "@/components/school-mark";
 import { SectionHeading } from "@/components/section-heading";
 import { ShareButton } from "@/components/share-button";
 import { Sparkline } from "@/components/sparkline";
@@ -78,7 +78,7 @@ export default async function PlayerPage({
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, display_name, rating, matches_played, created_at, avatar_url, ball, tagline, favorite_game, schools(name, short_name, primary_color)"
+      "id, display_name, rating, matches_played, created_at, avatar_url, ball, tagline, favorite_game, schools(name, short_name, primary_color, logo_url)"
     )
     .eq("id", id)
     .single();
@@ -193,7 +193,7 @@ export default async function PlayerPage({
           </h1>
           <span className="text-muted-foreground flex flex-wrap items-center justify-center gap-2 text-[13px]">
             <span className="flex items-center gap-2">
-              <SchoolDot color={school?.primary_color} />
+              <SchoolMark school={school} size={16} />
               {school?.name}
             </span>
             {profile.favorite_game && (

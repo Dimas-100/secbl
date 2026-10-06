@@ -203,3 +203,34 @@ export async function adminRejectMatch(formData: FormData) {
   if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/admin");
 }
+
+// Records a school's logo URL after the browser uploaded it. The database
+// function requires an admin; this adds the host and per-school path check so
+// a logo can never point outside this project's own bucket.
+export async function setSchoolLogo(schoolId: string, url: string | null): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Please log in again." };
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(schoolId)) {
+    return { error: "Unknown school." };
+  }
+  if (url !== null) {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return { error: "That logo link is not valid." };
+    }
+    const storageHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname;
+    const expectedPath = `/storage/v1/object/public/school-logos/${schoolId}/`;
+    if (parsed.protocol !== "https:" || parsed.hostname !== storageHost || !parsed.pathname.startsWith(expectedPath)) {
+      return { error: "Logos must be uploaded through the app." };
+    }
+  }
+  const { error } = await supabase.rpc("set_school_logo", { p_school_id: schoolId, p_url: url });
+  if (error) return { error: error.message };
+  revalidatePath("/", "layout");
+  return { error: null };
+}

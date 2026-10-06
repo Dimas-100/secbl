@@ -7,6 +7,7 @@ import { SectionLabel } from "@/components/section-label";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/server";
 import { SubmitButton } from "@/components/submit-button";
+import { SchoolLogoUploader } from "./school-logo-uploader";
 import { formatEventWhen } from "@/lib/events";
 import {
   addEventSource,
@@ -83,7 +84,7 @@ export default async function AdminPage({
       .from("event_sources")
       .select("id, name, feed_url, enabled, last_synced_at, last_status, last_error, last_imported, schools(short_name)")
       .order("created_at"),
-    supabase.from("schools").select("id, short_name").order("short_name"),
+    supabase.from("schools").select("id, name, short_name, primary_color, logo_url").order("short_name"),
     supabase.from("events").select("source_id").not("source_id", "is", null),
   ]);
   const importedBySource = new Map<string, number>();
@@ -143,6 +144,15 @@ export default async function AdminPage({
               </div>
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <SectionLabel>Schools</SectionLabel>
+        </CardHeader>
+        <CardContent>
+          <SchoolLogoUploader schools={schools ?? []} />
         </CardContent>
       </Card>
 
