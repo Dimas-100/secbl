@@ -29,6 +29,8 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
       return data.user!.id;
     }
     pendingId = await makeUser(pendingEmail);
+    // Membership is open (0021): a pending user has to be made so on purpose.
+    await admin.from("profiles").update({ status: "pending" }).eq("id", pendingId);
     memberId = await makeUser(memberEmail);
     await admin.from("profiles").update({ status: "approved" }).eq("id", memberId);
 

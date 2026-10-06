@@ -45,7 +45,7 @@ export default async function InstallCardPage() {
           {[
             "Scan the code with your camera.",
             "Add SECBL to your home screen.",
-            "Pick your school, get approved, start logging games.",
+            "Pick your school and start logging games.",
           ].map((step, i) => (
             <li
               key={step}

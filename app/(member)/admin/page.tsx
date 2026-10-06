@@ -14,9 +14,7 @@ import {
   addEventSource,
   adminRejectMatch,
   adminResolveMatch,
-  approveProfile,
   reinstateProfile,
-  rejectProfile,
   removeEventSource,
   suspendProfile,
   syncEventSourcesNow,
@@ -64,15 +62,8 @@ export default async function AdminPage({
     .single();
   if (me?.role !== "admin") redirect("/");
 
-  const { data: pending } = await supabase
-    .from("profiles")
-    .select("id, display_name, created_at, schools(short_name)")
-    .eq("status", "pending")
-    .order("created_at");
-
-  // Everyone who is in the club or was until they were suspended. Excludes the
-  // signup queue above, and excludes you — self-suspension would lock the only
-  // admin out of their own club.
+  // Everyone who is in the club or was until they were suspended, excluding
+  // you — self-suspension would lock the only admin out of their own club.
   const { data: members } = await supabase
     .from("profiles")
     .select("id, display_name, status, schools(short_name)")
@@ -111,43 +102,6 @@ export default async function AdminPage({
       {error && (
         <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
       )}
-      <Card>
-        <CardHeader>
-          <SectionLabel>Signup approvals</SectionLabel>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {(pending ?? []).length === 0 && (
-            <p className="text-sm text-muted-foreground">No pending signups.</p>
-          )}
-          {(pending ?? []).map((p) => (
-            <div key={p.id} className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{p.display_name}</span>
-                <Badge variant="secondary">
-                  {Array.isArray(p.schools)
-                    ? (p.schools as Array<{ short_name: string }>)[0]?.short_name
-                    : (p.schools as { short_name: string })?.short_name}
-                </Badge>
-              </div>
-              <div className="flex gap-2">
-                <form action={approveProfile}>
-                  <input type="hidden" name="profile_id" value={p.id} />
-                  <Button type="submit">
-                    Approve
-                  </Button>
-                </form>
-                <form action={rejectProfile}>
-                  <input type="hidden" name="profile_id" value={p.id} />
-                  <Button variant="outline" type="submit">
-                    Reject
-                  </Button>
-                </form>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
           <SectionLabel>Schools</SectionLabel>

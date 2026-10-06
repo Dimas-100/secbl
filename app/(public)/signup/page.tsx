@@ -24,7 +24,7 @@ export default async function SignupPage({
       compact
       eyebrow="Join the league"
       title="Pick your school, pick a name."
-      lead="An admin approves new members, usually the same day."
+      lead="You're in as soon as you sign up — your school room and the ladder are waiting."
     >
       {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
       <form action={signup} className="flex flex-col gap-6">

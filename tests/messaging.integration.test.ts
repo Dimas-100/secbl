@@ -47,6 +47,7 @@ describe.skipIf(!url || !anonKey || !serviceKey)("messaging", () => {
       return data.user!.id;
     }
     ids.pending = await makeUser(emails.pending, schoolOne);
+    await admin.from("profiles").update({ status: "pending" }).eq("id", ids.pending);
     ids.a = await makeUser(emails.a, schoolOne);
     ids.b = await makeUser(emails.b, schoolOne);
     ids.c = await makeUser(emails.c, schoolTwo);

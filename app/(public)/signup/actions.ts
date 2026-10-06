@@ -16,8 +16,9 @@ export async function signup(formData: FormData) {
     options: { data: { display_name: displayName, school_id: schoolId } },
   });
   if (error) redirect(`/signup?error=${encodeURIComponent(error.message)}`);
-  // With email confirmation disabled we get a session and can go straight
-  // to the pending screen; otherwise the user confirms by email first.
-  if (data.session) redirect("/pending");
+  // Membership is open (the invitation link is the gate): the signup trigger
+  // approves the profile, so with a session the member goes straight in.
+  // Without one (email confirmation on) they confirm by email first.
+  if (data.session) redirect("/");
   redirect(`/login?message=${encodeURIComponent("Check your email to confirm, then log in.")}`);
 }
