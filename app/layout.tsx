@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Archivo, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { RegisterServiceWorker } from "@/components/register-sw";
 
@@ -11,6 +11,15 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Display face for ratings, scores and page titles: a sturdy grotesk with
+// real weight at the top end, so the numbers read like a scoreboard without
+// borrowing a novelty font. Body copy stays Geist.
+const archivo = Archivo({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: ["600", "700", "800", "900"],
 });
 
 export const metadata: Metadata = {
@@ -35,7 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}

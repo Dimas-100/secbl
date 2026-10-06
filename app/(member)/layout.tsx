@@ -45,7 +45,7 @@ export default async function MemberLayout({
       <header className="flex items-center justify-between py-3">
         {/* Text, not the logo image: the wordmark's ball letterforms smear at
             header size. --primary carries the brand here instead. */}
-        <Link href="/" className="text-primary text-lg font-extrabold tracking-tight">
+        <Link href="/" className="display text-primary text-[20px] tracking-[-0.03em]">
           SECBL
         </Link>
         <div className="flex items-center gap-3">

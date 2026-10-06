@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Trophy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -132,49 +133,51 @@ export default async function HomePage({
   return (
     <main>
       <HeroBand title={greetingFor(now, me?.display_name ?? "")}>
-        <span className="mt-2 block text-[11px] font-bold tracking-[0.12em] text-white/70 uppercase">
+        <span className="mt-3 block text-[11px] font-semibold tracking-[0.14em] text-white/55 uppercase">
           Your rating
         </span>
         <div className="mt-1 flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="stat-number text-gold text-[52px] leading-none">{rating}</span>
+            <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
+              <span className="stat-number text-gold text-[64px] leading-[0.9] tracking-[-0.03em]">
+                {rating}
+              </span>
               {change !== null && (
                 <span
                   className={cn(
-                    "stat-number text-sm",
-                    change >= 0 ? "text-gold" : "text-white/80"
+                    "stat-number mb-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
+                    change >= 0 ? "bg-white/12 text-gold" : "bg-white/12 text-white/85"
                   )}
                 >
                   {change >= 0 ? "▲" : "▼"} {Math.abs(change)}
-                  <span className="ml-1 font-medium text-white/60">this month</span>
+                  <span className="font-medium text-white/60">this month</span>
                 </span>
               )}
             </div>
-            <div className="mt-1 text-[11px] text-white/60">
+            <div className="mt-2 text-[12px] text-white/65">
               {schoolRank > 0 && mySchool ? `#${schoolRank} at ${mySchool.short_name}` : "Unranked"}
               {" · "}
               {played} played{provisional && " · provisional"}
             </div>
           </div>
           {/* The one memorable element: your line, drawing itself once. */}
-          <Sparkline ratings={ratings} className="text-gold shrink-0" />
+          <Sparkline ratings={ratings} width={150} height={56} className="text-gold shrink-0" />
         </div>
         {form.length > 0 && (
           <div
             className="mt-3 flex items-center gap-2"
             aria-label={`Recent form: ${form.map((f) => (f.won ? "win" : "loss")).join(", ")}`}
           >
-            <span className="text-[10px] font-bold tracking-[0.12em] text-white/60 uppercase">
+            <span className="text-[10px] font-semibold tracking-[0.14em] text-white/55 uppercase">
               Form
             </span>
-            <span className="flex gap-1">
+            <span className="flex gap-1.5">
               {form.map((f) => (
                 <span
                   key={f.id}
                   className={cn(
                     "stat-number flex size-6 items-center justify-center rounded-full text-[11px]",
-                    f.won ? "bg-gold text-gold-foreground" : "bg-white/15 text-white/70"
+                    f.won ? "bg-gold text-gold-foreground" : "bg-white/12 text-white/60 ring-1 ring-white/20"
                   )}
                 >
                   {f.won ? "W" : "L"}
@@ -302,7 +305,9 @@ export default async function HomePage({
           <CardContent className="flex flex-col gap-3">
             {feed.length === 0 && (
               <div className="flex flex-col items-center gap-2 py-6 text-center">
-                <span className="text-4xl">🎱</span>
+                <span className="bg-muted text-primary flex size-12 items-center justify-center rounded-full">
+                  <Trophy className="size-6" />
+                </span>
                 <p className="text-sm font-semibold">No results yet this season.</p>
                 <Button asChild variant="hero" size="sm">
                   <Link href="/matches/new">Report the first match</Link>
@@ -311,8 +316,13 @@ export default async function HomePage({
             )}
             {feed.map((group) => (
               <div key={group.date}>
-                <div className="text-muted-foreground mb-1 text-xs font-semibold">{group.label}</div>
-                <div className="divide-border/60 flex flex-col divide-y">
+                <div className="flex items-center gap-3">
+                  <span className="text-muted-foreground shrink-0 text-[11px] font-semibold tracking-[0.1em] uppercase">
+                    {group.label}
+                  </span>
+                  <span className="bg-hairline h-px flex-1" />
+                </div>
+                <div className="divide-hairline flex flex-col divide-y">
                   {group.matches.map((m) => {
                     const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
                     const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;

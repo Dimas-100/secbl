@@ -1,7 +1,15 @@
 import { cn } from "@/lib/utils";
 
-// One number, one plain label, optional one-line note. Four of these in a
-// row are the "at a glance" layer under every hero (chess.com's stats strip).
+// The at-a-glance layer under a hero. One card, numbers side by side,
+// separated by hairlines: an editorial stats strip rather than four boxes.
+export function StatStrip({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-card grid grid-cols-2 overflow-hidden rounded-2xl shadow-[var(--shadow-card)] ring-1 ring-hairline min-[400px]:grid-cols-4">
+      {children}
+    </div>
+  );
+}
+
 export function StatTile({
   label,
   value,
@@ -18,17 +26,19 @@ export function StatTile({
   return (
     <div
       className={cn(
-        "bg-card flex min-w-0 flex-col gap-0.5 rounded-xl px-3 py-3 shadow-[var(--shadow-card)]",
+        // Hairline between cells on both axes; the strip's overflow-hidden
+        // trims the outer edges so no stray rule shows.
+        "flex min-w-0 flex-col gap-1 px-4 py-4 -ml-px -mt-px border-l border-t border-hairline",
         className
       )}
     >
-      <span className="text-muted-foreground truncate text-xs font-medium">{label}</span>
+      <span className="text-muted-foreground truncate text-xs">{label}</span>
       <span
         className={cn(
           "stat-number truncate text-[26px] leading-none",
           tone === "win" && "text-win",
           tone === "loss" && "text-loss",
-          tone === "gold" && "text-primary"
+          tone === "gold" && "text-brass-deep"
         )}
       >
         {value}
@@ -38,6 +48,7 @@ export function StatTile({
   );
 }
 
+// Kept for callers that still lay tiles out as separate cards.
 export function StatGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-2 gap-2 min-[400px]:grid-cols-4">{children}</div>;
+  return <StatStrip>{children}</StatStrip>;
 }

@@ -4,7 +4,7 @@ import { CardTitle } from "@/components/ui/card";
 // so every card keeps a real heading in the document outline.
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <CardTitle className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+    <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
       {children}
     </CardTitle>
   );

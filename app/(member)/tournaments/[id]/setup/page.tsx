@@ -28,12 +28,18 @@ export default async function TournamentSetupPage({
     .single();
   if (me?.role !== "admin") redirect("/tournaments");
 
-  const { data: tournament } = await supabase
+  const { data: tournament, error: tournamentError } = await supabase
     .from("tournaments")
     .select("id, name, status")
     .eq("id", id)
     .single();
-  if (!tournament) notFound();
+  if (!tournament) {
+    // A real lookup failure (not merely "no row") should be visible in logs.
+    if (tournamentError && tournamentError.code !== "PGRST116") {
+      console.error("tournament setup lookup failed", tournamentError);
+    }
+    notFound();
+  }
   if (tournament.status !== "setup") redirect(`/tournaments/${id}`);
 
   const { data: candidates } = await supabase

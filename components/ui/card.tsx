@@ -7,9 +7,9 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        // Borderless by design (Sleek Broadcast): depth comes from the shadow
-        // scale, and the warm page ground provides the separation.
-        "flex flex-col gap-4 rounded-xl bg-card py-5 text-card-foreground shadow-[var(--shadow-card)]",
+        // A hairline edge plus a soft two-layer shadow: crisp on the warm
+        // ground without reading as a drawn border.
+        "flex flex-col gap-4 rounded-2xl bg-card py-5 text-card-foreground shadow-[var(--shadow-card)] ring-1 ring-hairline",
         className
       )}
       {...props}
