@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Shuffle, Sparkles } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Shuffle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { SectionLabel } from "@/components/section-label";
 import { SubmitButton } from "@/components/submit-button";
 import { MAX_PLAYERS, MIN_PLAYERS } from "@/lib/bracket";
-import { byRating, moveSeed, shuffleSeeds } from "@/lib/seeding";
+import { byRating, shuffleSeeds, toggleSeed } from "@/lib/seeding";
+import { cn } from "@/lib/utils";
 import { saveEntrants, startTournament } from "@/app/(member)/tournaments/actions";
 
 export interface Candidate {
@@ -18,11 +18,12 @@ export interface Candidate {
   school: string | null;
 }
 
-// Who is in, and in what order. The seed list IS the bracket: seed 1 is the
-// favourite, byes go to the top seeds, 1 and 2 can only meet in the final.
-// Admins set the order by hand (everyone starts at the same rating, so
-// judgement matters), sort it by rating, or draw it at random. Both Save and
-// Start submit the list as shown, so what you see is what gets bracketed.
+// Tap in order. The order you tap players is the seed order: first tap is
+// seed 1, and a seeded player tapped again drops out while everyone below
+// moves up. The seed list IS the bracket — seed 1 is the favourite, byes go
+// to the top seeds, 1 and 2 can only meet in the final. "By rating" and
+// "Random draw" rewrite the order when you would rather not rank people.
+// Both Save and Start submit the list as shown.
 export function EntrantsEditor({
   tournamentId,
   candidates,
@@ -34,16 +35,20 @@ export function EntrantsEditor({
 }) {
   const byId = new Map(candidates.map((c) => [c.id, c]));
   const [seeds, setSeeds] = useState<string[]>(initialSeeds.filter((id) => byId.has(id)));
-  const [drawn, setDrawn] = useState(false);
-  const chosen = new Set(seeds);
-
-  function toggle(id: string) {
-    setDrawn(false);
-    setSeeds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
-  }
-
+  const [mode, setMode] = useState<"tap" | "drawn" | "rating">("tap");
+  const seedOf = new Map(seeds.map((id, i) => [id, i + 1]));
   const ratingOf = (id: string) => byId.get(id)?.rating ?? 0;
   const nameOf = (id: string) => byId.get(id)?.display_name ?? "";
+  const first = seeds[0] ? byId.get(seeds[0]) : null;
+
+  const summary =
+    seeds.length === 0
+      ? "Tap players in order of strength — the first tap is seed 1."
+      : mode === "drawn"
+        ? `${seeds.length} entrants, drawn at random. ${first?.display_name} is seed 1. Draw again, or tap to adjust.`
+        : mode === "rating"
+          ? `${seeds.length} entrants, seeded by rating. ${first?.display_name} is seed 1.`
+          : `${seeds.length} ${seeds.length === 1 ? "entrant" : "entrants"} · ${first?.display_name} is seed 1. Tap a seeded player to take them out.`;
 
   return (
     <form className="flex flex-col gap-6">
@@ -53,114 +58,89 @@ export function EntrantsEditor({
       ))}
 
       <Card>
-        <CardHeader>
-          <SectionLabel>Seeds</SectionLabel>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {seeds.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Tick players below to add them. The order you set here is the bracket.</p>
-          ) : (
-            <ol className="flex flex-col">
-              {seeds.map((id, i) => {
-                const c = byId.get(id)!;
-                return (
-                  <li key={id} className="border-hairline-row flex items-center gap-3 border-b py-2.5 last:border-b-0">
-                    <span className="stat-number text-muted-foreground w-6 text-[13px]">{i + 1}</span>
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-[15px] font-medium">{c.display_name}</span>
-                      <span className="text-muted-foreground text-[12px]">
-                        {c.school ? `${c.school} · ` : ""}
-                        {c.rating}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      aria-label={`Move ${c.display_name} up`}
-                      disabled={i === 0}
-                      onClick={() => {
-                        setDrawn(false);
-                        setSeeds((cur) => moveSeed(cur, i, -1));
-                      }}
-                      className="press flex size-10 items-center justify-center rounded-full shadow-[inset_0_0_0_1px_var(--hairline-ghost)] disabled:opacity-30"
-                    >
-                      <ArrowUp className="size-4" strokeWidth={1.8} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Move ${c.display_name} down`}
-                      disabled={i === seeds.length - 1}
-                      onClick={() => {
-                        setDrawn(false);
-                        setSeeds((cur) => moveSeed(cur, i, 1));
-                      }}
-                      className="press flex size-10 items-center justify-center rounded-full shadow-[inset_0_0_0_1px_var(--hairline-ghost)] disabled:opacity-30"
-                    >
-                      <ArrowDown className="size-4" strokeWidth={1.8} />
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={seeds.length < 2}
-              onClick={() => {
-                setDrawn(false);
-                setSeeds((cur) => byRating(cur, ratingOf, nameOf));
-              }}
-            >
-              <Sparkles className="size-4" />
-              Seed by rating
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={seeds.length < 2}
-              onClick={() => {
-                setSeeds((cur) => shuffleSeeds(cur, Math.random));
-                setDrawn(true);
-              }}
-            >
-              <Shuffle className="size-4" />
-              Random draw
-            </Button>
+        <CardHeader className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <SectionLabel>Players</SectionLabel>
+            <div className="flex gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={seeds.length < 2}
+                onClick={() => {
+                  setSeeds((cur) => shuffleSeeds(cur, Math.random));
+                  setMode("drawn");
+                }}
+              >
+                <Shuffle className="size-4" />
+                Random draw
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={seeds.length < 2}
+                onClick={() => {
+                  setSeeds((cur) => byRating(cur, ratingOf, nameOf));
+                  setMode("rating");
+                }}
+              >
+                <Sparkles className="size-4" />
+                By rating
+              </Button>
+            </div>
           </div>
-          <p aria-live="polite" className="text-muted-foreground text-[12px]">
-            {drawn
-              ? "Drawn at random. Draw again if you like, or move anyone by hand."
-              : "Seed 1 is the favourite. Byes go to the top seeds; seeds 1 and 2 can only meet in the final."}
+          <p aria-live="polite" className="text-muted-foreground text-[13px]">
+            {summary}
           </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <SectionLabel>Players</SectionLabel>
         </CardHeader>
-        <CardContent className="flex flex-col gap-1">
-          <p className="text-muted-foreground pb-1 text-xs">
-            Tick to add to the bottom of the seeds. {MIN_PLAYERS} to {MAX_PLAYERS} players.
-          </p>
-          {candidates.map((c) => (
-            <label key={c.id} className="flex min-h-11 items-center gap-3 text-sm">
-              <input
-                type="checkbox"
-                value={c.id}
-                checked={chosen.has(c.id)}
-                onChange={() => toggle(c.id)}
-                aria-label={c.display_name}
-                className="accent-primary size-5"
-              />
-              <span className="font-medium">{c.display_name}</span>
-              {c.school && <Badge variant="secondary">{c.school}</Badge>}
-              <span className="text-muted-foreground">{c.rating}</span>
-            </label>
-          ))}
+        <CardContent className="flex flex-col">
+          {candidates.map((c) => {
+            const seed = seedOf.get(c.id);
+            return (
+              <label
+                key={c.id}
+                className={cn(
+                  "press border-hairline-row relative flex min-h-[56px] cursor-pointer items-center gap-3.5 border-b py-2 last:border-b-0",
+                  seed === undefined && "text-muted-foreground"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  value={c.id}
+                  checked={seed !== undefined}
+                  onChange={() => {
+                    setSeeds((cur) => toggleSeed(cur, c.id));
+                    setMode("tap");
+                  }}
+                  aria-label={c.display_name}
+                  // Invisible but full-size: the whole row is the tap target, and
+                  // it stays a real, focusable checkbox for keyboards and tests.
+                  className="absolute inset-0 size-full cursor-pointer opacity-0"
+                />
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "stat-number flex size-8 shrink-0 items-center justify-center rounded-full text-[13px]",
+                    seed !== undefined
+                      ? "bg-brass text-background font-semibold"
+                      : "shadow-[inset_0_0_0_1px_var(--hairline-ghost)]"
+                  )}
+                >
+                  {seed ?? ""}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className={cn("truncate text-[15px]", seed !== undefined ? "text-foreground font-medium" : "font-normal")}>
+                    {c.display_name}
+                  </span>
+                  <span className="text-muted-foreground text-[12px]">
+                    {c.school ? `${c.school} · ` : ""}
+                    {c.rating}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
         </CardContent>
       </Card>
 
@@ -178,7 +158,8 @@ export function EntrantsEditor({
           Start tournament ({seeds.length} {seeds.length === 1 ? "entrant" : "entrants"})
         </SubmitButton>
         <p className="text-muted-foreground text-xs">
-          Starting saves this order, generates the whole bracket and locks the entrant list.
+          Seed 1 is the favourite; byes go to the top seeds; seeds 1 and 2 can only meet in the final. Starting
+          saves this order, builds the whole bracket and locks the list. {MIN_PLAYERS} to {MAX_PLAYERS} players.
         </p>
       </div>
     </form>
