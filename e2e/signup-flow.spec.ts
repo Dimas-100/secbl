@@ -4,7 +4,7 @@ import { cleanupTracked, serviceClient, trackDisplayName, trackUser } from "./cl
 test.afterEach(cleanupTracked);
 
 // Requires "Confirm email" OFF in Supabase auth settings (signup must return a session).
-test("signup → pending → approve → home", async ({ page }) => {
+test("signup → straight in → home", async ({ page }) => {
   const email = `e2e-${Date.now()}@gmail.com`;
   const displayName = email.slice(0, 40);
   const service = serviceClient();
@@ -22,17 +22,17 @@ test("signup → pending → approve → home", async ({ page }) => {
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', "e2e-password-123!");
   await page.click('button[type="submit"]');
-  await expect(page.getByText(/waiting for admin approval/i)).toBeVisible();
+  // Membership is open: the trigger approves the profile, so Home comes up
+  // straight away with the league's rooms already joined.
+  await expect(page.getByRole("heading", { name: /^recent$/i })).toBeVisible();
 
   const { data: profile } = await service
     .from("profiles")
-    .select("id")
+    .select("id, status")
     .eq("display_name", displayName)
     .single();
-  expect(profile).not.toBeNull();
+  expect(profile?.status).toBe("approved");
   trackUser(profile!.id);
-  await service.from("profiles").update({ status: "approved" }).eq("id", profile!.id);
-
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: /^recent$/i })).toBeVisible();
+  await page.goto("/chat");
+  await expect(page.getByRole("link", { name: /^Everyone/ })).toBeVisible();
 });

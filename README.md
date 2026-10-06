@@ -50,7 +50,7 @@ database from pausing after a quiet week.
 | Path | What |
 |---|---|
 | `app/(public)` | login, signup, password reset |
-| `app/(member)` | everything behind approval: home, log a game, events (+ cups), leaderboard, players, chat, settings, admin |
+| `app/(member)` | everything behind login: home, log a game, events (+ cups), leaderboard, players, chat, settings, admin |
 | `lib/rating.ts`, `lib/bracket.ts`, `lib/events.ts`, `lib/chat.ts`, `lib/inbox.ts`, `lib/report-form.ts`, `lib/race.ts`, `lib/levels.ts`, `lib/push.ts` | pure, test-first logic |
 | `lib/push-send.ts`, `public/sw.js` | Web Push: server-side send (VAPID, service role) and the service worker that shows it |
 | `scripts/seed-school-logos.mjs` | one-off: seeds the schools' logos from Wikimedia Commons into the `school-logos` bucket |

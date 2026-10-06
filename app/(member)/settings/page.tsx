@@ -38,16 +38,6 @@ export default async function SettingsPage({
     .select("messages, matches, events")
     .eq("profile_id", user.id)
     .maybeSingle();
-  // Admins see how many signups are waiting without opening the queue — a
-  // new member left pending for days is the fastest way to lose them.
-  let pending = 0;
-  if (profile?.role === "admin") {
-    const { count } = await supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending");
-    pending = count ?? 0;
-  }
 
   return (
     <main>
@@ -62,17 +52,9 @@ export default async function SettingsPage({
         <ListRow
           href="/admin"
           title="Admin"
-          meta="Approvals, event sources, tournaments"
-          ariaLabel={pending > 0 ? `Admin, ${pending} waiting for approval` : "Admin"}
-          trailing={
-            pending > 0 ? (
-              <span className="bg-brass text-background stat-number rounded-full px-2 py-0.5 text-[11px]">
-                {pending}
-              </span>
-            ) : (
-              <ChevronRight className="text-muted-foreground size-4" strokeWidth={1.7} />
-            )
-          }
+          meta="Members, disputes, event sources, tournaments"
+          ariaLabel="Admin"
+          trailing={<ChevronRight className="text-muted-foreground size-4" strokeWidth={1.7} />}
         />
       )}
 
