@@ -24,6 +24,7 @@ import {
 import { recentOpponents } from "@/lib/report-form";
 import { cn } from "@/lib/utils";
 import { reportMatch } from "./actions";
+import { clearLiveGame, publishLiveGame } from "./live-actions";
 
 const GAME_TYPES = [
   { value: "8ball", label: "8-ball" },
@@ -118,6 +119,16 @@ export function ReportMatchForm({
     }
   }, [draftKey, d]);
 
+  // Everyone on Home sees this table while an opponent is picked (spec §3).
+  // Debounced so a run of taps is one write; a restored draft republishes.
+  useEffect(() => {
+    if (!opponentId) return;
+    const timer = setTimeout(() => {
+      void publishLiveGame({ opponentId, gameType: game, raceTo, spot, spotTo: spotTo === "you" ? "me" : spotTo, you, them });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [opponentId, game, raceTo, spot, spotTo, you, them]);
+
   const selected = opponents.find((o) => o.id === opponentId) ?? null;
   let chips = recentOpponents(recentIds, opponents);
   // A search-picked opponent who isn't a regular still needs a visible,
@@ -171,6 +182,7 @@ export function ReportMatchForm({
     setEditingDate(false);
     setD(freshDraft(today));
     buzzed.current = null;
+    void clearLiveGame();
     try {
       localStorage.removeItem(draftKey);
     } catch {

@@ -69,8 +69,11 @@ export async function reportMatch(formData: FormData) {
     .single();
   if (error || !created) fail(error?.message ?? "Could not save the match");
 
-  // Tell the opponent there is something to confirm.
+  // The table is no longer live once the result is sent.
   const service = createServiceClient();
+  await service.from("live_games").delete().eq("reporter_id", user.id);
+
+  // Tell the opponent there is something to confirm.
   const { data: reporter } = await service.from("profiles").select("display_name").eq("id", user.id).single();
   await notify(service, {
     candidates: [opponentId],

@@ -5,6 +5,8 @@ import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { AvatarStack } from "@/components/avatar-stack";
 import { ActivityRow } from "@/components/activity-row";
 import { ListRow } from "@/components/list-row";
+import { LiveGameCard } from "@/components/live-game-card";
+import { LiveHome } from "@/components/live-home";
 import { MessagesButton } from "@/components/messages-button";
 import { NotifyPrompt } from "@/components/notify-prompt";
 import { SectionHeading } from "@/components/section-heading";
@@ -15,7 +17,8 @@ import { TitleBadge } from "@/components/title-badge";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
-import { FEED_SELECT, type FeedRow } from "@/lib/feed";
+import { FEED_SELECT, one, type FeedPerson, type FeedRow } from "@/lib/feed";
+import { LIVE_STALE_MS } from "@/lib/live";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
 import { xpCaption } from "@/lib/levels";
 import { formatLabel } from "@/lib/race";
@@ -59,6 +62,7 @@ export default async function HomePage({
     { data: scheduledEvents },
     { xp, level },
     openSeason,
+    { data: liveRows },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -103,7 +107,20 @@ export default async function HomePage({
       .limit(5),
     loadXp(supabase, user.id),
     loadOpenSeason(supabase),
+    // Tables being played right now; a board nobody touched for three hours is not.
+    supabase
+      .from("live_games")
+      .select(
+        "reporter_id, opponent_id, game_type, race_to, spot, spot_to, reporter_score, opponent_score, updated_at, reporter:profiles!live_games_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!live_games_opponent_id_fkey(id, display_name, avatar_url, ball)"
+      )
+      .gte("updated_at", new Date(now.getTime() - LIVE_STALE_MS).toISOString())
+      .order("updated_at", { ascending: false }),
   ]);
+  const live = (liveRows ?? []).map((g) => ({
+    ...g,
+    reporter: one(g.reporter as FeedPerson | FeedPerson[] | null),
+    opponent: one(g.opponent as FeedPerson | FeedPerson[] | null),
+  }));
   // Your place in the running season, for the strip under the stats.
   const mine = openSeason ? (await loadSeasonStandings(supabase, openSeason)).find((s) => s.id === user.id) ?? null : null;
 
@@ -166,6 +183,19 @@ export default async function HomePage({
       {message && <p className="bg-card rounded-2xl p-3 text-sm">{message}</p>}
       {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
       <NotifyPrompt />
+      <LiveHome />
+
+      {live.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <span className="eyebrow flex items-center gap-2">
+            <span aria-hidden="true" className="bg-win motion-safe:animate-pulse size-2 rounded-full" />
+            Live now
+          </span>
+          {live.map((g) => (
+            <LiveGameCard key={g.reporter_id} row={g} viewerId={user.id} />
+          ))}
+        </section>
+      )}
 
       <section className="flex flex-col gap-[18px]">
         <span className="eyebrow">Rating · {openSeason?.name ?? seasonLabel(today)}</span>
