@@ -5,6 +5,7 @@ import { AvatarStack } from "@/components/avatar-stack";
 import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
 import { MessagesButton } from "@/components/messages-button";
+import { NotifyPrompt } from "@/components/notify-prompt";
 import { SectionHeading } from "@/components/section-heading";
 import { ShowMore } from "@/components/show-more";
 import { Sparkline } from "@/components/sparkline";
@@ -164,6 +165,7 @@ export default async function HomePage({
 
       {message && <p className="bg-card rounded-2xl p-3 text-sm">{message}</p>}
       {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
+      <NotifyPrompt />
 
       <section className="flex flex-col gap-[18px]">
         <span className="eyebrow">Rating · {seasonLabel(today)}</span>
