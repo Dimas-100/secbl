@@ -35,6 +35,7 @@ export default async function NewDmPage({
       channelType="dm"
       title={other.display_name}
       subtitle="Direct message"
+      otherId={other.id}
       meId={user.id}
       initialMessages={[]}
       initialNames={{ [other.id]: other.display_name, [user.id]: "You" }}

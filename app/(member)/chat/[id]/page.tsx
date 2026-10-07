@@ -65,6 +65,7 @@ export default async function ChatRoomPage({
       channelType={channel.type}
       title={title}
       subtitle={subtitle}
+      otherId={channel.type === "dm" ? others[0]?.profile_id : undefined}
       meId={user.id}
       initialMessages={initialMessages}
       initialNames={names}

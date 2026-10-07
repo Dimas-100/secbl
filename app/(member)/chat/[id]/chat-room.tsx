@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowUp, ChevronLeft, Users } from "lucide-react";
+import { useOnline } from "@/components/presence-provider";
 import { createClient } from "@/lib/supabase/client";
 import {
   formatMessageTime,
@@ -32,6 +33,7 @@ export function ChatRoom({
   channelType,
   title,
   subtitle,
+  otherId,
   meId,
   initialMessages,
   initialNames,
@@ -41,6 +43,9 @@ export function ChatRoom({
   channelType: ChannelType;
   title: string;
   subtitle: string;
+  // The other person in a DM: the header says whether they are in the app
+  // right now, the one place that word helps (are they likely to reply?).
+  otherId?: string;
   meId: string;
   initialMessages: ChatMessage[];
   initialNames: Record<string, string>;
@@ -48,6 +53,7 @@ export function ChatRoom({
   const supabase = createClient();
   const router = useRouter();
   const isDraft = channelId === null;
+  const otherOnline = useOnline(otherId ?? "");
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [names, setNames] = useState<Record<string, string>>(initialNames);
   const [draft, setDraft] = useState("");
@@ -317,7 +323,18 @@ export function ChatRoom({
           <h1 className="truncate text-base font-semibold">{title}</h1>
           <p className="text-muted-foreground flex items-center gap-1 truncate text-[11px]">
             {isGroup && <Users className="size-3" />}
-            {subtitle}
+            {otherId ? (
+              otherOnline ? (
+                <span className="text-win flex items-center gap-1">
+                  <span aria-hidden="true" className="bg-win size-1.5 rounded-full" />
+                  Online
+                </span>
+              ) : (
+                "Offline"
+              )
+            ) : (
+              subtitle
+            )}
             {live === false && <span className="text-brass"> · reconnecting…</span>}
           </p>
         </div>
