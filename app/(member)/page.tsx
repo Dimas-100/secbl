@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { AvatarStack } from "@/components/avatar-stack";
+import { CelebrationCard } from "@/components/celebration-card";
 import { ActivityRow } from "@/components/activity-row";
 import { ListRow } from "@/components/list-row";
 import { LiveGameCard } from "@/components/live-game-card";
@@ -13,18 +14,20 @@ import { SectionHeading } from "@/components/section-heading";
 import { ShowMore } from "@/components/show-more";
 import { Sparkline } from "@/components/sparkline";
 import { StatGrid, StatTile } from "@/components/stat-tile";
+import { StreakFlame } from "@/components/streak-flame";
 import { TitleBadge } from "@/components/title-badge";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
+import { freshMatch, headline } from "@/lib/celebration";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { FEED_SELECT, one, type FeedPerson, type FeedRow } from "@/lib/feed";
 import { LIVE_STALE_MS } from "@/lib/live";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
-import { xpCaption } from "@/lib/levels";
+import { xpCaption, type TitleName } from "@/lib/levels";
 import { formatLabel } from "@/lib/race";
 import { seasonCountdownLabel } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
-import { overallRank, ratingChangeSince, seasonLabel, winRate } from "@/lib/stats";
+import { currentStreak, overallRank, ratingChangeSince, seasonLabel, winRate, type StatMatch } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { loadXp } from "@/lib/xp-data";
 import type { RsvpResponse } from "@/lib/types";
@@ -63,6 +66,7 @@ export default async function HomePage({
     { xp, level },
     openSeason,
     { data: liveRows },
+    { data: myMatches },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -115,7 +119,58 @@ export default async function HomePage({
       )
       .gte("updated_at", new Date(now.getTime() - LIVE_STALE_MS).toISOString())
       .order("updated_at", { ascending: false }),
+    // Your newest confirmed games: the streak flame and the result card.
+    supabase
+      .from("matches")
+      .select(
+        "id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, confirmed_at, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
+      )
+      .eq("status", "confirmed")
+      .or(`reporter_id.eq.${user.id},opponent_id.eq.${user.id}`)
+      .order("confirmed_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(30),
   ]);
+  const mine30 = (myMatches ?? []) as (StatMatch & { reporter: unknown; opponent: unknown })[];
+  const streak = currentStreak(mine30, user.id);
+  const streakLength = streak?.kind === "W" ? streak.length : 0;
+
+  // The result card: the newest confirmed game in the last day, with what it
+  // did to the rating and XP, and the badge or streak mark it caused.
+  const fresh = freshMatch(mine30, now);
+  let celebration: React.ComponentProps<typeof CelebrationCard> | null = null;
+  if (fresh) {
+    const [{ data: hist }, { data: moments }] = await Promise.all([
+      supabase
+        .from("rating_history")
+        .select("rating_before, rating_after")
+        .eq("match_id", fresh.id)
+        .eq("profile_id", user.id)
+        .maybeSingle(),
+      supabase.from("activity").select("kind, data").eq("match_id", fresh.id).eq("actor_id", user.id),
+    ]);
+    const opponentRaw = fresh.reporter_id === user.id ? fresh.opponent : fresh.reporter;
+    const opponent = one(opponentRaw as FeedPerson | FeedPerson[] | null);
+    const badgeRow = (moments ?? []).find((r) => r.kind === "badge");
+    const streakRow = (moments ?? []).find((r) => r.kind === "streak");
+    if (hist && opponent) {
+      celebration = {
+        matchId: fresh.id,
+        won: fresh.winner_id === user.id,
+        headline: headline(fresh, user.id, opponent.display_name),
+        opponent,
+        ratingBefore: hist.rating_before,
+        ratingAfter: hist.rating_after,
+        xpEarned: xp.perMatch.get(fresh.id) ?? 0,
+        xpCapped: xp.capped.has(fresh.id),
+        level: level.level,
+        intoLevel: level.intoLevel,
+        needed: level.needed,
+        badge: badgeRow ? (String((badgeRow.data as { title?: string }).title) as TitleName) : null,
+        streak: streakRow ? Number((streakRow.data as { length?: number }).length) : null,
+      };
+    }
+  }
   const live = (liveRows ?? []).map((g) => ({
     ...g,
     reporter: one(g.reporter as FeedPerson | FeedPerson[] | null),
@@ -174,6 +229,7 @@ export default async function HomePage({
             <span className="flex items-center gap-1.5 text-[16px] font-medium">
               {first}
               <TitleBadge title={level.title} size={20} />
+              <StreakFlame length={streakLength} />
             </span>
           </span>
         </Link>
@@ -182,6 +238,7 @@ export default async function HomePage({
 
       {message && <p className="bg-card rounded-2xl p-3 text-sm">{message}</p>}
       {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
+      {celebration && <CelebrationCard {...celebration} />}
       <NotifyPrompt />
       <LiveHome />
 

@@ -71,6 +71,14 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
   await expect(pageB.getByText("Race to 3 · 1 on the wire to you")).toBeVisible();
   await pageB.getByRole("button", { name: "Confirm" }).click();
   await expect(pageB.getByText(/ratings updated/i)).toBeVisible();
+  // The result card: the loser's side, their rating change and XP, dismissable.
+  const card = pageB.getByRole("region", { name: "Latest result" });
+  await expect(card.getByRole("heading", { name: "Lost 1–3 vs E2E" })).toBeVisible();
+  await expect(card.getByText("+80 XP")).toBeVisible();
+  await card.getByRole("button", { name: "Nice" }).click();
+  await expect(card).toHaveCount(0);
+  await pageB.reload();
+  await expect(pageB.getByRole("region", { name: "Latest result" })).toHaveCount(0);
   await pageB.goto(`/players/${weak.id}`);
   await expect(pageB.getByText(/race to 3 · 1 spot/)).toBeVisible();
 
