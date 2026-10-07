@@ -15,14 +15,18 @@ export async function publishLiveGame(input: LiveInput): Promise<{ error: string
     if (!user) return { error: "Please log in again." };
     const problem = validateLive(input, user.id);
     if (problem) return { error: problem };
+    // The write goes through the service role (live_games has no client
+    // write policy), so membership is checked here: a suspended account must
+    // not be able to put a table on everyone's Home.
     const service = createServiceClient();
-    const { data: opponent } = await service
+    const { data: people } = await service
       .from("profiles")
       .select("id")
-      .eq("id", input.opponentId)
-      .eq("status", "approved")
-      .maybeSingle();
-    if (!opponent) return { error: "Opponent not found" };
+      .in("id", [user.id, input.opponentId])
+      .eq("status", "approved");
+    const approved = new Set((people ?? []).map((p) => p.id as string));
+    if (!approved.has(user.id)) return { error: "Your account is not active." };
+    if (!approved.has(input.opponentId)) return { error: "Opponent not found" };
     const { error } = await service.from("live_games").upsert(
       {
         reporter_id: user.id,
