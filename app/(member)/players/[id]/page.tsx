@@ -148,6 +148,11 @@ export default async function PlayerPage({
   const lastMeeting =
     viewerId && !isMe ? all.find((m) => [m.reporter_id, m.opponent_id].includes(viewerId)) : undefined;
   const today = clubDateOf(now.toISOString());
+  const { count: seasonsWon } = await supabase
+    .from("seasons")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "closed")
+    .eq("champion_id", id);
   const achievements = earnedAchievements({
     viewerId: id,
     rating: profile.rating,
@@ -155,6 +160,7 @@ export default async function PlayerPage({
     matches: all,
     opponentRatings: ratingsById,
     tournamentsWon: titles ?? 0,
+    seasonsWon: seasonsWon ?? 0,
   });
   const nextAchievement = ACHIEVEMENTS.find((a) => !achievements.some((e) => e.id === a.id));
   const firstName = profile.display_name.split(" ")[0];

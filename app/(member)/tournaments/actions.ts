@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { recordMatchMoments } from "@/lib/activity-write";
 import { generateSingleElim, MAX_PLAYERS, MIN_PLAYERS } from "@/lib/bracket";
 import { clubDateOf } from "@/lib/events";
 import { buildRecomputePayload } from "@/lib/recompute";
@@ -197,6 +198,7 @@ export async function recordResult(formData: FormData) {
     ...payload,
   });
   if (error) fail(error.message);
+  await recordMatchMoments(service, matchId);
 
   revalidatePath(`/tournaments/${tournamentId}`);
   revalidatePath("/leaderboard");

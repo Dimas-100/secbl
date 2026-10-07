@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { AvatarStack } from "@/components/avatar-stack";
+import { ActivityRow } from "@/components/activity-row";
 import { ListRow } from "@/components/list-row";
-import { MatchRow } from "@/components/match-row";
+import { LiveGameCard } from "@/components/live-game-card";
+import { LiveHome } from "@/components/live-home";
 import { MessagesButton } from "@/components/messages-button";
 import { NotifyPrompt } from "@/components/notify-prompt";
 import { SectionHeading } from "@/components/section-heading";
@@ -14,11 +17,14 @@ import { TitleBadge } from "@/components/title-badge";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
-import { winnerDelta } from "@/lib/form";
+import { FEED_SELECT, one, type FeedPerson, type FeedRow } from "@/lib/feed";
+import { LIVE_STALE_MS } from "@/lib/live";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
 import { xpCaption } from "@/lib/levels";
-import { formatLabel, formatShort } from "@/lib/race";
-import { labelPlayedDate, overallRank, ratingChangeSince, seasonLabel, winRate } from "@/lib/stats";
+import { formatLabel } from "@/lib/race";
+import { seasonCountdownLabel } from "@/lib/season";
+import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
+import { overallRank, ratingChangeSince, seasonLabel, winRate } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { loadXp } from "@/lib/xp-data";
 import type { RsvpResponse } from "@/lib/types";
@@ -52,9 +58,11 @@ export default async function HomePage({
     { data: history },
     { data: toConfirm },
     { data: awaiting },
-    { data: recent },
+    { data: feed },
     { data: scheduledEvents },
     { xp, level },
+    openSeason,
+    { data: liveRows },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -84,15 +92,8 @@ export default async function HomePage({
       .eq("reporter_id", user.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
-    supabase
-      .from("matches")
-      .select(
-        "id, reporter_id, reporter_score, opponent_score, game_type, played_at, winner_id, race_to, spot, spot_to, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
-      )
-      .eq("status", "confirmed")
-      .order("played_at", { ascending: false })
-      .order("confirmed_at", { ascending: false })
-      .limit(30),
+    // The league feed: results, badges, streaks, passes, cups, seasons, joins.
+    supabase.from("activity").select(FEED_SELECT).order("created_at", { ascending: false }).limit(30),
     // Bound the fetch, but let partitionEvents make the actual upcoming/past
     // call so the home card and the calendar can never disagree.
     supabase
@@ -105,7 +106,23 @@ export default async function HomePage({
       .order("starts_at")
       .limit(5),
     loadXp(supabase, user.id),
+    loadOpenSeason(supabase),
+    // Tables being played right now; a board nobody touched for three hours is not.
+    supabase
+      .from("live_games")
+      .select(
+        "reporter_id, opponent_id, game_type, race_to, spot, spot_to, reporter_score, opponent_score, updated_at, reporter:profiles!live_games_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!live_games_opponent_id_fkey(id, display_name, avatar_url, ball)"
+      )
+      .gte("updated_at", new Date(now.getTime() - LIVE_STALE_MS).toISOString())
+      .order("updated_at", { ascending: false }),
   ]);
+  const live = (liveRows ?? []).map((g) => ({
+    ...g,
+    reporter: one(g.reporter as FeedPerson | FeedPerson[] | null),
+    opponent: one(g.opponent as FeedPerson | FeedPerson[] | null),
+  }));
+  // Your place in the running season, for the strip under the stats.
+  const mine = openSeason ? (await loadSeasonStandings(supabase, openSeason)).find((s) => s.id === user.id) ?? null : null;
 
   const rating = me?.rating ?? 450;
   const played = me?.matches_played ?? 0;
@@ -166,9 +183,22 @@ export default async function HomePage({
       {message && <p className="bg-card rounded-2xl p-3 text-sm">{message}</p>}
       {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
       <NotifyPrompt />
+      <LiveHome />
+
+      {live.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <span className="eyebrow flex items-center gap-2">
+            <span aria-hidden="true" className="bg-win motion-safe:animate-pulse size-2 rounded-full" />
+            Live now
+          </span>
+          {live.map((g) => (
+            <LiveGameCard key={g.reporter_id} row={g} viewerId={user.id} />
+          ))}
+        </section>
+      )}
 
       <section className="flex flex-col gap-[18px]">
-        <span className="eyebrow">Rating · {seasonLabel(today)}</span>
+        <span className="eyebrow">Rating · {openSeason?.name ?? seasonLabel(today)}</span>
         <div className="flex items-end justify-between gap-4">
           <span className="hero-number">{rating}</span>
           {change !== null && (
@@ -192,6 +222,23 @@ export default async function HomePage({
             note={`${Math.round((level.intoLevel / level.needed) * 100)}% to ${level.level + 1}`}
           />
         </StatGrid>
+        {openSeason && mine && (
+          <Link
+            href="/leaderboard?tab=season"
+            className="press bg-card flex items-center justify-between gap-3 rounded-[20px] px-5 py-4 shadow-[inset_0_0_0_1px_var(--hairline-row)]"
+          >
+            <span className="flex min-w-0 flex-col gap-1.5">
+              <span className="eyebrow">{openSeason.name}</span>
+              <span className="stat-number text-[20px] leading-none">
+                {mine.played > 0 ? `#${mine.rank} · ${mine.points} pts` : "No games yet"}
+              </span>
+            </span>
+            <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-[12px]">
+              {seasonCountdownLabel(openSeason, today)}
+              <ChevronRight className="size-4" strokeWidth={1.7} />
+            </span>
+          </Link>
+        )}
       </section>
 
       {(toConfirm ?? []).length > 0 && (
@@ -294,7 +341,7 @@ export default async function HomePage({
 
       <section className="flex flex-col gap-1.5">
         <SectionHeading action={{ href: `/players/${user.id}`, label: "All games" }}>Recent</SectionHeading>
-        {(recent ?? []).length === 0 && (
+        {(feed ?? []).length === 0 && (
           <p className="text-muted-foreground py-6 text-center text-sm">
             No results yet this season.{" "}
             <Link href="/matches/new" className="text-brass">
@@ -303,28 +350,17 @@ export default async function HomePage({
           </p>
         )}
         <ShowMore
-          label="Show {hidden} more games"
-          items={(recent ?? []).map((m) => {
-          const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
-          const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
-          const reporterWon = m.winner_id === reporter?.id;
-          return (
-            <MatchRow
-              key={m.id}
-              winner={reporterWon ? reporter : opponent}
-              loser={reporterWon ? opponent : reporter}
-              winnerScore={Math.max(m.reporter_score, m.opponent_score)}
-              loserScore={Math.min(m.reporter_score, m.opponent_score)}
-              delta={winnerDelta(m)}
+          label="Show {hidden} more"
+          items={((feed ?? []) as unknown as FeedRow[]).map((row) => (
+            <ActivityRow
+              key={row.id}
+              row={row}
               viewerId={user.id}
-              perspectiveId={user.id}
-              gameType={GAME_LABEL[m.game_type] ?? m.game_type}
-              format={formatShort(m.race_to, m.spot)}
-              meta={labelPlayedDate(m.played_at, today)}
-              caption={xpCaption(m.id, xp)}
+              today={today}
+              now={now}
+              caption={row.match_id ? xpCaption(row.match_id, xp) : undefined}
             />
-          );
-          })}
+          ))}
         />
       </section>
     </main>

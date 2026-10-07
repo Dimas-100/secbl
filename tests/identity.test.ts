@@ -47,6 +47,7 @@ describe("earnedAchievements", () => {
     matches: [],
     opponentRatings: {},
     tournamentsWon: 0,
+    seasonsWon: 0,
   };
   const win = (id: string, opp: string, mine = 5, theirs = 3) => ({
     id,

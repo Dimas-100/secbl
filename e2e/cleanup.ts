@@ -20,6 +20,12 @@ const displayNames = new Set<string>();
 const eventTitles = new Set<string>();
 const tournamentNames = new Set<string>();
 const sourceNames = new Set<string>();
+const seasonNames = new Set<string>();
+
+/** Delete any season with this (unique per run) name; its feed rows cascade. */
+export function trackSeasonName(name: string) {
+  seasonNames.add(name);
+}
 
 /** Delete any event source with this (unique per run) name, and the events it imported. */
 export function trackSourceName(name: string) {
@@ -102,6 +108,12 @@ export async function cleanupTracked() {
       await service.from("event_sources").delete().eq("id", s.id);
     }
   }
+  // A season's created_by/champion_id null out on user delete, so this is
+  // tidiness, not a blocker — but a leaked test season would sit on every
+  // real member's Season tab.
+  for (const name of seasonNames) {
+    await service.from("seasons").delete().eq("name", name);
+  }
   // Messages and memberships cascade from the user, but a DM channel does
   // not (it belongs to the pair), so it would survive as an empty room.
   for (const id of userIds) {
@@ -134,4 +146,5 @@ export async function cleanupTracked() {
   eventTitles.clear();
   tournamentNames.clear();
   sourceNames.clear();
+  seasonNames.clear();
 }

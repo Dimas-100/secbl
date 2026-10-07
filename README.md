@@ -33,6 +33,15 @@ Web Push (VAPID) · Vitest · Playwright · Vercel
   bracket with byes to the top seeds, and score each match on its own sheet with rails toward the
   cup's race length. Members watch the bracket update live. Results are real rated games; wrong
   scores can be fixed and wrong winners voided, with the ladder replayed.
+- **Seasons.** An admin opens a semester; every confirmed game earns 3 points for a win and 1 for a
+  loss on a scoreboard that resets when the admin ends it, crowning a champion. Ratings and XP are
+  never reset. A reminder goes out a week before a planned end.
+- **Activity feed.** Home shows the league as it happens: results, badges unlocked, win streaks,
+  ladder passes into the top 10, cups starting and finishing, seasons opening and closing, new
+  members. Written by database triggers and stored with the match that caused them, so a voided
+  result takes its moments with it. Updates live.
+- **Live now.** A scoreboard being played publishes itself: everyone on Home sees the table, the
+  score and the rails move, and it disappears when the result is sent.
 - **Events and RSVP**, including feeds synced from school calendars.
 - **Chat.** League room, a room per school, and direct messages that don't exist until the first
   message is sent. Inbox ordered by latest activity and re-sorted live.
@@ -98,7 +107,8 @@ schedules a daily health check that keeps a free-tier database from pausing, and
 |---|---|
 | `app/(public)` | login, signup (tap-your-school picker), password reset, install guide and invitation card |
 | `app/(member)` | everything behind login: home, log a game, events (+ cups), leaderboard, players, chat, settings, admin |
-| `lib/rating.ts`, `lib/bracket.ts`, `lib/seeding.ts`, `lib/race.ts`, `lib/levels.ts`, `lib/chat.ts`, `lib/inbox.ts`, `lib/push.ts`, `lib/events.ts` | pure, test-first logic |
+| `lib/rating.ts`, `lib/bracket.ts`, `lib/seeding.ts`, `lib/race.ts`, `lib/levels.ts`, `lib/season.ts`, `lib/activity.ts`, `lib/feed.ts`, `lib/live.ts`, `lib/chat.ts`, `lib/inbox.ts`, `lib/push.ts`, `lib/events.ts` | pure, test-first logic |
+| `lib/activity-write.ts`, `lib/season-data.ts`, `lib/season-tick.ts` | server-side feed moments, season loaders, the daily season reminder (runs from `/api/health`) |
 | `lib/push-send.ts`, `public/sw.js` | Web Push: server-side send (VAPID, service role) and the service worker that shows it |
 | `supabase/migrations` | schema, RLS, SECURITY DEFINER functions (the only write path for ratings, brackets, membership) |
 | `docs/superpowers/specs` | design specs per feature; `plans/` the implementation plans |
@@ -114,6 +124,11 @@ schedules a daily health check that keeps a free-tier database from pausing, and
 - Chat DMs are visible to exactly the two participants — admins included out.
 - PostgREST caps every response at the project's Max Rows (1000) whatever `.range()` asks for.
   Whole-table scans page through `lib/paging.ts`.
+- Seasons never touch ratings or XP. A match belongs to a season by `played_at`; nothing is stamped
+  on it. Only `open_season` / `close_season` write the `seasons` table, and only one can be open.
+- The activity feed is written by triggers on `matches`, `tournaments`, `tournament_matches` and
+  `profiles`, by the season functions, and by the service role after a confirmation (badge, streak,
+  pass). Every derived row carries its `match_id`, so leaving `confirmed` deletes them all.
 - Push notifications are a courtesy, never part of the write: every trigger runs after the row is
   saved and swallows its own failures. A message's push is claimed by stamping
   `messages.notified_at` first, so it can only fire once.

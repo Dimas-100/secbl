@@ -21,9 +21,11 @@ import {
   type RaceState,
   type Side,
 } from "@/lib/race";
+import { isFresh } from "@/lib/live";
 import { recentOpponents } from "@/lib/report-form";
 import { cn } from "@/lib/utils";
 import { reportMatch } from "./actions";
+import { clearLiveGame, publishLiveGame } from "./live-actions";
 
 const GAME_TYPES = [
   { value: "8ball", label: "8-ball" },
@@ -108,6 +110,10 @@ export function ReportMatchForm({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const buzzed = useRef<Side | null>(null);
+  // The pending live publish, so Send can cancel it: a publish landing after
+  // the report's delete would leave a finished table on everyone's Home.
+  const publishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sent = useRef(false);
 
   // Mirror every change so a locked phone does not lose the race.
   useEffect(() => {
@@ -117,6 +123,23 @@ export function ReportMatchForm({
       // Private mode or blocked storage: the form still works, it just forgets.
     }
   }, [draftKey, d]);
+
+  // Everyone on Home sees this table while an opponent is picked (spec §3).
+  // Debounced so a run of taps is one write; a restored draft republishes.
+  useEffect(() => {
+    if (!opponentId || sent.current) return;
+    // A draft restored hours later is a memory, not a table being played:
+    // it goes live again only once someone touches it (every patch bumps `at`).
+    if (!isFresh(new Date(d.at).toISOString(), new Date())) return;
+    publishTimer.current = setTimeout(() => {
+      publishTimer.current = null;
+      if (sent.current) return;
+      void publishLiveGame({ opponentId, gameType: game, raceTo, spot, spotTo: spotTo === "you" ? "me" : spotTo, you, them });
+    }, 600);
+    return () => {
+      if (publishTimer.current) clearTimeout(publishTimer.current);
+    };
+  }, [opponentId, game, raceTo, spot, spotTo, you, them, d.at]);
 
   const selected = opponents.find((o) => o.id === opponentId) ?? null;
   let chips = recentOpponents(recentIds, opponents);
@@ -171,6 +194,7 @@ export function ReportMatchForm({
     setEditingDate(false);
     setD(freshDraft(today));
     buzzed.current = null;
+    void clearLiveGame();
     try {
       localStorage.removeItem(draftKey);
     } catch {
@@ -211,6 +235,8 @@ export function ReportMatchForm({
     <form
       action={reportMatch}
       onSubmit={() => {
+        sent.current = true;
+        if (publishTimer.current) clearTimeout(publishTimer.current);
         try {
           localStorage.removeItem(draftKey);
         } catch {

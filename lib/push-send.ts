@@ -2,6 +2,7 @@
 // import from a client component.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
+import { fetchAllPages } from "@/lib/paging";
 import { recipientsFor, type Prefs, type PushCategory, type PushPayload } from "@/lib/push";
 
 // The sending half of push. Service-role only: it reads other members'
@@ -72,7 +73,7 @@ export async function loadPrefs(
 ): Promise<{ profile_id: string; prefs: Prefs | null; approved: boolean }[]> {
   if (ids.length === 0) return [];
   const [{ data: prefRows }, { data: approvedRows }] = await Promise.all([
-    service.from("notification_prefs").select("profile_id, messages, matches, events").in("profile_id", ids),
+    service.from("notification_prefs").select("profile_id, messages, matches, events, league").in("profile_id", ids),
     service.from("profiles").select("id").in("id", ids).eq("status", "approved"),
   ]);
   const byId = new Map((prefRows ?? []).map((p) => [p.profile_id as string, p as Prefs & { profile_id: string }]));
@@ -81,7 +82,7 @@ export async function loadPrefs(
     const p = byId.get(id);
     return {
       profile_id: id,
-      prefs: p ? { messages: p.messages, matches: p.matches, events: p.events } : null,
+      prefs: p ? { messages: p.messages, matches: p.matches, events: p.events, league: p.league } : null,
       approved: approved.has(id),
     };
   });
@@ -98,6 +99,28 @@ export async function notify(
     await sendPush(service, ids, input.payload);
   } catch (err) {
     console.warn("push: notify failed", err);
+  }
+}
+
+// Every approved member, for league-wide news (a season opening or closing).
+// Paged: PostgREST caps a response at the project's max rows.
+export async function notifyAllMembers(
+  service: SupabaseClient,
+  input: { category: PushCategory; excludeId: string | null; payload: PushPayload }
+): Promise<void> {
+  try {
+    const ids = await fetchAllPages<{ id: string }>((from, to) =>
+      service
+        .from("profiles")
+        .select("id")
+        .eq("status", "approved")
+        .order("id")
+        .range(from, to)
+        .then(({ data }) => (data ?? []) as { id: string }[])
+    );
+    await notify(service, { candidates: ids.map((p) => p.id), ...input });
+  } catch (err) {
+    console.warn("push: notifyAllMembers failed", err);
   }
 }
 

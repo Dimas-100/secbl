@@ -1,12 +1,14 @@
 // Push notifications — the pure half (docs/superpowers/specs/2026-10-06-live-club-design.md §2).
 // Who gets what, and the words. Sending lives in lib/push-send.ts (server only).
+import { formatClubDate } from "@/lib/season";
 
-export type PushCategory = "messages" | "matches" | "events";
+export type PushCategory = "messages" | "matches" | "events" | "league";
 
 export interface Prefs {
   messages: boolean;
   matches: boolean;
   events: boolean;
+  league: boolean;
 }
 
 export interface PushPayload {
@@ -159,5 +161,47 @@ export function eventPayload(input: { eventId: string; title: string; when: stri
     url: `/events/${input.eventId}`,
     tag: `event:${input.eventId}`,
     category: "events",
+  };
+}
+
+// Season news (spec 2026-10-06-seasons-feed-live §4), category "league".
+export function seasonOpenedPayload(input: { seasonId: string; name: string; endsOn: string | null }): PushPayload {
+  return {
+    title: `${input.name} has begun`,
+    body: `3 points a win, 1 a loss. ${input.endsOn ? `Ends ${formatClubDate(input.endsOn)}.` : "No end date yet."}`,
+    url: "/leaderboard?tab=season",
+    tag: `season:${input.seasonId}`,
+    category: "league",
+  };
+}
+
+export function seasonWeekLeftPayload(input: {
+  seasonId: string;
+  name: string;
+  leaderName: string | null;
+  leaderPoints: number;
+}): PushPayload {
+  const lead = input.leaderName ? `${first(input.leaderName)} leads with ${input.leaderPoints} pts. ` : "";
+  return {
+    title: `One week left in ${input.name}`,
+    body: `${lead}Every game counts.`,
+    url: "/leaderboard?tab=season",
+    tag: `season:${input.seasonId}`,
+    category: "league",
+  };
+}
+
+export function seasonClosedPayload(input: {
+  seasonId: string;
+  name: string;
+  championName: string | null;
+  points: number;
+}): PushPayload {
+  return {
+    title: `${input.name} is in the books`,
+    body: input.championName ? `${first(input.championName)} is champion with ${input.points} pts.` : "No games were played.",
+    url: `/leaderboard?tab=season&season=${input.seasonId}`,
+    tag: `season:${input.seasonId}`,
+    category: "league",
   };
 }

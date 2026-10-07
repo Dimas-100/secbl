@@ -8,12 +8,18 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/server";
 import { SubmitButton } from "@/components/submit-button";
 import { SchoolLogoUploader } from "./school-logo-uploader";
-import { formatEventWhen } from "@/lib/events";
+import { EndSeasonButton } from "./end-season-button";
+import { clubDateOf, formatEventWhen } from "@/lib/events";
 import { formatLabel } from "@/lib/race";
+import { formatClubDate, nextSeasonStart, seasonChampion, seasonCountdownLabel } from "@/lib/season";
+import { loadOpenSeason, loadSeasonStandings, loadSeasons } from "@/lib/season-data";
+import { seasonLabel } from "@/lib/stats";
 import {
   addEventSource,
   adminRejectMatch,
   adminResolveMatch,
+  endSeason,
+  openSeason,
   reinstateProfile,
   removeEventSource,
   suspendProfile,
@@ -84,6 +90,27 @@ export default async function AdminPage({
     importedBySource.set(row.source_id, (importedBySource.get(row.source_id) ?? 0) + 1);
   }
 
+  // The season card: who leads, how many are on the board, and how many
+  // reports played inside the season still wait on a confirmation.
+  const today = clubDateOf(new Date().toISOString());
+  const season = await loadOpenSeason(supabase);
+  // The next season may not start on the day the last one ended.
+  const lastClosed = season ? null : (await loadSeasons(supabase)).find((s) => s.status === "closed") ?? null;
+  const defaultStart = nextSeasonStart(lastClosed?.ends_on ?? null, today);
+  const standings = season ? await loadSeasonStandings(supabase, season) : [];
+  const leader = seasonChampion(standings);
+  const onBoard = standings.filter((s) => s.played > 0).length;
+  let pendingCount = 0;
+  if (season) {
+    let pending = supabase
+      .from("matches")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .gte("played_at", season.starts_on);
+    if (season.ends_on) pending = pending.lte("played_at", season.ends_on);
+    pendingCount = (await pending).count ?? 0;
+  }
+
   const { data: disputed } = await supabase
     .from("matches")
     .select(
@@ -102,6 +129,56 @@ export default async function AdminPage({
       {error && (
         <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
       )}
+      <Card>
+        <CardHeader>
+          <SectionLabel>Season</SectionLabel>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {season ? (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[16px] font-medium">{season.name}</span>
+                  <span className="text-muted-foreground text-[12px]">
+                    Started {formatClubDate(season.starts_on)}
+                    {season.ends_on ? ` · ends ${formatClubDate(season.ends_on)}` : " · no end date"} ·{" "}
+                    {seasonCountdownLabel(season, today)}
+                  </span>
+                  <span className="text-muted-foreground text-[12px]">
+                    {onBoard} on the board
+                    {leader ? ` · ${leader.display_name} leads with ${leader.points} pts` : ""}
+                    {pendingCount > 0 ? ` · ${pendingCount} awaiting confirmation` : ""}
+                  </span>
+                </div>
+                <form action={endSeason}>
+                  <input type="hidden" name="season_id" value={season.id} />
+                  <EndSeasonButton name={season.name} pending={pendingCount} />
+                </form>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Ending crowns the leader, posts the final standings to Home and tells every member.
+                Ratings and XP are untouched.
+              </p>
+            </>
+          ) : (
+            <form action={openSeason} className="flex flex-col gap-3">
+              <p className="text-muted-foreground text-sm">
+                No season is running. Open one and every confirmed game earns 3 points for a win and 1
+                for a loss until you end it.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr]">
+                <Input name="season_name" defaultValue={seasonLabel(today)} aria-label="Season name" required />
+                <Input type="date" name="starts_on" defaultValue={defaultStart} aria-label="Start date" required />
+                <Input type="date" name="ends_on" aria-label="Planned end (optional)" />
+              </div>
+              <SubmitButton size="sm" pendingChildren="Opening…">
+                Open season
+              </SubmitButton>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <SectionLabel>Schools</SectionLabel>

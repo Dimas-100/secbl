@@ -13,6 +13,7 @@ const CATEGORIES: { key: keyof Prefs; label: string; hint: string }[] = [
   { key: "messages", label: "Messages", hint: "DMs and the rooms you're in" },
   { key: "matches", label: "Matches", hint: "Games reported to you, confirmations, disputes" },
   { key: "events", label: "Events", hint: "New events on the calendar" },
+  { key: "league", label: "League", hint: "Season news" },
 ];
 
 // One master switch (the push subscription itself) and three category

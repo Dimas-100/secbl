@@ -4,11 +4,14 @@ import { Avatar } from "@/components/avatar";
 import { ListRow } from "@/components/list-row";
 import { PageHeader } from "@/components/page-header";
 import { SchoolMark, type SchoolMarkSchool } from "@/components/school-mark";
+import { SectionHeading } from "@/components/section-heading";
 import { Segmented } from "@/components/segmented";
 import { TitleBadge } from "@/components/title-badge";
 import { UnderlineTabs } from "@/components/underline-tabs";
 import { createClient } from "@/lib/supabase/server";
 import { clubDateOf } from "@/lib/events";
+import { formatClubDate, seasonCountdownLabel, seasonProgress } from "@/lib/season";
+import { loadOpenSeason, loadSeasonStandings, loadSeasons } from "@/lib/season-data";
 import { movementSince, seasonLabel } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { levelOf, loadAllLevels } from "@/lib/xp-data";
@@ -58,11 +61,10 @@ const PODIUM_RING = ["var(--podium-1)", "var(--podium-2)", "var(--podium-3)"];
 export default async function LeaderboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ scope?: string; tab?: string }>;
+  searchParams: Promise<{ scope?: string; tab?: string; season?: string }>;
 }) {
-  const { scope: rawScope, tab: rawTab } = await searchParams;
+  const { scope: rawScope, tab: rawTab, season: rawSeason } = await searchParams;
   const scope = rawScope === "school" ? "school" : "all";
-  const tab = rawTab === "schools" ? "schools" : "players";
   const supabase = await createClient();
   const {
     data: { user },
@@ -73,9 +75,10 @@ export default async function LeaderboardPage({
   // rejects the latter in a component.
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 86_400_000).toISOString();
-  const [{ data: me }, { data: rows }, { data: weekHistory }, { data: schoolStats }, { data: schools }, levels] =
+  const today = clubDateOf(now.toISOString());
+  const [{ data: me }, { data: rows }, { data: weekHistory }, { data: schoolStats }, { data: schools }, levels, openSeason, seasons] =
     await Promise.all([
-      supabase.from("profiles").select("schools(short_name)").eq("id", user.id).single(),
+      supabase.from("profiles").select("role, schools(short_name)").eq("id", user.id).single(),
       supabase.from("leaderboard").select("*"),
       supabase
         .from("rating_history")
@@ -84,10 +87,32 @@ export default async function LeaderboardPage({
       supabase.from("school_stats").select("id, name, short_name, member_count, avg_rating, wins, losses"),
       supabase.from("schools").select("id, short_name, primary_color, logo_url"),
       loadAllLevels(supabase),
+      loadOpenSeason(supabase),
+      loadSeasons(supabase),
     ]);
   const mySchool = (Array.isArray(me?.schools) ? me.schools[0] : me?.schools)?.short_name;
+  const isAdmin = me?.role === "admin";
+
+  // Season is the tab people race for, so it leads while one is open; a
+  // closed season is reachable by id from the Past seasons list.
+  const tab =
+    rawTab === "schools"
+      ? "schools"
+      : rawTab === "players"
+        ? "players"
+        : rawTab === "season"
+          ? "season"
+          : openSeason
+            ? "season"
+            : "players";
+  const viewed = rawSeason ? (seasons.find((s) => s.id === rawSeason) ?? null) : openSeason;
+  const standings = tab === "season" && viewed ? await loadSeasonStandings(supabase, viewed) : [];
+  const champion = viewed?.champion_id ? (standings.find((s) => s.id === viewed.champion_id) ?? null) : null;
+  const progress = viewed && viewed.status === "open" ? seasonProgress(viewed, today) : null;
+  const past = seasons.filter((s) => s.status === "closed" && s.id !== viewed?.id);
 
   const allRows = (rows ?? []) as Row[];
+  const peopleById: Record<string, Row> = Object.fromEntries(allRows.map((r) => [r.id, r]));
   const visible =
     scope === "school" && mySchool ? allRows.filter((r) => r.school_short_name === mySchool) : allRows;
   const current = Object.fromEntries(visible.map((r) => [r.id, r.rating]));
@@ -106,15 +131,142 @@ export default async function LeaderboardPage({
 
   return (
     <main className="flex flex-col gap-7">
-      <PageHeader overline={seasonLabel(clubDateOf(now.toISOString()))} title="Leaderboard" />
+      <PageHeader overline={openSeason?.name ?? seasonLabel(today)} title="Leaderboard" />
       <UnderlineTabs
         ariaLabel="Leaderboard type"
         value={tab}
         options={[
-          { value: "players", label: "Players", href: scope === "school" ? "/leaderboard?scope=school" : "/leaderboard" },
+          { value: "season", label: "Season", href: "/leaderboard?tab=season" },
+          {
+            value: "players",
+            label: "Players",
+            href: scope === "school" ? "/leaderboard?tab=players&scope=school" : "/leaderboard?tab=players",
+          },
           { value: "schools", label: "Schools", href: "/leaderboard?tab=schools" },
         ]}
       />
+
+      {tab === "season" && (
+        <div className="flex flex-col gap-6">
+          {!viewed && (
+            <p className="text-muted-foreground py-10 text-center text-sm">
+              No season running yet.
+              {isAdmin && (
+                <>
+                  {" "}
+                  <Link href="/admin" className="text-brass">
+                    Open one from Admin.
+                  </Link>
+                </>
+              )}
+            </p>
+          )}
+          {viewed && (
+            <>
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="eyebrow">{viewed.name}</span>
+                  <span className="text-muted-foreground text-[12px]">{seasonCountdownLabel(viewed, today)}</span>
+                </div>
+                {progress !== null && (
+                  <div className="bg-hairline-divider h-0.5">
+                    <div className="bg-brass h-full" style={{ width: `${Math.round(progress * 100)}%` }} />
+                  </div>
+                )}
+                {viewed.status === "closed" && champion && (
+                  <ListRow
+                    href={`/players/${champion.id}`}
+                    leading={
+                      <Avatar
+                        person={peopleById[champion.id] ?? { id: champion.id, display_name: champion.display_name }}
+                        size="md"
+                        ring="var(--gold)"
+                      />
+                    }
+                    title={`${champion.display_name} · champion`}
+                    meta={`${champion.points} pts · ${champion.wins}–${champion.losses}`}
+                  />
+                )}
+              </div>
+              <ol aria-label="Season standings" className="flex flex-col">
+                {standings.map((s) => {
+                  const p = peopleById[s.id];
+                  const isMe = s.id === user.id;
+                  return (
+                    <li key={s.id}>
+                      <ListRow
+                        href={`/players/${s.id}`}
+                        className={cn(
+                          isMe && "bg-card -mx-3 rounded-[14px] border-b-transparent px-3",
+                          s.played === 0 && "opacity-60"
+                        )}
+                        leading={
+                          <>
+                            <span
+                              className={cn(
+                                "stat-number w-[22px] text-[13px]",
+                                s.rank === 1 && s.played > 0 ? "text-brass" : "text-muted-foreground"
+                              )}
+                            >
+                              {s.rank}
+                            </span>
+                            <Avatar person={p ?? { id: s.id, display_name: s.display_name }} size="sm" />
+                          </>
+                        }
+                        title={
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate">{s.display_name}</span>
+                            <TitleBadge title={levelOf(levels, s.id).title} size={20} />
+                          </span>
+                        }
+                        meta={
+                          <span className="flex items-center gap-1.5">
+                            {p && (
+                              <>
+                                <SchoolMark school={schoolById[p.school_id]} size={16} />
+                                {p.school_short_name}
+                                <span aria-hidden="true">·</span>
+                              </>
+                            )}
+                            {s.wins}–{s.losses}
+                          </span>
+                        }
+                        trailing={
+                          <>
+                            <span className="stat-number text-[15px]">{s.points}</span>
+                            <span className="text-muted-foreground text-[12px]">pts</span>
+                          </>
+                        }
+                      />
+                    </li>
+                  );
+                })}
+              </ol>
+              <p className="text-muted-foreground text-[12px]">
+                3 pts a win · 1 pt a loss · games played {formatClubDate(viewed.starts_on)}
+                {viewed.ends_on ? ` – ${formatClubDate(viewed.ends_on)}` : " onward"}
+              </p>
+            </>
+          )}
+          {past.length > 0 && (
+            <section className="flex flex-col gap-1.5">
+              <SectionHeading as="h3">Past seasons</SectionHeading>
+              {past.map((s) => {
+                const c = s.champion_id ? peopleById[s.champion_id] : null;
+                return (
+                  <ListRow
+                    key={s.id}
+                    href={`/leaderboard?tab=season&season=${s.id}`}
+                    leading={c ? <Avatar person={c} size="sm" ring="var(--gold)" /> : undefined}
+                    title={s.name}
+                    meta={`${formatClubDate(s.starts_on)}${s.ends_on ? ` – ${formatClubDate(s.ends_on)}` : ""}${c ? ` · ${c.display_name}` : ""}`}
+                  />
+                );
+              })}
+            </section>
+          )}
+        </div>
+      )}
 
       {tab === "players" && (
         <div className="flex flex-col gap-7">
@@ -125,8 +277,8 @@ export default async function LeaderboardPage({
                 value={scope}
                 className="w-fit"
                 options={[
-                  { value: "all", label: "League", href: "/leaderboard" },
-                  { value: "school", label: mySchool, href: "/leaderboard?scope=school" },
+                  { value: "all", label: "League", href: "/leaderboard?tab=players" },
+                  { value: "school", label: mySchool, href: "/leaderboard?tab=players&scope=school" },
                 ]}
               />
             </div>

@@ -18,6 +18,8 @@ export interface AchievementInput {
   // Opponents' current ratings, for "giant killer".
   opponentRatings: Record<string, number>;
   tournamentsWon: number;
+  // Closed seasons with this player as champion.
+  seasonsWon: number;
 }
 
 const CATALOGUE: (Achievement & { test: (i: AchievementInput) => boolean })[] = [
@@ -91,6 +93,13 @@ const CATALOGUE: (Achievement & { test: (i: AchievementInput) => boolean })[] = 
     emoji: "🏆",
     description: "Won a tournament.",
     test: (i) => i.tournamentsWon >= 1,
+  },
+  {
+    id: "season-champion",
+    label: "Season champion",
+    emoji: "🥇",
+    description: "Topped a season's standings.",
+    test: (i) => i.seasonsWon >= 1,
   },
 ];
 
