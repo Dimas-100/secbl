@@ -3,13 +3,9 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Prefs } from "@/lib/push";
+import { pushPermission, pushSupported, refreshSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push-client";
 import { cn } from "@/lib/utils";
-import {
-  removePushSubscription,
-  savePushSubscription,
-  sendTestPush,
-  updateNotificationPrefs,
-} from "./push-actions";
+import { sendTestPush, updateNotificationPrefs } from "./push-actions";
 
 type Status = "checking" | "unsupported" | "blocked" | "off" | "on";
 
@@ -18,14 +14,6 @@ const CATEGORIES: { key: keyof Prefs; label: string; hint: string }[] = [
   { key: "matches", label: "Matches", hint: "Games reported to you, confirmations, disputes" },
   { key: "events", label: "Events", hint: "New events on the calendar" },
 ];
-
-function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const raw = atob((base64 + padding).replace(/-/g, "+").replace(/_/g, "/"));
-  const out = new Uint8Array(new ArrayBuffer(raw.length));
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out;
-}
 
 // One master switch (the push subscription itself) and three category
 // switches. The subscription lives in the browser; the server only keeps a
@@ -39,28 +27,16 @@ export function NotificationsCard({ initialPrefs }: { initialPrefs: Prefs }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      if (!pushSupported()) {
         if (!cancelled) setStatus("unsupported");
         return;
       }
-      if (Notification.permission === "denied") {
+      if (pushPermission() === "denied") {
         if (!cancelled) setStatus("blocked");
         return;
       }
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (cancelled) return;
-        if (sub) {
-          // Refresh the server's copy so a re-installed browser is still reachable.
-          void savePushSubscription(sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } }, navigator.userAgent);
-          setStatus("on");
-        } else {
-          setStatus("off");
-        }
-      } catch {
-        if (!cancelled) setStatus("off");
-      }
+      const has = await refreshSubscription();
+      if (!cancelled) setStatus(has ? "on" : "off");
     })();
     return () => {
       cancelled = true;
@@ -70,48 +46,18 @@ export function NotificationsCard({ initialPrefs }: { initialPrefs: Prefs }) {
   async function turnOn() {
     setBusy(true);
     setNote(null);
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setStatus(permission === "denied" ? "blocked" : "off");
-        return;
-      }
-      const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!key) {
-        setNote("Notifications aren't configured on this server yet.");
-        return;
-      }
-      const reg = await navigator.serviceWorker.ready;
-      const sub =
-        (await reg.pushManager.getSubscription()) ??
-        (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) }));
-      const result = await savePushSubscription(
-        sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } },
-        navigator.userAgent
-      );
-      if (result.error) {
-        setNote(result.error);
-        return;
-      }
-      setStatus("on");
-    } catch (err) {
-      console.error("push subscribe failed", err);
-      setNote("Couldn't turn notifications on. On iPhone, add SECBL to your Home Screen first.");
-    } finally {
-      setBusy(false);
-    }
+    const result = await subscribeToPush();
+    if (result.permission !== "granted") setStatus(result.permission === "denied" ? "blocked" : "off");
+    else if (result.error) setNote(result.error);
+    else setStatus("on");
+    setBusy(false);
   }
 
   async function turnOff() {
     setBusy(true);
     setNote(null);
     try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        await removePushSubscription(sub.endpoint);
-        await sub.unsubscribe();
-      }
+      await unsubscribeFromPush();
       setStatus("off");
     } catch {
       setNote("Couldn't turn notifications off. Try again.");

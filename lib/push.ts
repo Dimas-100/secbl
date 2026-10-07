@@ -68,6 +68,25 @@ export function recipientsFor(
   return out;
 }
 
+// The one-tap prompt on Home. Browsers insist on a tap and their own
+// permission dialog, so the most the app can do is ask well, once, at the
+// right moment. Pure so the rule is tested without a browser.
+export type PromptDecision = "turn-on" | "install" | "hide";
+export function promptDecision(input: {
+  supported: boolean;
+  permission: "default" | "granted" | "denied";
+  subscribed: boolean;
+  snoozedUntil: number | null;
+  now: number;
+  ios: boolean;
+  standalone: boolean;
+}): PromptDecision {
+  if (input.subscribed || input.permission === "denied") return "hide";
+  if (input.snoozedUntil !== null && input.snoozedUntil > input.now) return "hide";
+  if (!input.supported) return input.ios && !input.standalone ? "install" : "hide";
+  return "turn-on";
+}
+
 export function messagePayload(input: {
   channelId: string;
   channelType: "everyone" | "school" | "dm";

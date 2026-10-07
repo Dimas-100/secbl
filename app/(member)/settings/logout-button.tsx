@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/app/(public)/login/actions";
-import { removePushSubscription } from "./push-actions";
+import { unsubscribeFromPush } from "@/lib/push-client";
 
 // Logging out also drops this browser's push subscription, so a shared
 // device (a lab PC, a friend's phone) stops showing your messages the moment
@@ -26,14 +26,7 @@ export function LogoutButton() {
         setBusy(true);
         (async () => {
           try {
-            if ("serviceWorker" in navigator && "PushManager" in window) {
-              const reg = await navigator.serviceWorker.ready;
-              const sub = await reg.pushManager.getSubscription();
-              if (sub) {
-                await removePushSubscription(sub.endpoint);
-                await sub.unsubscribe();
-              }
-            }
+            await unsubscribeFromPush();
           } catch {
             // ignore — logging out matters more
           } finally {

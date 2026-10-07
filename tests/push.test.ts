@@ -6,6 +6,7 @@ import {
   matchDisputedPayload,
   matchReportedPayload,
   messagePayload,
+  promptDecision,
   recipientsFor,
   type Prefs,
 } from "@/lib/push";
@@ -125,5 +126,23 @@ describe("payloads", () => {
       category: "events",
     });
     expect(eventPayload({ eventId: "e", title: "League night", when: "Thu", location: null }).body).toBe("Thu");
+  });
+});
+
+describe("promptDecision", () => {
+  const base = { supported: true, permission: "default" as const, subscribed: false, snoozedUntil: null, now: 1_000_000, ios: false, standalone: false };
+  it("offers Turn on to a supported browser that has not decided yet", () => {
+    expect(promptDecision(base)).toBe("turn-on");
+  });
+  it("stays quiet once subscribed, blocked, or snoozed", () => {
+    expect(promptDecision({ ...base, subscribed: true })).toBe("hide");
+    expect(promptDecision({ ...base, permission: "denied" })).toBe("hide");
+    expect(promptDecision({ ...base, snoozedUntil: 2_000_000 })).toBe("hide");
+    expect(promptDecision({ ...base, snoozedUntil: 999_999 })).toBe("turn-on");
+  });
+  it("tells an iPhone in Safari to install first, and hides on other unsupported browsers", () => {
+    expect(promptDecision({ ...base, supported: false, ios: true })).toBe("install");
+    expect(promptDecision({ ...base, supported: true, ios: true, standalone: true })).toBe("turn-on");
+    expect(promptDecision({ ...base, supported: false, ios: false })).toBe("hide");
   });
 });
