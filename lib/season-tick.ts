@@ -60,3 +60,31 @@ export async function runSeasonTick(service: SupabaseClient, today: string): Pro
     console.warn("season tick failed", err);
   }
 }
+
+// Uploads that never became a post (the browser uploads first, then records
+// the row) would otherwise sit in the bucket for good. Service role: reads
+// storage.objects directly, removes anything older than a day with no post.
+export async function sweepOrphanPhotos(service: SupabaseClient): Promise<number> {
+  try {
+    const cutoff = new Date(Date.now() - 86_400_000).toISOString();
+    const { data: objects, error } = await service
+      .schema("storage")
+      .from("objects")
+      .select("name")
+      .eq("bucket_id", "posts")
+      .lt("created_at", cutoff)
+      .limit(500);
+    if (error || !objects || objects.length === 0) return 0;
+    const names = objects.map((o) => o.name as string);
+    const { data: used } = await service.from("posts").select("image_path").in("image_path", names);
+    const keep = new Set((used ?? []).map((p) => p.image_path as string));
+    const orphans = names.filter((n) => !keep.has(n));
+    if (orphans.length === 0) return 0;
+    const { error: rmErr } = await service.storage.from("posts").remove(orphans);
+    if (rmErr) console.warn("orphan sweep: remove failed", rmErr.message);
+    return rmErr ? 0 : orphans.length;
+  } catch (err) {
+    console.warn("orphan sweep failed", err);
+    return 0;
+  }
+}

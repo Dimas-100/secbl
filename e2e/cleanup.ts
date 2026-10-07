@@ -137,6 +137,13 @@ export async function cleanupTracked() {
     }
     await service.from("rating_history").delete().eq("profile_id", id);
   }
+  // Post photos live in a private bucket under <user id>/; rows cascade from
+  // the user but objects do not.
+  for (const id of userIds) {
+    const { data: objects } = await service.storage.from("posts").list(id);
+    const names = (objects ?? []).map((o) => `${id}/${o.name}`);
+    if (names.length > 0) await service.storage.from("posts").remove(names);
+  }
   for (const id of userIds) {
     await service.auth.admin.deleteUser(id);
   }

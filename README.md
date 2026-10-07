@@ -43,6 +43,10 @@ Web Push (VAPID) · Vitest · Playwright · Vercel
 - **The result moment.** When a game is confirmed, Home opens with a card: the rating counts to its
   new value, the XP bar fills by what the game earned, a badge unlocked or a streak mark gets its
   line. Dismissed per device. A flame beside your name tracks a win streak from 3 games on.
+- **Posts.** Share a photo of a shot with a caption from Home. Photos are shrunk on the phone and
+  kept in a private bucket served through short-lived signed URLs, so nothing is reachable outside
+  the club. Members like and comment; the author or an admin deletes; three reports hide a post
+  until an admin clears it. Five posts a day, and the cap can't be gamed by deleting.
 - **Live now.** A scoreboard being played publishes itself: everyone on Home sees the table, the
   score and the rails move, and it disappears when the result is sent.
 - **Events and RSVP**, including feeds synced from school calendars.
@@ -111,6 +115,7 @@ schedules a daily health check that keeps a free-tier database from pausing, and
 | `app/(public)` | login, signup (tap-your-school picker), password reset, install guide and invitation card |
 | `app/(member)` | everything behind login: home, log a game, events (+ cups), leaderboard, players, chat, settings, admin |
 | `lib/rating.ts`, `lib/bracket.ts`, `lib/seeding.ts`, `lib/race.ts`, `lib/levels.ts`, `lib/season.ts`, `lib/activity.ts`, `lib/feed.ts`, `lib/live.ts`, `lib/chat.ts`, `lib/inbox.ts`, `lib/push.ts`, `lib/events.ts` | pure, test-first logic |
+| `lib/posts.ts`, `lib/image-client.ts`, `app/(member)/posts/actions.ts` | post rules (caps, text), browser-side photo compression, the post/like/comment/report actions |
 | `lib/activity-write.ts`, `lib/season-data.ts`, `lib/season-tick.ts` | server-side feed moments, season loaders, the daily season reminder (runs from `/api/health`) |
 | `lib/push-send.ts`, `public/sw.js` | Web Push: server-side send (VAPID, service role) and the service worker that shows it |
 | `supabase/migrations` | schema, RLS, SECURITY DEFINER functions (the only write path for ratings, brackets, membership) |

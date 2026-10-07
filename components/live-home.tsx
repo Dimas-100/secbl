@@ -31,6 +31,8 @@ export function LiveHome() {
       if (session) await supabase.realtime.setAuth(session.access_token);
       channel
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "activity" }, refresh)
+        .on("postgres_changes", { event: "DELETE", schema: "public", table: "activity" }, refresh)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "comments" }, refresh)
         .on("postgres_changes", { event: "*", schema: "public", table: "live_games" }, refresh)
         .subscribe();
     })();

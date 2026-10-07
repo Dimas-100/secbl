@@ -12,6 +12,7 @@ import { seasonChampion } from "@/lib/season";
 import { loadSeasonById, loadSeasonStandings } from "@/lib/season-data";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { assertPublicFeedUrl, syncAllSources } from "@/lib/sync-sources";
+import { adminClearPost, deletePost } from "@/app/(member)/posts/actions";
 
 async function setStatus(formData: FormData, status: "approved" | "rejected") {
   const supabase = await createClient();
@@ -330,4 +331,20 @@ export async function endSeason(formData: FormData) {
       champion ? `${season.name} closed — ${champion.display_name} is champion.` : `${season.name} closed.`
     )}`
   );
+}
+
+// --- Posts moderation (spec 2026-10-07-posts-design §3, §9) ------------------
+
+export async function adminClearPostForm(formData: FormData) {
+  await requireAdmin();
+  const r = await adminClearPost(String(formData.get("post_id") ?? ""));
+  if (r.error) redirect(`/admin?error=${encodeURIComponent(r.error)}`);
+  redirect(`/admin?message=${encodeURIComponent("Post restored to the feed.")}`);
+}
+
+export async function adminDeletePostForm(formData: FormData) {
+  await requireAdmin();
+  const r = await deletePost(String(formData.get("post_id") ?? ""));
+  if (r.error) redirect(`/admin?error=${encodeURIComponent(r.error)}`);
+  redirect(`/admin?message=${encodeURIComponent("Post deleted.")}`);
 }

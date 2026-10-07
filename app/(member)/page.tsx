@@ -10,6 +10,7 @@ import { LiveGameCard } from "@/components/live-game-card";
 import { LiveHome } from "@/components/live-home";
 import { MessagesButton } from "@/components/messages-button";
 import { NotifyPrompt } from "@/components/notify-prompt";
+import { PostComposer } from "@/components/post-composer";
 import { SectionHeading } from "@/components/section-heading";
 import { ShowMore } from "@/components/show-more";
 import { Sparkline } from "@/components/sparkline";
@@ -70,7 +71,7 @@ export default async function HomePage({
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, display_name, rating, matches_played, avatar_url, ball, schools(short_name)")
+      .select("id, display_name, rating, matches_played, avatar_url, ball, role, schools(short_name)")
       .eq("id", user.id)
       .single(),
     // Rank, wins and losses come from the same view the leaderboard renders,
@@ -171,6 +172,16 @@ export default async function HomePage({
       };
     }
   }
+  // Post photos live in a private bucket: sign every path on this render, in one call.
+  const feedRows = (feed ?? []) as unknown as FeedRow[];
+  const imagePaths = feedRows.map((r) => one(r.post)?.image_path).filter((p): p is string => !!p);
+  const signed = new Map<string, string>();
+  if (imagePaths.length > 0) {
+    const { data: urls } = await supabase.storage.from("posts").createSignedUrls(imagePaths, 3600);
+    for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+  }
+  const isAdmin = me?.role === "admin";
+
   const mySchool = one(me?.schools as { short_name: string } | { short_name: string }[] | null)?.short_name ?? null;
   const live = orderLiveGames(
     (liveRows ?? []).map((g) => {
@@ -406,6 +417,9 @@ export default async function HomePage({
 
       <section className="flex flex-col gap-1.5">
         <SectionHeading action={{ href: `/players/${user.id}`, label: "All games" }}>Recent</SectionHeading>
+        <div className="mb-2">
+          <PostComposer meId={user.id} />
+        </div>
         {(feed ?? []).length === 0 && (
           <p className="text-muted-foreground py-6 text-center text-sm">
             No results yet this season.{" "}
@@ -416,7 +430,7 @@ export default async function HomePage({
         )}
         <ShowMore
           label="Show {hidden} more"
-          items={((feed ?? []) as unknown as FeedRow[]).map((row) => (
+          items={feedRows.map((row) => (
             <ActivityRow
               key={row.id}
               row={row}
@@ -424,6 +438,8 @@ export default async function HomePage({
               today={today}
               now={now}
               caption={row.match_id ? xpCaption(row.match_id, xp) : undefined}
+              signedUrl={row.post ? (signed.get(one(row.post)?.image_path ?? "") ?? null) : null}
+              isAdmin={isAdmin}
             />
           ))}
         />

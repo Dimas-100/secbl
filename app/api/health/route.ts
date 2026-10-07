@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { clubDateOf } from "@/lib/events";
-import { runSeasonTick } from "@/lib/season-tick";
+import { runSeasonTick, sweepOrphanPhotos } from "@/lib/season-tick";
 
 // Liveness check that also touches the database on purpose. Supabase pauses a
 // free-tier project after a week without API activity — it happened to this
@@ -26,6 +26,7 @@ export async function GET() {
   if (!error && serviceKey) {
     const service = createClient(url, serviceKey, { auth: { persistSession: false } });
     await runSeasonTick(service, clubDateOf(new Date().toISOString()));
+    await sweepOrphanPhotos(service);
     seasonTick = "ran";
   }
 
