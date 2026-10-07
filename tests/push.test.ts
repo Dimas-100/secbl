@@ -8,6 +8,9 @@ import {
   messagePayload,
   promptDecision,
   recipientsFor,
+  seasonClosedPayload,
+  seasonOpenedPayload,
+  seasonWeekLeftPayload,
   type Prefs,
 } from "@/lib/push";
 
@@ -148,5 +151,36 @@ describe("promptDecision", () => {
     expect(promptDecision({ ...base, supported: false, ios: true })).toBe("install");
     expect(promptDecision({ ...base, supported: true, ios: true, standalone: true })).toBe("turn-on");
     expect(promptDecision({ ...base, supported: false, ios: false })).toBe("hide");
+  });
+});
+
+describe("season payloads", () => {
+  it("opened, one week left, closed", () => {
+    expect(seasonOpenedPayload({ seasonId: "s", name: "Fall 2026", endsOn: "2026-12-12" })).toEqual({
+      title: "Fall 2026 has begun",
+      body: "3 points a win, 1 a loss. Ends Dec 12.",
+      url: "/leaderboard?tab=season",
+      tag: "season:s",
+      category: "league",
+    });
+    expect(seasonOpenedPayload({ seasonId: "s", name: "Fall 2026", endsOn: null }).body).toBe(
+      "3 points a win, 1 a loss. No end date yet."
+    );
+    expect(seasonWeekLeftPayload({ seasonId: "s", name: "Fall 2026", leaderName: "Dennis Ro", leaderPoints: 42 }).body).toBe(
+      "Dennis leads with 42 pts. Every game counts."
+    );
+    expect(seasonWeekLeftPayload({ seasonId: "s", name: "Fall 2026", leaderName: null, leaderPoints: 0 }).body).toBe(
+      "Every game counts."
+    );
+    expect(seasonClosedPayload({ seasonId: "s", name: "Fall 2026", championName: "Dennis Ro", points: 48 })).toEqual({
+      title: "Fall 2026 is in the books",
+      body: "Dennis is champion with 48 pts.",
+      url: "/leaderboard?tab=season&season=s",
+      tag: "season:s",
+      category: "league",
+    });
+    expect(seasonClosedPayload({ seasonId: "s", name: "Fall 2026", championName: null, points: 0 }).body).toBe(
+      "No games were played."
+    );
   });
 });
