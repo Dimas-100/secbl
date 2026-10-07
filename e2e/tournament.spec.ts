@@ -70,33 +70,27 @@ test("admin runs a 4-player tournament to a champion", async ({ page }) => {
   await adminBox.check();
   await expect(page.getByText(new RegExp(`${p1Name} is seed 1`))).toBeVisible();
   await page.getByRole("button", { name: /start tournament/i }).click();
-  await expect(page.getByRole("heading", { name: "Round 1" })).toBeVisible();
-  await expect(page.getByText(`${p1Name} (1)`).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^(Round 1|Semifinals|Final)$/ }).first()).toBeVisible();
+  // The card shows the seed under the name ("1 · GSU").
+  await expect(page.locator("article", { hasText: p1Name }).first().getByText(/^1 · /)).toBeVisible();
 
   // Play every match that is ready, round by round, until a champion exists.
-  // Result entry is stepper-based (no number inputs): tap + on each player's
-  // stepper, confirm the winner chip, save.
+  // Scoring happens on the match's own sheet: tap + until the race is won
+  // (5–3 in a race to 5), Save, land back on the bracket.
   for (let guard = 0; guard < 10; guard++) {
-    const forms = page.locator("form[data-result-entry]");
-    if ((await forms.count()) === 0) break;
-    const form = forms.first();
-    const matchId = await form.locator('input[name="tournament_match_id"]').inputValue();
+    const score = page.getByRole("link", { name: "Score this match" });
+    if ((await score.count()) === 0) break;
+    await score.first().click();
+    await page.waitForURL(/\/score\/[0-9a-f-]{36}$/);
+    const form = page.locator("form[data-result-entry]");
     const increase = form.getByRole("button", { name: /^Increase/ });
-    for (let i = 0; i < 5; i++) await increase.nth(0).click();
     for (let i = 0; i < 3; i++) await increase.nth(1).click();
-    // 5–3 auto-selects player1, but tap the chip anyway — explicit beats implied.
-    await form.getByRole("button", { name: / won$/ }).nth(0).click();
-    await form.getByRole("button", { name: "Save" }).click();
-    // Wait for THIS match's entry form to go away, i.e. for the action's
-    // fresh payload to actually reach the DOM. "networkidle" is not enough:
-    // a Server Action returns the re-rendered route inside its own response,
-    // so the network can fall idle a render before the bracket updates, and
-    // the next iteration would then act on an already-decided match.
-    await expect(
-      page.locator(
-        `form[data-result-entry]:has(input[name="tournament_match_id"][value="${matchId}"])`
-      )
-    ).toHaveCount(0);
+    for (let i = 0; i < 5; i++) await increase.nth(0).click();
+    await expect(form.getByRole("button", { name: "Save result" })).toBeEnabled();
+    await form.getByRole("button", { name: "Save result" }).click();
+    // The action redirects to the bracket once the result (and the ladder
+    // replay behind it) has landed.
+    await page.waitForURL(/\/tournaments\/[0-9a-f-]{36}$/);
   }
 
   await expect(page.getByRole("heading", { name: "Champion" })).toBeVisible();

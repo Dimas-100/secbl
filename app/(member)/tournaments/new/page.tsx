@@ -58,6 +58,23 @@ export default async function NewTournamentPage({
             ))}
           </select>
         </div>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-sm font-medium">Race to</legend>
+          <div className="bg-card grid grid-cols-3 gap-1 rounded-full p-1">
+            {[3, 5, 7].map((n) => (
+              <label
+                key={n}
+                className="text-muted-foreground has-checked:bg-primary has-checked:text-primary-foreground flex h-10 cursor-pointer items-center justify-center rounded-full text-[13px] font-medium has-checked:font-semibold"
+              >
+                <input type="radio" name="race_to" value={n} defaultChecked={n === 5} aria-label={`Race to ${n}`} className="sr-only" />
+                {n}
+              </label>
+            ))}
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Every match in the cup is a race to this many games. The score sheet fills toward it.
+          </p>
+        </fieldset>
         <Button type="submit" size="lg" className="w-full">
           Create
         </Button>

@@ -1,21 +1,45 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import { SectionLabel } from "@/components/section-label";
-import { SubmitButton } from "@/components/submit-button";
 import { bracketRounds, type GeneratedMatch } from "@/lib/bracket";
 import { createClient } from "@/lib/supabase/server";
-import { correctScores, voidResult } from "@/app/(member)/tournaments/actions";
+import { cn } from "@/lib/utils";
 import { LiveRefresh } from "./refresh";
-import { ResultForm } from "./result-form";
 
 interface MatchRow extends GeneratedMatch {
   player1_score: number | null;
   player2_score: number | null;
 }
 
+interface Entrant extends AvatarIdentity {
+  seed: number;
+  school: string | null;
+}
+
+// Round names for a bracket of `count` rounds, last first: Final, Semifinals,
+// Quarterfinals, then Round N.
+function roundName(index: number, count: number): string {
+  const fromEnd = count - 1 - index;
+  if (fromEnd === 0) return "Final";
+  if (fromEnd === 1) return "Semifinals";
+  if (fromEnd === 2) return "Quarterfinals";
+  return `Round ${index + 1}`;
+}
+function matchName(index: number, count: number, position: number): string {
+  const fromEnd = count - 1 - index;
+  if (fromEnd === 0) return "Final";
+  if (fromEnd === 1) return `Semifinal ${position + 1}`;
+  if (fromEnd === 2) return `Quarterfinal ${position + 1}`;
+  return `Match ${position + 1}`;
+}
+
+// The cup as a scoreboard: match cards by round, the next match outlined in
+// brass, results with the loser muted, the champion on top when it is over.
+// Scoring lives on its own sheet (/score/[matchId]); members and the admin
+// read the same bracket, the admin also gets the Score buttons.
 export default async function TournamentPage({
   params,
   searchParams,
@@ -30,167 +54,191 @@ export default async function TournamentPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const { data: me } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  const { data: tournament } = await supabase
-    .from("tournaments")
-    .select("id, name, status")
-    .eq("id", id)
-    .single();
+  const [{ data: me }, { data: tournament }] = await Promise.all([
+    supabase.from("profiles").select("role").eq("id", user.id).single(),
+    supabase.from("tournaments").select("id, name, status, race_to").eq("id", id).single(),
+  ]);
   if (!tournament) notFound();
   if (tournament.status === "setup") redirect(`/tournaments/${id}/setup`);
 
-  const { data: rows } = await supabase
-    .from("tournament_matches")
-    .select(
-      "id, round, position, player1_id, player2_id, player1_score, player2_score, winner_id, winner_advances_to, winner_advances_slot"
-    )
-    .eq("tournament_id", id);
+  const [{ data: rows }, { data: entrantRows }] = await Promise.all([
+    supabase
+      .from("tournament_matches")
+      .select("id, round, position, player1_id, player2_id, player1_score, player2_score, winner_id, winner_advances_to, winner_advances_slot")
+      .eq("tournament_id", id),
+    supabase
+      .from("tournament_players")
+      .select("profile_id, seed, profiles(id, display_name, avatar_url, ball, schools(short_name))")
+      .eq("tournament_id", id)
+      .order("seed"),
+  ]);
 
-  const { data: entrants } = await supabase
-    .from("tournament_players")
-    .select("profile_id, seed, profiles(display_name)")
-    .eq("tournament_id", id)
-    .order("seed");
-
-  const nameOf = new Map<string, string>();
-  const seedOf = new Map<string, number>();
-  for (const e of entrants ?? []) {
-    const profile = Array.isArray(e.profiles) ? e.profiles[0] : e.profiles;
-    nameOf.set(e.profile_id as string, profile?.display_name ?? "Unknown");
-    seedOf.set(e.profile_id as string, e.seed as number);
+  const entrants = new Map<string, Entrant>();
+  for (const e of entrantRows ?? []) {
+    const p = Array.isArray(e.profiles) ? e.profiles[0] : e.profiles;
+    const school = p ? (Array.isArray(p.schools) ? p.schools[0] : p.schools) : null;
+    entrants.set(e.profile_id as string, {
+      id: e.profile_id as string,
+      display_name: p?.display_name ?? "Unknown",
+      avatar_url: p?.avatar_url ?? null,
+      ball: p?.ball ?? null,
+      seed: e.seed as number,
+      school: school?.short_name ?? null,
+    });
   }
-  const label = (playerId: string | null) =>
-    playerId ? `${nameOf.get(playerId) ?? "Unknown"} (${seedOf.get(playerId) ?? "?"})` : "TBD";
 
   const matches = (rows ?? []) as MatchRow[];
-  const rounds = bracketRounds(matches);
+  const rounds = bracketRounds(matches) as MatchRow[][];
   const final = matches.find((m) => m.winner_advances_to === null);
+  const champion = tournament.status === "complete" && final?.winner_id ? entrants.get(final.winner_id) : null;
   const isAdmin = me?.role === "admin";
+  const live = tournament.status === "live";
+
+  // Byes are not matches: the player simply starts a round later. Note it on
+  // the match they advance into instead of drawing a fake fixture.
+  const isBye = (m: MatchRow) => m.player2_id === null && m.player1_id !== null && m.winner_id !== null;
+  const feederOf = (m: MatchRow, slot: 1 | 2) =>
+    matches.find((x) => x.winner_advances_to === m.id && x.winner_advances_slot === slot);
+  const champRecord = champion
+    ? matches.filter((m) => !isBye(m) && m.winner_id === champion.id).length
+    : 0;
+
+  // The first undecided, playable match is "up next"; the rest wait.
+  const nextId = matches
+    .filter((m) => m.player1_id && m.player2_id && !m.winner_id)
+    .sort((a, b) => a.round - b.round || a.position - b.position)[0]?.id;
 
   return (
-    <main>
-      {tournament.status === "live" && <LiveRefresh />}
+    <main className="flex flex-col gap-7">
+      {live && <LiveRefresh />}
       <PageHeader
         title={tournament.name}
         back="/events?tab=cups"
         trailing={
-          tournament.status === "live" ? (
-            <Badge className="bg-brass text-background">Live</Badge>
-          ) : (
-            <Badge variant="secondary">Complete</Badge>
-          )
+          live ? <Badge className="bg-brass text-background">Live</Badge> : <Badge variant="secondary">Complete</Badge>
         }
       />
-      <div className="mt-6 flex flex-col gap-6">
-      {message && (
-        <p className="bg-card rounded-2xl p-3 text-sm shadow-[inset_0_0_0_1px_var(--hairline-row)]">{message}</p>
-      )}
-      {error && (
-        <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>
+      {message && <p className="bg-card rounded-2xl p-3 text-sm shadow-[inset_0_0_0_1px_var(--hairline-row)]">{message}</p>}
+      {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
+
+      {champion && (
+        <section className="bg-card flex items-center gap-4 rounded-[20px] p-5 shadow-[inset_0_0_0_1px_var(--brass)]">
+          <Avatar person={champion} size="lg" ring="var(--brass)" />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="eyebrow">Champion</h2>
+            <span className="truncate text-[20px] leading-tight font-semibold tracking-[-0.02em]">
+              <Link href={`/players/${champion.id}`}>{champion.display_name}</Link>
+            </span>
+            <span className="text-muted-foreground text-[12px]">
+              {[champion.school, `${champRecord}–0 in the cup`, "+300 XP"].filter(Boolean).join(" · ")}
+            </span>
+          </div>
+        </section>
       )}
 
-      {tournament.status === "complete" && final?.winner_id && (
-        <Card>
-          <CardHeader>
-            <SectionLabel>Champion</SectionLabel>
-          </CardHeader>
-          <CardContent className="stat-number text-2xl">{label(final.winner_id)}</CardContent>
-        </Card>
-      )}
+      <nav aria-label="Rounds" className="-mx-6 flex gap-2 overflow-x-auto px-6 [scrollbar-width:none]">
+        {rounds.map((_, i) => (
+          <a
+            key={i}
+            href={`#round-${i + 1}`}
+            className="bg-card text-muted-foreground shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-medium shadow-[inset_0_0_0_1px_var(--hairline-row)]"
+          >
+            {roundName(i, rounds.length)}
+          </a>
+        ))}
+      </nav>
 
-      {rounds.map((round, index) => (
-        <Card key={index}>
-          <CardHeader>
-            {/* Same heading text the e2e suite waits on ("Round 1", "Final"). */}
-            <SectionLabel>
-              {index === rounds.length - 1 ? "Final" : `Round ${index + 1}`}
-            </SectionLabel>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {round.map((m) => {
-              const match = m as MatchRow;
-              const decided = match.winner_id !== null;
-              const bye = match.player1_id !== null && match.player2_id === null && decided;
-              const ready = match.player1_id !== null && match.player2_id !== null;
-              return (
-                <div key={match.id} className="flex flex-col gap-2 border-b pb-3 last:border-b-0">
-                  <div className="text-sm">
-                    <span className={match.winner_id === match.player1_id ? "font-bold" : ""}>
-                      {label(match.player1_id)}
-                    </span>
-                    {" vs "}
-                    <span className={match.winner_id === match.player2_id ? "font-bold" : ""}>
-                      {bye ? "bye" : label(match.player2_id)}
-                    </span>
-                    {decided && !bye && (
-                      <span className="stat-number text-muted-foreground">
-                        {" "}
-                        {match.player1_score}–{match.player2_score}
+      {[...rounds].map((round, index) => ({ round, index })).reverse().map(({ round, index }) => (
+        <section key={index} id={`round-${index + 1}`} className="flex flex-col gap-3 scroll-mt-4">
+          {/* Same heading text the e2e suite waits on ("Round 1", "Final"). */}
+          <h2 className="eyebrow">
+            {roundName(index, rounds.length)}
+            {index === 0 && rounds.length > 1 && roundName(index, rounds.length) !== "Round 1" ? " · Round 1" : ""}
+          </h2>
+          {index === 0 && !["Round 1"].includes(roundName(index, rounds.length)) && (
+            <span className="sr-only">Round 1</span>
+          )}
+          {round
+            .filter((m) => !isBye(m))
+            .map((m) => {
+              const p1 = m.player1_id ? entrants.get(m.player1_id) : null;
+              const p2 = m.player2_id ? entrants.get(m.player2_id) : null;
+              const decided = m.winner_id !== null;
+              const ready = !!(m.player1_id && m.player2_id);
+              const isNext = m.id === nextId;
+              const status = decided ? "Final" : isNext ? "Up next" : ready ? "Ready" : "Waiting";
+              const slotNote = (slot: 1 | 2) => {
+                const f = feederOf(m, slot);
+                if (!f) return null;
+                if (isBye(f) && f.player1_id) return "bye";
+                const a = f.player1_id ? entrants.get(f.player1_id)?.display_name?.split(" ")[0] : null;
+                const b = f.player2_id ? entrants.get(f.player2_id)?.display_name?.split(" ")[0] : null;
+                return a && b ? `Winner of ${a} vs ${b}` : "Winner of the previous round";
+              };
+              const Row = ({ p, score, slot }: { p: Entrant | null | undefined; score: number | null; slot: 1 | 2 }) => {
+                const won = decided && p && m.winner_id === p.id;
+                const lost = decided && p && m.winner_id !== p.id;
+                const note = slotNote(slot);
+                return (
+                  <div className={cn("flex items-center gap-3", lost && "text-muted-foreground")}>
+                    {p ? (
+                      <Avatar person={p} size="xs" className={cn(lost && "opacity-60")} />
+                    ) : (
+                      <span className="bg-secondary text-muted-foreground flex size-[30px] shrink-0 items-center justify-center rounded-full text-[12px]">
+                        ?
                       </span>
                     )}
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className={cn("truncate text-[15px] leading-tight", won ? "font-semibold" : "font-medium")}>
+                        {p ? <Link href={`/players/${p.id}`}>{p.display_name}</Link> : (note ?? "TBD")}
+                      </span>
+                      <span className="text-muted-foreground text-[12px] leading-tight">
+                        {p
+                          ? [p.seed, p.school, note === "bye" ? "bye into this round" : null].filter(Boolean).join(" · ")
+                          : ""}
+                      </span>
+                    </span>
+                    <span className={cn("stat-number text-[26px] leading-none", !decided && "text-muted-foreground", lost && "text-muted-foreground")}>
+                      {decided ? score : "–"}
+                    </span>
                   </div>
-
-                  {isAdmin && ready && !decided && tournament.status === "live" && (
-                    <ResultForm
-                      tournamentId={id}
-                      matchId={match.id}
-                      player1={{ id: match.player1_id!, label: label(match.player1_id) }}
-                      player2={{ id: match.player2_id!, label: label(match.player2_id) }}
-                    />
+                );
+              };
+              return (
+                <article
+                  key={m.id}
+                  className={cn(
+                    "bg-card flex flex-col gap-3 rounded-[20px] px-4 py-3.5",
+                    isNext && live ? "shadow-[inset_0_0_0_1.5px_var(--brass)]" : "shadow-[inset_0_0_0_1px_var(--hairline-row)]"
                   )}
-
-                  {isAdmin && decided && !bye && (
-                    <div className="flex flex-wrap items-end gap-2">
-                      {/* Fixing a score never touches the ladder, so it stays
-                          available even after the winner has played on. */}
-                      <form action={correctScores} className="flex items-end gap-2">
-                        <input type="hidden" name="tournament_id" value={id} />
-                        <input type="hidden" name="tournament_match_id" value={match.id} />
-                        <Input
-                          name="player1_score"
-                          type="number"
-                          inputMode="numeric"
-                          min={0}
-                          required
-                          defaultValue={match.player1_score ?? 0}
-                          className="w-16"
-                          aria-label="Corrected first score"
-                        />
-                        <Input
-                          name="player2_score"
-                          type="number"
-                          inputMode="numeric"
-                          min={0}
-                          required
-                          defaultValue={match.player2_score ?? 0}
-                          className="w-16"
-                          aria-label="Corrected second score"
-                        />
-                        <SubmitButton size="sm" variant="outline" pendingChildren="Saving…">
-                          Fix score
-                        </SubmitButton>
-                      </form>
-                      <form action={voidResult}>
-                        <input type="hidden" name="tournament_id" value={id} />
-                        <input type="hidden" name="tournament_match_id" value={match.id} />
-                        <SubmitButton size="sm" variant="outline" pendingChildren="Voiding…">
-                          Void result
-                        </SubmitButton>
-                      </form>
-                    </div>
+                >
+                  <div className="flex items-center justify-between text-[11px] tracking-[0.08em] uppercase">
+                    <span className="text-muted-foreground">
+                      {matchName(index, rounds.length, m.position)} · race to {tournament.race_to}
+                    </span>
+                    <span className={cn(isNext && live ? "text-brass font-semibold" : "text-muted-foreground")}>{status}</span>
+                  </div>
+                  <Row p={p1} score={m.player1_score} slot={1} />
+                  <div className="bg-hairline-row h-px" />
+                  <Row p={p2} score={m.player2_score} slot={2} />
+                  {isAdmin && live && ready && !decided && (
+                    <Button asChild size="default" className="mt-1 w-full">
+                      <Link href={`/tournaments/${id}/score/${m.id}`}>Score this match</Link>
+                    </Button>
                   )}
-                </div>
+                  {isAdmin && decided && (
+                    <Link
+                      href={`/tournaments/${id}/score/${m.id}`}
+                      className="text-muted-foreground press self-end text-[12px] underline-offset-2 hover:underline"
+                    >
+                      Fix score or void
+                    </Link>
+                  )}
+                </article>
               );
             })}
-          </CardContent>
-        </Card>
+        </section>
       ))}
-      </div>
     </main>
   );
 }

@@ -32,9 +32,14 @@ export async function createTournament(formData: FormData) {
     redirect(`/tournaments/new?error=${encodeURIComponent("Give the tournament a name.")}`);
   }
   const eventId = String(formData.get("event_id") ?? "");
+  const raceTo = Number(formData.get("race_to") ?? 5);
+  if (!Number.isInteger(raceTo) || raceTo < 1 || raceTo > 25) {
+    redirect(`/tournaments/new?error=${encodeURIComponent("Pick a race length.")}`);
+  }
   const { data, error } = await supabase.rpc("create_tournament", {
     p_name: name,
     p_event_id: eventId || null,
+    p_race_to: raceTo,
   });
   if (error) {
     redirect(`/tournaments/new?error=${encodeURIComponent(error.message)}`);
@@ -137,13 +142,19 @@ export async function recordResult(formData: FormData) {
   const p2 = Number(formData.get("player2_score"));
   const winnerId = String(formData.get("winner_id") ?? "");
   const fail = (message: string): never =>
-    redirect(`/tournaments/${tournamentId}?error=${encodeURIComponent(message)}`);
+    redirect(`/tournaments/${tournamentId}/score/${tournamentMatchId}?error=${encodeURIComponent(message)}`);
 
   if (!Number.isInteger(p1) || !Number.isInteger(p2) || p1 < 0 || p2 < 0) {
     fail("Enter both scores as whole numbers.");
   }
   if (p1 === p2) fail("A tournament match cannot end level.");
   if (!winnerId) fail("Pick the winner.");
+  // The cup's race length is the finish line (the database re-checks this).
+  const { data: cup } = await supabase.from("tournaments").select("race_to").eq("id", tournamentId).single();
+  const raceTo = cup?.race_to ?? null;
+  if (raceTo !== null && (Math.max(p1, p2) !== raceTo || Math.min(p1, p2) >= raceTo)) {
+    fail(`The winner must reach ${raceTo} — this cup is a race to ${raceTo}.`);
+  }
 
   // The rated match's id is minted here so the replay can include this result
   // before it is written — the ladder is never briefly wrong.
@@ -201,7 +212,7 @@ export async function correctScores(formData: FormData) {
   const p2 = Number(formData.get("player2_score"));
   if (!Number.isInteger(p1) || !Number.isInteger(p2) || p1 < 0 || p2 < 0 || p1 === p2) {
     redirect(
-      `/tournaments/${tournamentId}?error=${encodeURIComponent("Enter two different whole-number scores.")}`
+      `/tournaments/${tournamentId}/score/${tournamentMatchId}?error=${encodeURIComponent("Enter two different whole-number scores.")}`
     );
   }
   // No recompute: the ladder depends on who won, not by how much.
@@ -211,7 +222,7 @@ export async function correctScores(formData: FormData) {
     p_player2_score: p2,
   });
   if (error) {
-    redirect(`/tournaments/${tournamentId}?error=${encodeURIComponent(error.message)}`);
+    redirect(`/tournaments/${tournamentId}/score/${tournamentMatchId}?error=${encodeURIComponent(error.message)}`);
   }
   revalidatePath(`/tournaments/${tournamentId}`);
   redirect(`/tournaments/${tournamentId}?message=${encodeURIComponent("Scores corrected.")}`);
@@ -253,7 +264,7 @@ export async function voidResult(formData: FormData) {
     ...payload,
   });
   if (error) {
-    redirect(`/tournaments/${tournamentId}?error=${encodeURIComponent(error.message)}`);
+    redirect(`/tournaments/${tournamentId}/score/${tournamentMatchId}?error=${encodeURIComponent(error.message)}`);
   }
   revalidatePath(`/tournaments/${tournamentId}`);
   revalidatePath("/leaderboard");
