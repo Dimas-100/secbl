@@ -267,7 +267,8 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function openSeason(formData: FormData) {
   const { supabase, user } = await requireAdmin();
-  const name = String(formData.get("name") ?? "").trim();
+  // season_name, not name: the event-source form below it already owns `name`.
+  const name = String(formData.get("season_name") ?? "").trim();
   const startsOn = String(formData.get("starts_on") ?? "");
   const endsOn = String(formData.get("ends_on") ?? "").trim();
   if (!name) redirect(`/admin?error=${encodeURIComponent("A season needs a name.")}`);

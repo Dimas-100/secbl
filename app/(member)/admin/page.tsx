@@ -164,7 +164,7 @@ export default async function AdminPage({
                 for a loss until you end it.
               </p>
               <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr]">
-                <Input name="name" defaultValue={seasonLabel(today)} aria-label="Season name" required />
+                <Input name="season_name" defaultValue={seasonLabel(today)} aria-label="Season name" required />
                 <Input type="date" name="starts_on" defaultValue={today} aria-label="Start date" required />
                 <Input type="date" name="ends_on" aria-label="Planned end (optional)" />
               </div>
