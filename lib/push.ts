@@ -1,12 +1,13 @@
 // Push notifications — the pure half (docs/superpowers/specs/2026-10-06-live-club-design.md §2).
 // Who gets what, and the words. Sending lives in lib/push-send.ts (server only).
 
-export type PushCategory = "messages" | "matches" | "events";
+export type PushCategory = "messages" | "matches" | "events" | "league";
 
 export interface Prefs {
   messages: boolean;
   matches: boolean;
   events: boolean;
+  league: boolean;
 }
 
 export interface PushPayload {

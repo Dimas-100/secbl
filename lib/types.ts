@@ -110,3 +110,44 @@ export interface TournamentMatch {
   loser_advances_slot: 1 | 2 | null;
   created_at: string;
 }
+
+export type SeasonStatus = "open" | "closed";
+export interface Season {
+  id: string;
+  name: string;
+  // Club dates, YYYY-MM-DD. ends_on is the planned end until the season is
+  // closed, then the date it actually ended.
+  starts_on: string;
+  ends_on: string | null;
+  status: SeasonStatus;
+  champion_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  closed_at: string | null;
+}
+
+export type ActivityKind =
+  | "match"
+  | "badge"
+  | "streak"
+  | "pass"
+  | "cup_started"
+  | "cup_round"
+  | "cup_won"
+  | "season_opened"
+  | "season_week_left"
+  | "season_closed"
+  | "member_joined";
+
+export interface LiveGame {
+  reporter_id: string;
+  opponent_id: string;
+  game_type: GameType;
+  race_to: number | null;
+  spot: number;
+  spot_to: string | null;
+  reporter_score: number;
+  opponent_score: number;
+  started_at: string;
+  updated_at: string;
+}

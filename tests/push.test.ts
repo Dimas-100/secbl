@@ -17,12 +17,16 @@ describe("recipientsFor", () => {
   it("honours the category switch and treats missing prefs as on", () => {
     const list = [
       c("a", null),
-      c("b", { messages: false, matches: true, events: true }),
-      c("c", { messages: true, matches: false, events: true }),
+      c("b", { messages: false, matches: true, events: true, league: true }),
+      c("c", { messages: true, matches: false, events: true, league: true }),
     ];
     expect(recipientsFor(list, "messages", null)).toEqual(["a", "c"]);
     expect(recipientsFor(list, "matches", null)).toEqual(["a", "b"]);
     expect(recipientsFor(list, "events", null)).toEqual(["a", "b", "c"]);
+  });
+  it("honours the league switch", () => {
+    const list = [c("a", null), c("b", { messages: true, matches: true, events: true, league: false })];
+    expect(recipientsFor(list, "league", null)).toEqual(["a"]);
   });
   it("drops members who are no longer approved", () => {
     expect(recipientsFor([c("a", null), { profile_id: "s", prefs: null, approved: false }], "messages", null)).toEqual(["a"]);
