@@ -1,10 +1,12 @@
 import type { TitleName } from "@/lib/levels";
 import { cn } from "@/lib/utils";
 
-// The six title badges (docs/superpowers/specs/2026-10-06-live-club-design.md
-// §4): a medallion in a material that climbs with the ladder, each with its
-// own glyph. Inline SVG so it scales from a 20px row mark to a 64px hero
-// without a second asset, and so it paints in the theme's own tokens.
+// The six title badges, from the rank-badge set designed 2026-10-07
+// (sources in docs/design/rank-badges/). A medallion in a material that
+// climbs with the ladder: hairline ring, solid disc, the glyph struck into it
+// in a dark tone — the "struck" set, which stays legible at the 20px row mark.
+// A locked badge is the "inlaid" set at low opacity: dark disc, the glyph in
+// the material, so what is still to earn reads as hollow.
 //
 //   Rookie   grey      a single ball
 //   Regular  bronze    the rack
@@ -13,52 +15,80 @@ import { cn } from "@/lib/utils";
 //   Master   gold      a crown
 //   Legend   platinum  a star, with a brass outer ring
 
-const MATERIAL: Record<TitleName, string> = {
-  Rookie: "var(--muted-foreground)",
-  Regular: "var(--podium-3)",
-  Shark: "var(--podium-2)",
-  Hustler: "var(--brass)",
-  Master: "var(--gold)",
-  Legend: "var(--foreground)",
-};
+const RING = "M0 24a24 24 0 1 0 48 0a24 24 0 1 0 -48 0ZM2.5 24a21.5 21.5 0 1 1 43 0a21.5 21.5 0 1 1 -43 0Z";
+const DISC = "M5.5 24a18.5 18.5 0 1 0 37 0a18.5 18.5 0 1 0 -37 0Z";
 
-function Glyph({ title, color }: { title: TitleName; color: string }) {
-  switch (title) {
-    case "Rookie":
-      return (
-        <>
-          <circle cx="24" cy="24" r="7" fill={color} />
-          <circle cx="21.5" cy="21.5" r="1.8" fill="var(--card)" opacity="0.9" />
-        </>
-      );
-    case "Regular":
-      return (
-        <>
-          <circle cx="24" cy="18" r="4.5" fill={color} />
-          <circle cx="18.5" cy="28" r="4.5" fill={color} />
-          <circle cx="29.5" cy="28" r="4.5" fill={color} />
-        </>
-      );
-    case "Shark":
-      return <path d="M14 32 C18 20, 24 14, 34 12 C30 20, 30 26, 34 32 Z" fill={color} />;
-    case "Hustler":
-      return (
-        <>
-          <line x1="12" y1="36" x2="34" y2="14" stroke={color} strokeWidth="3" strokeLinecap="round" />
-          <circle cx="29" cy="29" r="6" fill={color} />
-        </>
-      );
-    case "Master":
-      return <path d="M12 32 L14 18 L21 25 L24 14 L27 25 L34 18 L36 32 Z" fill={color} />;
-    case "Legend":
-      return (
-        <path
-          d="M24 12 L27.3 20.4 L36.3 20.9 L29.3 26.6 L31.6 35.3 L24 30.4 L16.4 35.3 L18.7 26.6 L11.7 20.9 L20.7 20.4 Z"
-          fill={color}
-        />
-      );
-  }
+// Each glyph is a list of paths in two tones: "a" is struck (dark on the
+// material disc), "b" is the material itself, so the inlaid set is the same
+// drawing with the tones swapped.
+type Tone = "a" | "b";
+interface Badge {
+  ring: string;
+  material: string;
+  dark: string;
+  glyph: { d: string; tone: Tone }[];
 }
+
+const BADGES: Record<TitleName, Badge> = {
+  Rookie: {
+    ring: "var(--muted-foreground)",
+    material: "var(--muted-foreground)",
+    dark: "#1E2023",
+    glyph: [
+      { d: "M15 24a9 9 0 1 0 18 0a9 9 0 1 0 -18 0Z", tone: "a" },
+      { d: "M18.8 22.4a3.6 3.6 0 1 0 7.2 0a3.6 3.6 0 1 0 -7.2 0Z", tone: "b" },
+    ],
+  },
+  Regular: {
+    ring: "var(--podium-3)",
+    material: "var(--podium-3)",
+    dark: "#2B2019",
+    glyph: [
+      {
+        d: "M20.85 17.59a3.15 3.15 0 1 0 6.3 0a3.15 3.15 0 1 0 -6.3 0ZM17.15 24a3.15 3.15 0 1 0 6.3 0a3.15 3.15 0 1 0 -6.3 0ZM24.55 24a3.15 3.15 0 1 0 6.3 0a3.15 3.15 0 1 0 -6.3 0ZM13.45 30.41a3.15 3.15 0 1 0 6.3 0a3.15 3.15 0 1 0 -6.3 0ZM20.85 30.41a3.15 3.15 0 1 0 6.3 0a3.15 3.15 0 1 0 -6.3 0ZM28.25 30.41a3.15 3.15 0 1 0 6.3 0a3.15 3.15 0 1 0 -6.3 0Z",
+        tone: "a",
+      },
+    ],
+  },
+  Shark: {
+    ring: "var(--podium-2)",
+    material: "var(--podium-2)",
+    dark: "#1C2026",
+    glyph: [{ d: "M13.5 32.5C19 30.6 24.2 23 29 14.5C28.4 21.6 30 27.4 34.5 32.5Z", tone: "a" }],
+  },
+  Hustler: {
+    ring: "var(--brass)",
+    material: "var(--brass)",
+    dark: "#2A2317",
+    glyph: [
+      { d: "M19.2 26.2a7 7 0 1 0 14 0a7 7 0 1 0 -14 0Z", tone: "a" },
+      { d: "M14.51 38.58L37.9 13.64L34.36 10.1L9.42 33.49Z", tone: "b" },
+      { d: "M14.51 36.31L35.64 13.64L34.36 12.36L11.69 33.49Z", tone: "a" },
+    ],
+  },
+  Master: {
+    ring: "var(--gold)",
+    material: "var(--gold)",
+    dark: "#2E2811",
+    glyph: [
+      {
+        d: "M15.2 28L14.2 18.8L20 23.6L24 16.6L28 23.6L33.8 18.8L32.8 28ZM12.4 17.8a1.8 1.8 0 1 0 3.6 0a1.8 1.8 0 1 0 -3.6 0ZM22.2 15.4a1.8 1.8 0 1 0 3.6 0a1.8 1.8 0 1 0 -3.6 0ZM32 17.8a1.8 1.8 0 1 0 3.6 0a1.8 1.8 0 1 0 -3.6 0ZM16.2 30.4H31.8Q32.8 30.4 32.8 31.4V32.6Q32.8 33.6 31.8 33.6H16.2Q15.2 33.6 15.2 32.6V31.4Q15.2 30.4 16.2 30.4Z",
+        tone: "a",
+      },
+    ],
+  },
+  Legend: {
+    ring: "var(--brass)",
+    material: "var(--foreground)",
+    dark: "#24241F",
+    glyph: [
+      {
+        d: "M24.00 13.80L26.76 21.20L34.65 21.54L28.47 26.45L30.58 34.06L24.00 29.70L17.42 34.06L19.53 26.45L13.35 21.54L21.24 21.20Z",
+        tone: "a",
+      },
+    ],
+  },
+};
 
 export function TitleBadge({
   title,
@@ -74,7 +104,10 @@ export function TitleBadge({
   decorative?: boolean;
   className?: string;
 }) {
-  const color = MATERIAL[title];
+  const b = BADGES[title];
+  // Struck when earned; inlaid (tones swapped) when locked.
+  const disc = locked ? b.dark : b.material;
+  const toneFill = (t: Tone) => (t === "a" ? (locked ? b.material : b.dark) : locked ? b.dark : b.material);
   return (
     <svg
       viewBox="0 0 48 48"
@@ -83,22 +116,13 @@ export function TitleBadge({
       role={decorative ? undefined : "img"}
       aria-hidden={decorative ? true : undefined}
       aria-label={decorative ? undefined : `${title} badge${locked ? " (locked)" : ""}`}
-      className={cn("shrink-0", locked && "opacity-35", className)}
+      className={cn("shrink-0", locked && "opacity-40", className)}
     >
-      {title === "Legend" && !locked && (
-        <circle cx="24" cy="24" r="23" fill="none" stroke="var(--brass)" strokeWidth="1" />
-      )}
-      <circle
-        cx="24"
-        cy="24"
-        r="21"
-        fill="var(--card)"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeDasharray={locked ? "3 3" : undefined}
-      />
-      <circle cx="24" cy="24" r="17" fill="none" stroke={color} strokeWidth="1" opacity="0.45" />
-      <Glyph title={title} color={color} />
+      <path d={RING} fill={b.ring} />
+      <path d={DISC} fill={disc} />
+      {b.glyph.map((g, i) => (
+        <path key={i} d={g.d} fill={toneFill(g.tone)} />
+      ))}
     </svg>
   );
 }
