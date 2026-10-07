@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { isKnownPushEndpoint, type Prefs } from "@/lib/push";
+import { isKnownPushEndpoint, type Prefs, DEFAULT_PREFS } from "@/lib/push";
 import { reownSubscription, sendPush } from "@/lib/push-send";
 
 // The member's own push rows, through their own client so RLS applies.
@@ -56,13 +56,13 @@ export async function removePushSubscription(endpoint: string): Promise<{ error:
 
 export async function loadNotificationPrefs(): Promise<Prefs> {
   const { supabase, user } = await me();
-  if (!user) return { messages: true, matches: true, events: true, league: true, social: false };
+  if (!user) return DEFAULT_PREFS;
   const { data } = await supabase
     .from("notification_prefs")
     .select("messages, matches, events, league, social")
     .eq("profile_id", user.id)
     .maybeSingle();
-  return data ?? { messages: true, matches: true, events: true, league: true, social: false };
+  return data ?? DEFAULT_PREFS;
 }
 
 export async function updateNotificationPrefs(prefs: Prefs): Promise<{ error: string | null }> {

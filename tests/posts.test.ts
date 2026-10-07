@@ -67,14 +67,14 @@ describe("post payloads", () => {
     expect(likePayload({ postId: "p", likerName: "Dennis Ro" })).toEqual({
       title: "Dennis liked your post",
       body: "Tap to see it.",
-      url: "/?post=p",
+      url: "/#post-p",
       tag: "post:p",
       category: "social",
     });
     expect(commentPayload({ postId: "p", commenterName: "Maya Chen", body: "Clean cut!" })).toEqual({
       title: "Maya commented on your post",
       body: "Clean cut!",
-      url: "/?post=p",
+      url: "/#post-p",
       tag: "post:p",
       category: "social",
     });

@@ -27,6 +27,13 @@ describe("recipientsFor", () => {
     expect(recipientsFor(list, "matches", null)).toEqual(["a", "b"]);
     expect(recipientsFor(list, "events", null)).toEqual(["a", "b", "c"]);
   });
+  it("treats missing prefs as the defaults: social off, everything else on", () => {
+    const list = [c("a", null)];
+    expect(recipientsFor(list, "social", null)).toEqual([]);
+    expect(recipientsFor(list, "messages", null)).toEqual(["a"]);
+    expect(recipientsFor(list, "league", null)).toEqual(["a"]);
+    expect(recipientsFor([c("b", { messages: true, matches: true, events: true, league: true, social: true })], "social", null)).toEqual(["b"]);
+  });
   it("honours the league switch", () => {
     const list = [c("a", null), c("b", { messages: true, matches: true, events: true, league: false, social: true })];
     expect(recipientsFor(list, "league", null)).toEqual(["a"]);

@@ -61,21 +61,22 @@ export async function deletePost(postId: string): Promise<Result> {
   return { error: null };
 }
 
-export async function toggleLike(postId: string): Promise<Result & { liked?: boolean }> {
+// Intent, not a toggle: a double tap sends the same intent twice and both
+// land on the same state. Insert is idempotent (a duplicate is success).
+export async function setLike(postId: string, liked: boolean): Promise<Result> {
   const { supabase, user } = await me();
   if (!user) return { error: "Please log in again." };
-  const { data: existing } = await supabase
-    .from("likes")
-    .select("post_id")
-    .eq("post_id", postId)
-    .eq("profile_id", user.id)
-    .maybeSingle();
-  if (existing) {
+  if (!liked) {
     const { error } = await supabase.from("likes").delete().eq("post_id", postId).eq("profile_id", user.id);
-    return { error: msg(error, "Could not unlike."), liked: false };
+    return { error: msg(error, "Could not unlike.") };
   }
-  const { error } = await supabase.from("likes").insert({ post_id: postId, profile_id: user.id });
-  if (error) return { error: msg(error, "Could not like that post."), liked: false };
+  const { data: inserted, error } = await supabase
+    .from("likes")
+    .upsert({ post_id: postId, profile_id: user.id }, { onConflict: "post_id,profile_id", ignoreDuplicates: true })
+    .select("post_id");
+  if (error) return { error: msg(error, "Could not like that post.") };
+  // No row came back: it was already liked, and the author already heard.
+  if (!inserted || inserted.length === 0) return { error: null };
   // Tell the author, if they want to hear it.
   const service = createServiceClient();
   const [{ data: post }, { data: liker }] = await Promise.all([
@@ -90,7 +91,7 @@ export async function toggleLike(postId: string): Promise<Result & { liked?: boo
       payload: likePayload({ postId, likerName: liker?.display_name ?? "Someone" }),
     });
   }
-  return { error: null, liked: true };
+  return { error: null };
 }
 
 export async function addComment(postId: string, body: string): Promise<Result> {

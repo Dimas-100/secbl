@@ -22,11 +22,12 @@ export async function GET() {
   const { error } = await supabase.from("schools").select("id").limit(1);
 
   let seasonTick = "skipped";
+  let orphans: { removed: number; error: string | null } = { removed: 0, error: "skipped" };
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!error && serviceKey) {
     const service = createClient(url, serviceKey, { auth: { persistSession: false } });
     await runSeasonTick(service, clubDateOf(new Date().toISOString()));
-    await sweepOrphanPhotos(service);
+    orphans = await sweepOrphanPhotos(service);
     seasonTick = "ran";
   }
 
@@ -35,6 +36,7 @@ export async function GET() {
     database: error ? `error: ${error.message}` : "reachable",
     latency_ms: Date.now() - started,
     season_tick: seasonTick,
+    orphan_photos: orphans,
     checked_at: new Date().toISOString(),
   };
   return NextResponse.json(body, {

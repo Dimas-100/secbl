@@ -1,3 +1,4 @@
+import { DEFAULT_PREFS } from "@/lib/push";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
@@ -106,7 +107,7 @@ export default async function SettingsPage({
         </CardHeader>
         <CardContent>
           <NotificationsCard
-            initialPrefs={prefs ?? { messages: true, matches: true, events: true, league: true, social: false }}
+            initialPrefs={prefs ?? DEFAULT_PREFS}
           />
         </CardContent>
       </Card>

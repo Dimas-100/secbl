@@ -53,9 +53,11 @@ function flatten(body: string): string {
   return flat.length <= BODY_MAX ? flat : flat.slice(0, BODY_MAX);
 }
 
-// Missing prefs = everything on. The actor never hears about their own
-// action, and a member who is no longer approved (suspended, say) hears
-// nothing at all — their room memberships may still exist.
+// Missing prefs mean the defaults (DEFAULT_PREFS: social off, the rest on).
+// The actor never hears about their own action, and a member who is no
+// longer approved (suspended, say) hears nothing at all — their room
+// memberships may still exist.
+export const DEFAULT_PREFS: Prefs = { messages: true, matches: true, events: true, league: true, social: false };
 export function recipientsFor(
   candidates: { profile_id: string; prefs: Prefs | null; approved?: boolean }[],
   category: PushCategory,
@@ -65,7 +67,7 @@ export function recipientsFor(
   for (const c of candidates) {
     if (c.profile_id === excludeId) continue;
     if (c.approved === false) continue;
-    if (c.prefs && !c.prefs[category]) continue;
+    if (!(c.prefs ?? DEFAULT_PREFS)[category]) continue;
     if (!out.includes(c.profile_id)) out.push(c.profile_id);
   }
   return out;
@@ -214,7 +216,7 @@ export function likePayload(input: { postId: string; likerName: string }): PushP
   return {
     title: `${first(input.likerName)} liked your post`,
     body: "Tap to see it.",
-    url: `/?post=${input.postId}`,
+    url: `/#post-${input.postId}`,
     tag: `post:${input.postId}`,
     category: "social",
   };
@@ -224,7 +226,7 @@ export function commentPayload(input: { postId: string; commenterName: string; b
   return {
     title: `${first(input.commenterName)} commented on your post`,
     body: flatten(input.body),
-    url: `/?post=${input.postId}`,
+    url: `/#post-${input.postId}`,
     tag: `post:${input.postId}`,
     category: "social",
   };

@@ -117,9 +117,15 @@ export default async function AdminPage({
   // hidden posts and reports through RLS).
   const { data: hiddenPosts } = await supabase
     .from("posts")
-    .select("id, caption, created_at, author:profiles!posts_author_id_fkey(display_name), post_reports(reason, reporter:profiles!post_reports_reporter_id_fkey(display_name))")
+    .select("id, caption, image_path, created_at, author:profiles!posts_author_id_fkey(display_name), post_reports(reason, reporter:profiles!post_reports_reporter_id_fkey(display_name))")
     .not("hidden_at", "is", null)
     .order("hidden_at", { ascending: false });
+  const hiddenPaths = (hiddenPosts ?? []).map((p) => p.image_path as string);
+  const hiddenSigned = new Map<string, string>();
+  if (hiddenPaths.length > 0) {
+    const { data: urls } = await supabase.storage.from("posts").createSignedUrls(hiddenPaths, 3600);
+    for (const u of urls ?? []) if (u.path && u.signedUrl) hiddenSigned.set(u.path, u.signedUrl);
+  }
 
   const { data: disputed } = await supabase
     .from("matches")
@@ -203,7 +209,15 @@ export default async function AdminPage({
             return (
               <div key={p.id} className="flex flex-col gap-2 border-b pb-3 last:border-b-0 last:pb-0">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 flex-col gap-0.5">
+                  {hiddenSigned.get(p.image_path as string) && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={hiddenSigned.get(p.image_path as string)}
+                      alt=""
+                      className="size-16 shrink-0 rounded-[12px] object-cover"
+                    />
+                  )}
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="font-medium">{author?.display_name ?? "Member"}</span>
                     {p.caption && <span className="text-muted-foreground truncate text-sm">{p.caption}</span>}
                     <span className="text-muted-foreground text-xs">

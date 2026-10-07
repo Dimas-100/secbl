@@ -2,13 +2,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { Heart, MoreHorizontal, Send } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import type { FeedPerson } from "@/lib/feed";
 import { COMMENT_MAX, likeState, visibleComments } from "@/lib/posts";
 import { cn } from "@/lib/utils";
-import { addComment, deleteComment, deletePost, reportPost, toggleLike } from "@/app/(member)/posts/actions";
+import { addComment, deleteComment, deletePost, reportPost, setLike } from "@/app/(member)/posts/actions";
 
 export interface PostCardComment {
   id: string;
@@ -45,9 +45,25 @@ export function PostCard({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const initial = likeState(post.likes, meId);
-  const [liked, setLiked] = useState(initial.mine);
-  const [count, setCount] = useState(initial.count);
+  // The server's likes are the truth on every render; a tap is an optimistic
+  // overlay that lasts exactly as long as its transition.
+  const server = likeState(post.likes, meId);
+  const [like, setOptimisticLike] = useOptimistic(server, (_cur, next: boolean) => ({
+    mine: next,
+    count: server.count + (next ? 1 : 0) - (server.mine ? 1 : 0),
+  }));
+  // Signed URLs change on every render; keep the first one this card saw
+  // and adopt the latest only every 50 minutes, so a live refresh never
+  // re-downloads the photo and the URL is swapped before it expires.
+  const [src, setSrc] = useState<string | null>(post.signedUrl);
+  const latest = useRef(post.signedUrl);
+  useEffect(() => {
+    latest.current = post.signedUrl;
+  }, [post.signedUrl]);
+  useEffect(() => {
+    const timer = setInterval(() => setSrc(latest.current), 50 * 60_000);
+    return () => clearInterval(timer);
+  }, []);
   const [showAll, setShowAll] = useState(false);
   const [draft, setDraft] = useState("");
   const [menu, setMenu] = useState(false);
@@ -56,18 +72,13 @@ export function PostCard({
   const { shown, hidden } = visibleComments(post.comments, showAll);
   const name = mine ? "You" : (author?.display_name ?? "Member");
 
-  function like() {
-    // Optimistic: the heart flips now, the server catches up.
-    const next = !liked;
-    setLiked(next);
-    setCount((c) => c + (next ? 1 : -1));
+  function toggleLike() {
+    const next = !like.mine;
     start(async () => {
-      const r = await toggleLike(post.id);
-      if (r.error) {
-        setLiked(!next);
-        setCount((c) => c - (next ? 1 : -1));
-        setNote(r.error);
-      }
+      setOptimisticLike(next);
+      const r = await setLike(post.id, next);
+      if (r.error) setNote(r.error);
+      else router.refresh();
     });
   }
 
@@ -97,14 +108,16 @@ export function PostCard({
 
   function report() {
     setMenu(false);
-    if (!window.confirm("Report this post to the admins? Three reports hide it.")) return;
+    const reason = window.prompt("Report this post to the admins? Three reports hide it.\nReason (optional):");
+    if (reason === null) return;
     start(async () => {
-      const r = await reportPost(post.id, "");
+      const r = await reportPost(post.id, reason);
       setNote(r.error ?? "Reported. Thanks.");
     });
   }
 
   function removeComment(id: string) {
+    if (!window.confirm("Delete this comment?")) return;
     start(async () => {
       const r = await deleteComment(id);
       if (r.error) setNote(r.error);
@@ -155,11 +168,11 @@ export function PostCard({
 
       {post.caption && <p className="text-[15px] leading-snug whitespace-pre-line">{post.caption}</p>}
 
-      {post.signedUrl ? (
+      {src ? (
         // A plain img: the URL is signed and short-lived, so next/image's
         // loader and domain allow-list would only get in the way.
         <img
-          src={post.signedUrl}
+          src={src}
           alt={post.caption ? "" : "Photo"}
           loading="lazy"
           className="bg-card max-h-[520px] w-full rounded-[20px] object-cover shadow-[inset_0_0_0_1px_var(--hairline-row)]"
@@ -173,13 +186,13 @@ export function PostCard({
       <div className="flex items-center gap-4">
         <button
           type="button"
-          onClick={like}
-          aria-pressed={liked}
-          aria-label={liked ? "Unlike" : "Like"}
-          className={cn("press flex items-center gap-1.5 text-[14px]", liked ? "text-loss" : "text-muted-foreground")}
+          onClick={toggleLike}
+          aria-pressed={like.mine}
+          aria-label={like.mine ? "Unlike" : "Like"}
+          className={cn("press flex items-center gap-1.5 text-[14px]", like.mine ? "text-loss" : "text-muted-foreground")}
         >
-          <Heart className="size-5" strokeWidth={1.8} fill={liked ? "currentColor" : "none"} />
-          <span className="stat-number">{count}</span>
+          <Heart className="size-5" strokeWidth={1.8} fill={like.mine ? "currentColor" : "none"} />
+          <span className="stat-number">{like.count}</span>
         </button>
         <span className="text-muted-foreground text-[13px]">
           {post.comments.length === 0 ? "No comments" : `${post.comments.length} comment${post.comments.length === 1 ? "" : "s"}`}

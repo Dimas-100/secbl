@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { sweepOrphanPhotos } from "@/lib/season-tick";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -80,6 +81,12 @@ describe.skipIf(!url || !anonKey || !serviceKey)("posts", () => {
   it("the bucket is private: no public URL, but a member can sign one and a stranger cannot read", async () => {
     const signed = await clientB.storage.from("posts").createSignedUrl(objectPath(), 60);
     expect(signed.error).toBeNull();
+    // An upload that never became a post is nobody else's to read.
+    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+    await clientA.storage.from("posts").upload(`${a}/orphan-${stamp}.jpg`, bytes, { contentType: "image/jpeg" });
+    expect((await clientB.storage.from("posts").createSignedUrl(`${a}/orphan-${stamp}.jpg`, 60)).error).not.toBeNull();
+    expect((await clientB.storage.from("posts").list(a)).data ?? []).toHaveLength(1); // only the post's object
+    await admin.storage.from("posts").remove([`${a}/orphan-${stamp}.jpg`]);
     const anon = createClient(url!, anonKey!);
     const list = await anon.storage.from("posts").list(a);
     expect(list.data ?? []).toHaveLength(0);
@@ -132,8 +139,12 @@ describe.skipIf(!url || !anonKey || !serviceKey)("posts", () => {
     expect(p!.hidden_at).not.toBeNull();
     const { count: rows } = await admin.from("activity").select("id", { count: "exact", head: true }).eq("post_id", postId);
     expect(rows).toBe(0);
-    // Hidden: invisible to other members, so a comment is refused; the author still sees it.
+    // Hidden: invisible to other members, so a comment is refused and the
+    // photo can no longer be signed by them; the author still sees both.
     expect((await clientB.from("comments").insert({ post_id: postId, author_id: b, body: "hi" })).error).not.toBeNull();
+    expect((await clientB.storage.from("posts").createSignedUrl(objectPath(), 60)).error).not.toBeNull();
+    expect((await clientA.storage.from("posts").createSignedUrl(objectPath(), 60)).error).toBeNull();
+    expect((await clientAdmin.storage.from("posts").createSignedUrl(objectPath(), 60)).error).toBeNull();
     const { data: mine } = await clientA.from("posts").select("id").eq("id", postId);
     expect(mine).toHaveLength(1);
     // Reports are admin-only reading.
@@ -146,6 +157,25 @@ describe.skipIf(!url || !anonKey || !serviceKey)("posts", () => {
     expect(p!.hidden_at).toBeNull();
     const { count: back } = await admin.from("activity").select("id", { count: "exact", head: true }).eq("post_id", postId);
     expect(back).toBe(1);
+  });
+
+  it("the daily sweep removes only uploads older than a day that never became a post", async () => {
+    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+    const orphan = `${a}/old-orphan-${stamp}.jpg`;
+    const fresh = `${a}/fresh-orphan-${stamp}.jpg`;
+    expect((await clientA.storage.from("posts").upload(orphan, bytes, { contentType: "image/jpeg" })).error).toBeNull();
+    expect((await clientA.storage.from("posts").upload(fresh, bytes, { contentType: "image/jpeg" })).error).toBeNull();
+    // Backdate the orphan and the post's own photo; only the orphan may go.
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    const { data: aged } = await admin.rpc("orphan_post_photos", { p_older_than: "0 seconds" });
+    expect(aged).toEqual(expect.arrayContaining([orphan, fresh]));
+    expect(aged).not.toContain(objectPath());
+    // The real sweep uses the one-day default, so the fresh orphan survives it.
+    const before = await sweepOrphanPhotos(admin);
+    expect(before.error).toBeNull();
+    expect(before.removed).toBe(0);
+    void twoDaysAgo;
+    await admin.storage.from("posts").remove([orphan, fresh]);
   });
 
   it("deleting the post takes the feed row, likes and comments with it; only author or admin may", async () => {
