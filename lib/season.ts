@@ -49,12 +49,13 @@ export function seasonStandings(
   for (const m of members) {
     rows.set(m.id, { id: m.id, display_name: m.display_name, played: 0, wins: 0, losses: 0, points: 0, rank: 0 });
   }
-  const inRange = matches.filter(
-    (m) => inSeason(m.played_at, season) && rows.has(m.reporter_id) && rows.has(m.opponent_id)
-  );
+  // A member keeps the points from every game they played, even against
+  // someone who has since been suspended and is no longer listed.
+  const inRange = matches.filter((m) => inSeason(m.played_at, season));
   for (const m of inRange) {
     for (const id of [m.reporter_id, m.opponent_id]) {
-      const r = rows.get(id)!;
+      const r = rows.get(id);
+      if (!r) continue;
       r.played += 1;
       if (m.winner_id === id) {
         r.wins += 1;
@@ -109,6 +110,14 @@ export function daysBetween(a: string, b: string): number {
 // Null without a planned end; negative once it has passed.
 export function daysLeft(season: SeasonRange, today: string): number | null {
   return season.ends_on === null ? null : daysBetween(today, season.ends_on);
+}
+
+// The default start for the next season: today, or the day after the last
+// one ended (two seasons must never share a day, or a game counts twice).
+export function nextSeasonStart(lastEndsOn: string | null, today: string): string {
+  if (lastEndsOn === null || lastEndsOn < today) return today;
+  const d = new Date(utc(lastEndsOn) + 86_400_000);
+  return d.toISOString().slice(0, 10);
 }
 
 export function seasonProgress(season: SeasonRange, today: string): number | null {

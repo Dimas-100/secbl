@@ -4,6 +4,10 @@ import { raceProgress } from "@/lib/race";
 
 // A table nobody has touched for this long is not live any more.
 export const LIVE_STALE_MS = 3 * 3_600_000;
+// A report sent this recently means the table is over, whatever a publish
+// still in flight says.
+export const SENT_WINDOW_MS = 60_000;
+export const GAME_TYPES = ["8ball", "9ball", "10ball", "other"] as const;
 
 export interface LiveInput {
   opponentId: string;
@@ -17,6 +21,7 @@ export interface LiveInput {
 
 export function validateLive(i: LiveInput, meId: string): string | null {
   if (!i.opponentId || i.opponentId === meId) return "Pick an opponent";
+  if (!(GAME_TYPES as readonly string[]).includes(i.gameType)) return "Pick a game";
   if (i.raceTo !== null && (!Number.isInteger(i.raceTo) || i.raceTo < 1 || i.raceTo > 25)) return "Pick a race length";
   if (
     !Number.isInteger(i.spot) ||
@@ -46,6 +51,10 @@ export function liveLine(row: { reporter_score: number; opponent_score: number; 
     opponent,
     need: lead >= row.race_to ? "Finished" : `First to ${row.race_to} · leader needs ${row.race_to - lead}`,
   };
+}
+
+export function recentlySent(createdAt: string | null, now: Date): boolean {
+  return createdAt !== null && now.getTime() - Date.parse(createdAt) < SENT_WINDOW_MS;
 }
 
 export function isFresh(updatedAt: string, now: Date): boolean {

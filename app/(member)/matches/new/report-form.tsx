@@ -21,6 +21,7 @@ import {
   type RaceState,
   type Side,
 } from "@/lib/race";
+import { isFresh } from "@/lib/live";
 import { recentOpponents } from "@/lib/report-form";
 import { cn } from "@/lib/utils";
 import { reportMatch } from "./actions";
@@ -127,6 +128,9 @@ export function ReportMatchForm({
   // Debounced so a run of taps is one write; a restored draft republishes.
   useEffect(() => {
     if (!opponentId || sent.current) return;
+    // A draft restored hours later is a memory, not a table being played:
+    // it goes live again only once someone touches it (every patch bumps `at`).
+    if (!isFresh(new Date(d.at).toISOString(), new Date())) return;
     publishTimer.current = setTimeout(() => {
       publishTimer.current = null;
       if (sent.current) return;
@@ -135,7 +139,7 @@ export function ReportMatchForm({
     return () => {
       if (publishTimer.current) clearTimeout(publishTimer.current);
     };
-  }, [opponentId, game, raceTo, spot, spotTo, you, them]);
+  }, [opponentId, game, raceTo, spot, spotTo, you, them, d.at]);
 
   const selected = opponents.find((o) => o.id === opponentId) ?? null;
   let chips = recentOpponents(recentIds, opponents);

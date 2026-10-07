@@ -11,8 +11,8 @@ import { SchoolLogoUploader } from "./school-logo-uploader";
 import { EndSeasonButton } from "./end-season-button";
 import { clubDateOf, formatEventWhen } from "@/lib/events";
 import { formatLabel } from "@/lib/race";
-import { formatClubDate, seasonChampion, seasonCountdownLabel } from "@/lib/season";
-import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
+import { formatClubDate, nextSeasonStart, seasonChampion, seasonCountdownLabel } from "@/lib/season";
+import { loadOpenSeason, loadSeasonStandings, loadSeasons } from "@/lib/season-data";
 import { seasonLabel } from "@/lib/stats";
 import {
   addEventSource,
@@ -94,6 +94,9 @@ export default async function AdminPage({
   // reports played inside the season still wait on a confirmation.
   const today = clubDateOf(new Date().toISOString());
   const season = await loadOpenSeason(supabase);
+  // The next season may not start on the day the last one ended.
+  const lastClosed = season ? null : (await loadSeasons(supabase)).find((s) => s.status === "closed") ?? null;
+  const defaultStart = nextSeasonStart(lastClosed?.ends_on ?? null, today);
   const standings = season ? await loadSeasonStandings(supabase, season) : [];
   const leader = seasonChampion(standings);
   const onBoard = standings.filter((s) => s.played > 0).length;
@@ -165,7 +168,7 @@ export default async function AdminPage({
               </p>
               <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr]">
                 <Input name="season_name" defaultValue={seasonLabel(today)} aria-label="Season name" required />
-                <Input type="date" name="starts_on" defaultValue={today} aria-label="Start date" required />
+                <Input type="date" name="starts_on" defaultValue={defaultStart} aria-label="Start date" required />
                 <Input type="date" name="ends_on" aria-label="Planned end (optional)" />
               </div>
               <SubmitButton size="sm" pendingChildren="Opening…">

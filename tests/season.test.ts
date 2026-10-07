@@ -6,6 +6,7 @@ import {
   daysLeft,
   formatClubDate,
   inSeason,
+  nextSeasonStart,
   seasonChampion,
   seasonCountdownLabel,
   seasonProgress,
@@ -86,14 +87,29 @@ describe("seasonStandings", () => {
     ]);
   });
 
-  it("ignores games outside the season and players who are not members", () => {
-    const rows = seasonStandings([game("a", "b", "2026-08-01"), game("zz", "a")], members, season);
+  it("ignores games outside the season", () => {
+    const rows = seasonStandings([game("a", "b", "2026-08-01")], members, season);
     expect(rows.every((r) => r.points === 0 && r.played === 0)).toBe(true);
+  });
+  it("still credits a member whose opponent is no longer listed (suspended)", () => {
+    const rows = seasonStandings([game("a", "zz"), game("zz", "b")], members, season);
+    expect(rows.find((r) => r.id === "a")).toMatchObject({ played: 1, wins: 1, points: POINTS_WIN });
+    expect(rows.find((r) => r.id === "b")).toMatchObject({ played: 1, losses: 1, points: POINTS_LOSS });
+    expect(rows.some((r) => r.id === "zz")).toBe(false);
   });
 
   it("names the champion as the top row with games, or null", () => {
     expect(seasonChampion(seasonStandings([], members, season))).toBeNull();
     expect(seasonChampion(seasonStandings([game("c", "a")], members, season))?.id).toBe("c");
+  });
+});
+
+describe("nextSeasonStart", () => {
+  it("is today, or the day after the last season ended, whichever is later", () => {
+    expect(nextSeasonStart(null, "2026-12-12")).toBe("2026-12-12");
+    expect(nextSeasonStart("2026-12-12", "2026-12-12")).toBe("2026-12-13");
+    expect(nextSeasonStart("2026-12-31", "2026-12-12")).toBe("2027-01-01");
+    expect(nextSeasonStart("2026-08-01", "2026-12-12")).toBe("2026-12-12");
   });
 });
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { validateLive, type LiveInput } from "@/lib/live";
+import { recentlySent, validateLive, type LiveInput } from "@/lib/live";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 // The scoreboard publishes itself (spec §3): one row per reporter, upserted
@@ -27,6 +27,18 @@ export async function publishLiveGame(input: LiveInput): Promise<{ error: string
     const approved = new Set((people ?? []).map((p) => p.id as string));
     if (!approved.has(user.id)) return { error: "Your account is not active." };
     if (!approved.has(input.opponentId)) return { error: "Opponent not found" };
+    // A publish still in flight when Send was tapped must not resurrect the
+    // table after reportMatch deleted it: a report against this opponent in
+    // the last minute means the game is over.
+    const { data: sent } = await service
+      .from("matches")
+      .select("created_at")
+      .eq("reporter_id", user.id)
+      .eq("opponent_id", input.opponentId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (recentlySent(sent?.created_at ?? null, new Date())) return { error: null };
     const { error } = await service.from("live_games").upsert(
       {
         reporter_id: user.id,
