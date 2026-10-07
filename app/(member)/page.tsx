@@ -2,8 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { AvatarStack } from "@/components/avatar-stack";
+import { ActivityRow } from "@/components/activity-row";
 import { ListRow } from "@/components/list-row";
-import { MatchRow } from "@/components/match-row";
 import { MessagesButton } from "@/components/messages-button";
 import { NotifyPrompt } from "@/components/notify-prompt";
 import { SectionHeading } from "@/components/section-heading";
@@ -14,11 +14,11 @@ import { TitleBadge } from "@/components/title-badge";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
-import { winnerDelta } from "@/lib/form";
+import { FEED_SELECT, type FeedRow } from "@/lib/feed";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
 import { xpCaption } from "@/lib/levels";
-import { formatLabel, formatShort } from "@/lib/race";
-import { labelPlayedDate, overallRank, ratingChangeSince, seasonLabel, winRate } from "@/lib/stats";
+import { formatLabel } from "@/lib/race";
+import { overallRank, ratingChangeSince, seasonLabel, winRate } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { loadXp } from "@/lib/xp-data";
 import type { RsvpResponse } from "@/lib/types";
@@ -52,7 +52,7 @@ export default async function HomePage({
     { data: history },
     { data: toConfirm },
     { data: awaiting },
-    { data: recent },
+    { data: feed },
     { data: scheduledEvents },
     { xp, level },
   ] = await Promise.all([
@@ -84,15 +84,8 @@ export default async function HomePage({
       .eq("reporter_id", user.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
-    supabase
-      .from("matches")
-      .select(
-        "id, reporter_id, reporter_score, opponent_score, game_type, played_at, winner_id, race_to, spot, spot_to, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
-      )
-      .eq("status", "confirmed")
-      .order("played_at", { ascending: false })
-      .order("confirmed_at", { ascending: false })
-      .limit(30),
+    // The league feed: results, badges, streaks, passes, cups, seasons, joins.
+    supabase.from("activity").select(FEED_SELECT).order("created_at", { ascending: false }).limit(30),
     // Bound the fetch, but let partitionEvents make the actual upcoming/past
     // call so the home card and the calendar can never disagree.
     supabase
@@ -294,7 +287,7 @@ export default async function HomePage({
 
       <section className="flex flex-col gap-1.5">
         <SectionHeading action={{ href: `/players/${user.id}`, label: "All games" }}>Recent</SectionHeading>
-        {(recent ?? []).length === 0 && (
+        {(feed ?? []).length === 0 && (
           <p className="text-muted-foreground py-6 text-center text-sm">
             No results yet this season.{" "}
             <Link href="/matches/new" className="text-brass">
@@ -303,28 +296,17 @@ export default async function HomePage({
           </p>
         )}
         <ShowMore
-          label="Show {hidden} more games"
-          items={(recent ?? []).map((m) => {
-          const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
-          const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
-          const reporterWon = m.winner_id === reporter?.id;
-          return (
-            <MatchRow
-              key={m.id}
-              winner={reporterWon ? reporter : opponent}
-              loser={reporterWon ? opponent : reporter}
-              winnerScore={Math.max(m.reporter_score, m.opponent_score)}
-              loserScore={Math.min(m.reporter_score, m.opponent_score)}
-              delta={winnerDelta(m)}
+          label="Show {hidden} more"
+          items={((feed ?? []) as unknown as FeedRow[]).map((row) => (
+            <ActivityRow
+              key={row.id}
+              row={row}
               viewerId={user.id}
-              perspectiveId={user.id}
-              gameType={GAME_LABEL[m.game_type] ?? m.game_type}
-              format={formatShort(m.race_to, m.spot)}
-              meta={labelPlayedDate(m.played_at, today)}
-              caption={xpCaption(m.id, xp)}
+              today={today}
+              now={now}
+              caption={row.match_id ? xpCaption(row.match_id, xp) : undefined}
             />
-          );
-          })}
+          ))}
         />
       </section>
     </main>

@@ -4,7 +4,7 @@ import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import { bracketRounds, type GeneratedMatch } from "@/lib/bracket";
+import { bracketRounds, roundName, type GeneratedMatch } from "@/lib/bracket";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { LiveRefresh } from "./refresh";
@@ -19,15 +19,6 @@ interface Entrant extends AvatarIdentity {
   school: string | null;
 }
 
-// Round names for a bracket of `count` rounds, last first: Final, Semifinals,
-// Quarterfinals, then Round N.
-function roundName(index: number, count: number): string {
-  const fromEnd = count - 1 - index;
-  if (fromEnd === 0) return "Final";
-  if (fromEnd === 1) return "Semifinals";
-  if (fromEnd === 2) return "Quarterfinals";
-  return `Round ${index + 1}`;
-}
 function matchName(index: number, count: number, position: number): string {
   const fromEnd = count - 1 - index;
   if (fromEnd === 0) return "Final";

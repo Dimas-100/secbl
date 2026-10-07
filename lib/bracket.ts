@@ -140,3 +140,13 @@ export function bracketRounds(matches: GeneratedMatch[]): GeneratedMatch[][] {
     matches.filter((m) => m.round === round).sort((a, b) => a.position - b.position)
   );
 }
+
+// Round names for a bracket of `count` rounds, last first: Final, Semifinals,
+// Quarterfinals, then Round N. `index` is 0-based (round 1 → 0).
+export function roundName(index: number, count: number): string {
+  const fromEnd = count - 1 - index;
+  if (fromEnd === 0) return "Final";
+  if (fromEnd === 1) return "Semifinals";
+  if (fromEnd === 2) return "Quarterfinals";
+  return `Round ${index + 1}`;
+}
