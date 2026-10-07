@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import { ballFor, ballStyle } from "@/lib/identity";
+import { OnlineDot } from "@/components/online-dot";
 import { cn } from "@/lib/utils";
 
 const SIZES = {
@@ -43,28 +44,33 @@ export function Avatar({
     : ring
       ? `0 0 0 1px ${ring}, 0 0 0 ${gap + 1}px var(--background), 0 0 0 ${gap + 2}px ${ring}`
       : "0 0 0 1px var(--hairline-strong)";
-  const base = cn("shrink-0 rounded-full", SIZES[size], className);
-  if (person.avatar_url) {
-    return (
-      <img
-        src={person.avatar_url}
-        alt=""
-        width={128}
-        height={128}
-        loading="lazy"
-        style={{ boxShadow }}
-        className={cn(base, "object-cover")}
-      />
-    );
-  }
-  const ball = ballFor(person.ball, person.id);
-  return (
+  const base = cn("shrink-0 rounded-full", SIZES[size]);
+  // The wrapper carries the caller's classes (stack offsets, rings) and
+  // anchors the online dot; the face itself keeps its size and shadow.
+  const dot = size === "xs" || size === "sm" ? 8 : size === "md" || size === "lg" ? 10 : 12;
+  const face = person.avatar_url ? (
+    <img
+      src={person.avatar_url}
+      alt=""
+      width={128}
+      height={128}
+      loading="lazy"
+      style={{ boxShadow }}
+      className={cn(base, "object-cover")}
+    />
+  ) : (
     <span
       aria-hidden="true"
-      style={{ ...ballStyle(ball), boxShadow }}
+      style={{ ...ballStyle(ballFor(person.ball, person.id)), boxShadow }}
       className={cn(base, "flex items-center justify-center font-semibold")}
     >
       {initial}
+    </span>
+  );
+  return (
+    <span className={cn("relative inline-flex shrink-0 rounded-full", className)}>
+      {face}
+      <OnlineDot id={person.id} size={dot} />
     </span>
   );
 }
