@@ -32,6 +32,24 @@ export interface FeedMatch {
   opponent: FeedPerson | FeedPerson[] | null;
 }
 
+export interface FeedComment {
+  id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+  author: FeedPerson | FeedPerson[] | null;
+}
+
+export interface FeedPost {
+  id: string;
+  author_id: string;
+  caption: string | null;
+  image_path: string;
+  created_at: string;
+  likes: { profile_id: string }[];
+  comments: FeedComment[];
+}
+
 export interface FeedRow {
   id: string;
   kind: ActivityKind;
@@ -45,6 +63,7 @@ export interface FeedRow {
   actor: FeedPerson | FeedPerson[] | null;
   other: FeedPerson | FeedPerson[] | null;
   match: FeedMatch | FeedMatch[] | null;
+  post: FeedPost | FeedPost[] | null;
 }
 
 const PERSON = "id, display_name, avatar_url, ball, schools(short_name)";
@@ -53,7 +72,9 @@ export const FEED_SELECT =
   `actor:profiles!activity_actor_id_fkey(${PERSON}), other:profiles!activity_other_id_fkey(${PERSON}), ` +
   `match:matches(id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, game_type, played_at, ` +
   `race_to, spot, spot_to, rating_delta_reporter, rating_delta_opponent, ` +
-  `reporter:profiles!matches_reporter_id_fkey(${PERSON}), opponent:profiles!matches_opponent_id_fkey(${PERSON}))`;
+  `reporter:profiles!matches_reporter_id_fkey(${PERSON}), opponent:profiles!matches_opponent_id_fkey(${PERSON})), ` +
+  `post:posts(id, author_id, caption, image_path, created_at, likes(profile_id), ` +
+  `comments(id, author_id, body, created_at, author:profiles!comments_author_id_fkey(${PERSON})))`;
 
 // PostgREST returns a to-one join as an object or a one-element array
 // depending on how the relationship was inferred; callers never care which.
@@ -131,6 +152,7 @@ export function describeActivity(
       return { title: `${you} joined${school ? ` from ${school}` : ""}`, meta: null, href: profile };
     }
     case "match":
+    case "post":
     default:
       return { title: "", meta: null, href: null };
   }

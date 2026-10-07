@@ -1,3 +1,4 @@
+import { DEFAULT_PREFS } from "@/lib/push";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
@@ -35,7 +36,7 @@ export default async function SettingsPage({
   const school = Array.isArray(profile?.schools) ? profile.schools[0] : profile?.schools;
   const { data: prefs } = await supabase
     .from("notification_prefs")
-    .select("messages, matches, events, league")
+    .select("messages, matches, events, league, social")
     .eq("profile_id", user.id)
     .maybeSingle();
 
@@ -106,7 +107,7 @@ export default async function SettingsPage({
         </CardHeader>
         <CardContent>
           <NotificationsCard
-            initialPrefs={prefs ?? { messages: true, matches: true, events: true, league: true }}
+            initialPrefs={prefs ?? DEFAULT_PREFS}
           />
         </CardContent>
       </Card>

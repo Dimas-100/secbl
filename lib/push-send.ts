@@ -73,7 +73,7 @@ export async function loadPrefs(
 ): Promise<{ profile_id: string; prefs: Prefs | null; approved: boolean }[]> {
   if (ids.length === 0) return [];
   const [{ data: prefRows }, { data: approvedRows }] = await Promise.all([
-    service.from("notification_prefs").select("profile_id, messages, matches, events, league").in("profile_id", ids),
+    service.from("notification_prefs").select("profile_id, messages, matches, events, league, social").in("profile_id", ids),
     service.from("profiles").select("id").in("id", ids).eq("status", "approved"),
   ]);
   const byId = new Map((prefRows ?? []).map((p) => [p.profile_id as string, p as Prefs & { profile_id: string }]));
@@ -82,7 +82,7 @@ export async function loadPrefs(
     const p = byId.get(id);
     return {
       profile_id: id,
-      prefs: p ? { messages: p.messages, matches: p.matches, events: p.events, league: p.league } : null,
+      prefs: p ? { messages: p.messages, matches: p.matches, events: p.events, league: p.league, social: p.social } : null,
       approved: approved.has(id),
     };
   });

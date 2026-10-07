@@ -60,3 +60,21 @@ export async function runSeasonTick(service: SupabaseClient, today: string): Pro
     console.warn("season tick failed", err);
   }
 }
+
+// Uploads that never became a post (the browser uploads first, then records
+// the row) would otherwise sit in the bucket for good. The list comes from a
+// security-definer SQL function (PostgREST does not expose the storage
+// schema); an error anywhere means nothing is removed.
+export async function sweepOrphanPhotos(service: SupabaseClient): Promise<{ removed: number; error: string | null }> {
+  try {
+    const { data, error } = await service.rpc("orphan_post_photos");
+    if (error) return { removed: 0, error: error.message };
+    const orphans = ((data ?? []) as string[]).filter((n) => typeof n === "string" && n.length > 0);
+    if (orphans.length === 0) return { removed: 0, error: null };
+    const { error: rmErr } = await service.storage.from("posts").remove(orphans);
+    if (rmErr) return { removed: 0, error: rmErr.message };
+    return { removed: orphans.length, error: null };
+  } catch (err) {
+    return { removed: 0, error: err instanceof Error ? err.message : String(err) };
+  }
+}

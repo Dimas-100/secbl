@@ -16,6 +16,8 @@ import { loadOpenSeason, loadSeasonStandings, loadSeasons } from "@/lib/season-d
 import { seasonLabel } from "@/lib/stats";
 import {
   addEventSource,
+  adminClearPostForm,
+  adminDeletePostForm,
   adminRejectMatch,
   adminResolveMatch,
   endSeason,
@@ -111,6 +113,20 @@ export default async function AdminPage({
     pendingCount = (await pending).count ?? 0;
   }
 
+  // Posts hidden by reports, with who reported them and why (admins see
+  // hidden posts and reports through RLS).
+  const { data: hiddenPosts } = await supabase
+    .from("posts")
+    .select("id, caption, image_path, created_at, author:profiles!posts_author_id_fkey(display_name), post_reports(reason, reporter:profiles!post_reports_reporter_id_fkey(display_name))")
+    .not("hidden_at", "is", null)
+    .order("hidden_at", { ascending: false });
+  const hiddenPaths = (hiddenPosts ?? []).map((p) => p.image_path as string);
+  const hiddenSigned = new Map<string, string>();
+  if (hiddenPaths.length > 0) {
+    const { data: urls } = await supabase.storage.from("posts").createSignedUrls(hiddenPaths, 3600);
+    for (const u of urls ?? []) if (u.path && u.signedUrl) hiddenSigned.set(u.path, u.signedUrl);
+  }
+
   const { data: disputed } = await supabase
     .from("matches")
     .select(
@@ -176,6 +192,63 @@ export default async function AdminPage({
               </SubmitButton>
             </form>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <SectionLabel>Posts</SectionLabel>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {(hiddenPosts ?? []).length === 0 && (
+            <p className="text-muted-foreground text-sm">No reported posts. Three reports hide a post until you clear or delete it.</p>
+          )}
+          {(hiddenPosts ?? []).map((p) => {
+            const author = Array.isArray(p.author) ? p.author[0] : p.author;
+            const reports = (p.post_reports ?? []) as { reason: string | null; reporter: { display_name: string } | { display_name: string }[] | null }[];
+            return (
+              <div key={p.id} className="flex flex-col gap-2 border-b pb-3 last:border-b-0 last:pb-0">
+                <div className="flex items-start justify-between gap-3">
+                  {hiddenSigned.get(p.image_path as string) && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={hiddenSigned.get(p.image_path as string)}
+                      alt=""
+                      className="size-16 shrink-0 rounded-[12px] object-cover"
+                    />
+                  )}
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="font-medium">{author?.display_name ?? "Member"}</span>
+                    {p.caption && <span className="text-muted-foreground truncate text-sm">{p.caption}</span>}
+                    <span className="text-muted-foreground text-xs">
+                      {reports.length} report{reports.length === 1 ? "" : "s"}
+                      {reports
+                        .map((r) => {
+                          const who = Array.isArray(r.reporter) ? r.reporter[0] : r.reporter;
+                          return `${who?.display_name ?? "Member"}${r.reason ? `: ${r.reason}` : ""}`;
+                        })
+                        .map((t) => ` · ${t}`)
+                        .join("")}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <form action={adminClearPostForm}>
+                      <input type="hidden" name="post_id" value={p.id} />
+                      <Button variant="outline" size="sm" type="submit">
+                        Clear
+                      </Button>
+                    </form>
+                    <form action={adminDeletePostForm}>
+                      <input type="hidden" name="post_id" value={p.id} />
+                      <Button variant="destructive" size="sm" type="submit">
+                        Delete
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 

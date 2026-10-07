@@ -3,6 +3,7 @@ import { FlameMark } from "@/components/flame-mark";
 import { Avatar } from "@/components/avatar";
 import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
+import { PostCard } from "@/components/post-card";
 import { TitleBadge } from "@/components/title-badge";
 import { describeActivity, feedStamp, one, type FeedPerson, type FeedRow } from "@/lib/feed";
 import { winnerDelta } from "@/lib/form";
@@ -20,13 +21,38 @@ export function ActivityRow({
   today,
   now,
   caption,
+  signedUrl,
+  isAdmin = false,
 }: {
   row: FeedRow;
   viewerId: string;
   today: string;
   now: Date;
   caption?: React.ReactNode;
+  // A post's photo, signed for this render.
+  signedUrl?: string | null;
+  isAdmin?: boolean;
 }) {
+  if (row.kind === "post") {
+    const p = one(row.post);
+    if (!p) return null;
+    return (
+      <PostCard
+        post={{
+          id: p.id,
+          author_id: p.author_id,
+          caption: p.caption,
+          signedUrl: signedUrl ?? null,
+          likes: p.likes ?? [],
+          comments: (p.comments ?? []).map((c) => ({ ...c, author: one(c.author) })),
+        }}
+        author={one(row.actor)}
+        stamp={feedStamp(row.created_at, now)}
+        meId={viewerId}
+        isAdmin={isAdmin}
+      />
+    );
+  }
   if (row.kind === "match") {
     const m = one(row.match);
     if (!m) return null;

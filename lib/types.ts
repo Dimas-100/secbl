@@ -137,7 +137,8 @@ export type ActivityKind =
   | "season_opened"
   | "season_week_left"
   | "season_closed"
-  | "member_joined";
+  | "member_joined"
+  | "post";
 
 export interface LiveGame {
   reporter_id: string;
@@ -150,4 +151,22 @@ export interface LiveGame {
   opponent_score: number;
   started_at: string;
   updated_at: string;
+}
+
+export interface Post {
+  id: string;
+  author_id: string;
+  caption: string | null;
+  // Object path inside the private "posts" bucket: <author_id>/<uuid>.jpg
+  image_path: string;
+  hidden_at: string | null;
+  created_at: string;
+}
+
+export interface Comment {
+  id: string;
+  post_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
 }

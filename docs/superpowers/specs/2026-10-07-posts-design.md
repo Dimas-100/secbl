@@ -1,7 +1,7 @@
 # SECBL Posts — photos and clips in the league feed, with reactions and moderation
 
 **Date:** 2026-10-07
-**Status:** Spec approved in conversation 2026-10-07; **build on hold** by the owner's decision. No plan, no code.
+**Status:** Approved 2026-10-07; the owner then asked to build **iteration 1** the same day (§9 below narrows the scope). Plan: `docs/superpowers/plans/2026-10-07-posts.md`.
 **Builds on:** `2026-10-06-seasons-feed-live-design.md` (the `activity` table and Home feed, Realtime refresh), `2026-10-06-live-club-design.md` (push categories, Storage upload pattern from `0016_personalization.sql`), `2026-10-06-elevated-dark-redesign-design.md` (tokens, `ListRow`, cards).
 
 ## 0. The ask, and the calls made
@@ -130,3 +130,19 @@ Native video upload, multiple photos per post, comments on posts (chat rooms ser
 1. Should a post be allowed with **no** media (text only)? The spec says no: it's a shot feed, not a status feed, and the chat rooms already carry text.
 2. Reactions on **all** rows (spec) or on posts only? All rows is the livelier choice and costs nothing extra.
 3. Hide threshold of three reports: right for a club of about fifty? With five members it is too low; with two hundred it is too high. Make it an admin setting if the club grows.
+
+## 9. Iteration 1 (built 2026-10-07) — what ships now, and the deltas from §1–§6
+
+The owner asked for images and descriptions first, with "a liking system or comments". Calls made:
+
+| Topic | Iteration 1 |
+|---|---|
+| Media | **Photos only.** `clip_url` is not created yet; `posts.image_path` is `not null`. Clip links return in a later iteration with the column and the card. |
+| Reactions | **A single Like** per member per post (❤), with a count, instead of four emoji. Table `likes (post_id, profile_id)`. Likes are on **posts only**; results and badges are unchanged. |
+| Comments | **Yes, on posts.** Flat list, newest last, up to 280 characters, no editing; author of the comment, author of the post, or an admin can delete. Shown collapsed to the last three with "Show all N". |
+| Push | One new category **Social** (default **off**): a like or a comment on your post. Reports push the admins under **League** (its Settings hint becomes "Season news and admin alerts") so no admin-only category is needed yet. |
+| Realtime | Home already refreshes on `activity` INSERT; it now also listens for `activity` DELETE (a deleted or hidden post leaves everyone's feed) and `comments` INSERT. Likes update optimistically on the tapping device and arrive for others on their next render. |
+| Profile grid | Deferred. |
+| Admin | The **Posts** card as specified: hidden posts with their report count and reasons, Clear or Delete. |
+
+Everything else in §1–§6 stands (private bucket, signed URLs, compression, five posts a day, three reports hide, moderation menu, tests).
