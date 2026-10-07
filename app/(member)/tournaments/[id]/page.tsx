@@ -150,14 +150,7 @@ export default async function TournamentPage({
 
       {[...rounds].map((round, index) => ({ round, index })).reverse().map(({ round, index }) => (
         <section key={index} id={`round-${index + 1}`} className="flex flex-col gap-3 scroll-mt-4">
-          {/* Same heading text the e2e suite waits on ("Round 1", "Final"). */}
-          <h2 className="eyebrow">
-            {roundName(index, rounds.length)}
-            {index === 0 && rounds.length > 1 && roundName(index, rounds.length) !== "Round 1" ? " · Round 1" : ""}
-          </h2>
-          {index === 0 && !["Round 1"].includes(roundName(index, rounds.length)) && (
-            <span className="sr-only">Round 1</span>
-          )}
+          <h2 className="eyebrow">{roundName(index, rounds.length)}</h2>
           {round
             .filter((m) => !isBye(m))
             .map((m) => {
@@ -173,7 +166,7 @@ export default async function TournamentPage({
                 if (isBye(f) && f.player1_id) return "bye";
                 const a = f.player1_id ? entrants.get(f.player1_id)?.display_name?.split(" ")[0] : null;
                 const b = f.player2_id ? entrants.get(f.player2_id)?.display_name?.split(" ")[0] : null;
-                return a && b ? `Winner of ${a} vs ${b}` : "Winner of the previous round";
+                return a && b ? `Winner of ${a} vs ${b}` : `Winner of ${matchName(f.round - 1, rounds.length, f.position)}`;
               };
               const Row = ({ p, score, slot }: { p: Entrant | null | undefined; score: number | null; slot: 1 | 2 }) => {
                 const won = decided && p && m.winner_id === p.id;

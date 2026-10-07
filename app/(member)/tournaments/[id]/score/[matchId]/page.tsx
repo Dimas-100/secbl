@@ -28,7 +28,7 @@ export default async function ScoreMatchPage({
   const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (me?.role !== "admin") redirect(`/tournaments/${id}`);
 
-  const [{ data: tournament }, { data: match }, { data: entrants }] = await Promise.all([
+  const [{ data: tournament }, { data: match }, { data: entrants }, { data: lastRound }] = await Promise.all([
     supabase.from("tournaments").select("id, name, status, race_to").eq("id", id).single(),
     supabase
       .from("tournament_matches")
@@ -37,6 +37,7 @@ export default async function ScoreMatchPage({
       .eq("tournament_id", id)
       .single(),
     supabase.from("tournament_players").select("profile_id, seed, profiles(display_name)").eq("tournament_id", id),
+    supabase.from("tournament_matches").select("round").eq("tournament_id", id).order("round", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (!tournament || !match) notFound();
   if (!match.player1_id || !match.player2_id) redirect(`/tournaments/${id}`);
@@ -49,7 +50,17 @@ export default async function ScoreMatchPage({
   const p1 = { id: match.player1_id, ...(who.get(match.player1_id) ?? { name: "Unknown", seed: null }) };
   const p2 = { id: match.player2_id, ...(who.get(match.player2_id) ?? { name: "Unknown", seed: null }) };
   const decided = match.winner_id !== null;
-  const roundName = match.winner_advances_to === null ? "Final" : `Round ${match.round}`;
+  // Final, Semifinal 1, Quarterfinal 3, Match 2 — the same names as the bracket.
+  const rounds = lastRound?.round ?? match.round;
+  const fromEnd = rounds - match.round;
+  const roundName =
+    fromEnd === 0
+      ? "Final"
+      : fromEnd === 1
+        ? `Semifinal ${match.position + 1}`
+        : fromEnd === 2
+          ? `Quarterfinal ${match.position + 1}`
+          : `Round ${match.round} · Match ${match.position + 1}`;
 
   if (!decided && tournament.status !== "live") redirect(`/tournaments/${id}`);
 
