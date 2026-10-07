@@ -13,12 +13,10 @@ interface MatchScanRow {
   tournament_match_id: string | null;
 }
 
-// One loader for every surface that shows a level, so Home, Profile and the
-// ladder can never disagree. Reads only; nothing is stored.
-export async function loadXp(
-  supabase: SupabaseClient,
-  memberId: string
-): Promise<{ xp: XpResult; level: LevelInfo }> {
+// A member's confirmed matches in XP order, finals marked. The input to
+// every level computation, so a "level before this match" can be replayed
+// from the same list (lib/activity-write.ts).
+export async function loadXpMatches(supabase: SupabaseClient, memberId: string): Promise<XpMatch[]> {
   const [rows, { data: finals }] = await Promise.all([
     // PostgREST caps every response at db-max-rows (1000) whatever range is
     // asked for, so the scan pages (lib/paging.ts).
@@ -51,6 +49,16 @@ export async function loadXp(
     confirmed_at: r.confirmed_at,
     is_final: r.tournament_match_id ? finalIds.has(r.tournament_match_id) : false,
   }));
+  return matches;
+}
+
+// One loader for every surface that shows a level, so Home, Profile and the
+// ladder can never disagree. Reads only; nothing is stored.
+export async function loadXp(
+  supabase: SupabaseClient,
+  memberId: string
+): Promise<{ xp: XpResult; level: LevelInfo }> {
+  const matches = await loadXpMatches(supabase, memberId);
   const xp = xpFromMatches(memberId, matches, clubWeekOf);
   return { xp, level: levelFromXp(xp.total) };
 }

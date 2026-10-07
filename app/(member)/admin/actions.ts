@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { recordMatchMoments } from "@/lib/activity-write";
 import { confirmPendingMatch } from "@/lib/confirm-match";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { validateResult } from "@/lib/race";
@@ -142,6 +143,7 @@ export async function adminResolveMatch(formData: FormData) {
       `/admin?error=${encodeURIComponent("Confirmation failed — the match is back in the disputes queue. Try again.")}`
     );
   }
+  await recordMatchMoments(service, matchId);
   revalidatePath("/admin");
 }
 
