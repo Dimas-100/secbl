@@ -1,4 +1,4 @@
-import { Flame } from "lucide-react";
+import { FlameMark } from "@/components/flame-mark";
 import { streakTier } from "@/lib/celebration";
 import { cn } from "@/lib/utils";
 
@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 export function StreakFlame({ length, className }: { length: number; className?: string }) {
   const tier = streakTier(length);
   if (tier === "none") return null;
-  const size = tier === "blaze" ? "size-5" : tier === "hot" ? "size-[18px]" : "size-4";
+  const size = tier === "blaze" ? 22 : tier === "hot" ? 19 : 16;
   return (
     <span
       aria-label={`${length}-game win streak`}
@@ -18,7 +18,7 @@ export function StreakFlame({ length, className }: { length: number; className?:
         className
       )}
     >
-      <Flame className={size} strokeWidth={2} aria-hidden="true" />
+      <FlameMark tone={tier === "blaze" ? "gold" : "brass"} size={size} />
       {length}
     </span>
   );

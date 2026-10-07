@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flame } from "lucide-react";
+import { FlameMark } from "@/components/flame-mark";
 import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { LevelBar } from "@/components/level-bar";
 import { TitleBadge } from "@/components/title-badge";
@@ -128,7 +128,7 @@ export function CelebrationCard(p: CelebrationProps) {
           )}
           {p.streak && (
             <span className="text-brass ml-auto flex items-center gap-1 text-[15px] font-medium">
-              <Flame className="size-[18px]" strokeWidth={2} aria-hidden="true" />
+              <FlameMark size={20} />
               {p.streak} in a row
             </span>
           )}

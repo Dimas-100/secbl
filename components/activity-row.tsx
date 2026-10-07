@@ -1,4 +1,5 @@
-import { Flag, Flame, Medal, Trophy } from "lucide-react";
+import { Flag, Medal, Trophy } from "lucide-react";
+import { FlameMark } from "@/components/flame-mark";
 import { Avatar } from "@/components/avatar";
 import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
@@ -78,7 +79,7 @@ function Mark({ row, actor }: { row: FeedRow; actor: FeedPerson | null }) {
       return (
         <span className="relative flex">
           <Avatar person={person} size="md" />
-          <Flame className={`text-brass bg-background size-[18px] p-0.5 ${CORNER}`} strokeWidth={2} />
+          <FlameMark size={20} className={`bg-background p-0.5 ${CORNER}`} />
         </span>
       );
     case "pass":
