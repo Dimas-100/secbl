@@ -4,11 +4,12 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { createClient } from "@/lib/supabase/client";
 import { onlineIds } from "@/lib/presence";
 
-// Who has the app open right now. One Realtime presence channel for the
-// whole club: every member screen joins it with the user's token, announces
-// its own id, and keeps the set of ids it hears about. Nothing is stored —
-// close the app and you drop off within a minute. Suspended members never
-// get here: the member layout bounces them before this mounts.
+// Who has the app open right now. One private Realtime presence channel for
+// the whole club: every member screen joins it with the user's token,
+// announces its own id, and keeps the set of ids it hears about. The channel
+// is private, so the server admits only approved members (migration 0024);
+// the anon key alone cannot watch it. Nothing is stored — close the app and
+// you drop off within a minute.
 const PresenceContext = createContext<ReadonlySet<string>>(new Set());
 
 export function PresenceProvider({ meId, children }: { meId: string; children: ReactNode }) {
@@ -17,7 +18,7 @@ export function PresenceProvider({ meId, children }: { meId: string; children: R
   useEffect(() => {
     const supabase = createClient();
     // Keyed by member id, so two tabs are one presence.
-    const channel = supabase.channel("online", { config: { presence: { key: meId } } });
+    const channel = supabase.channel("online", { config: { private: true, presence: { key: meId } } });
     let active = true;
     (async () => {
       const {
