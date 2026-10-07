@@ -56,13 +56,13 @@ export async function removePushSubscription(endpoint: string): Promise<{ error:
 
 export async function loadNotificationPrefs(): Promise<Prefs> {
   const { supabase, user } = await me();
-  if (!user) return { messages: true, matches: true, events: true, league: true };
+  if (!user) return { messages: true, matches: true, events: true, league: true, social: false };
   const { data } = await supabase
     .from("notification_prefs")
-    .select("messages, matches, events, league")
+    .select("messages, matches, events, league, social")
     .eq("profile_id", user.id)
     .maybeSingle();
-  return data ?? { messages: true, matches: true, events: true, league: true };
+  return data ?? { messages: true, matches: true, events: true, league: true, social: false };
 }
 
 export async function updateNotificationPrefs(prefs: Prefs): Promise<{ error: string | null }> {
@@ -74,6 +74,7 @@ export async function updateNotificationPrefs(prefs: Prefs): Promise<{ error: st
     matches: !!prefs.matches,
     events: !!prefs.events,
     league: !!prefs.league,
+    social: !!prefs.social,
     updated_at: new Date().toISOString(),
   });
   return { error: error?.message ?? null };

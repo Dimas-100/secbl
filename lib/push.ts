@@ -2,13 +2,14 @@
 // Who gets what, and the words. Sending lives in lib/push-send.ts (server only).
 import { formatClubDate } from "@/lib/season";
 
-export type PushCategory = "messages" | "matches" | "events" | "league";
+export type PushCategory = "messages" | "matches" | "events" | "league" | "social";
 
 export interface Prefs {
   messages: boolean;
   matches: boolean;
   events: boolean;
   league: boolean;
+  social: boolean;
 }
 
 export interface PushPayload {
@@ -202,6 +203,39 @@ export function seasonClosedPayload(input: {
     body: input.championName ? `${first(input.championName)} is champion with ${input.points} pts.` : "No games were played.",
     url: `/leaderboard?tab=season&season=${input.seasonId}`,
     tag: `season:${input.seasonId}`,
+    category: "league",
+  };
+}
+
+// Posts (spec 2026-10-07-posts-design §4, §9). Likes and comments go to the
+// post's author under "social" (off by default); reports go to admins under
+// "league".
+export function likePayload(input: { postId: string; likerName: string }): PushPayload {
+  return {
+    title: `${first(input.likerName)} liked your post`,
+    body: "Tap to see it.",
+    url: `/?post=${input.postId}`,
+    tag: `post:${input.postId}`,
+    category: "social",
+  };
+}
+
+export function commentPayload(input: { postId: string; commenterName: string; body: string }): PushPayload {
+  return {
+    title: `${first(input.commenterName)} commented on your post`,
+    body: flatten(input.body),
+    url: `/?post=${input.postId}`,
+    tag: `post:${input.postId}`,
+    category: "social",
+  };
+}
+
+export function reportPayload(input: { postId: string; count: number }): PushPayload {
+  return {
+    title: "A post was reported",
+    body: `${input.count} of 3 reports. Three hide it until an admin clears it.`,
+    url: "/admin",
+    tag: `report:${input.postId}`,
     category: "league",
   };
 }
