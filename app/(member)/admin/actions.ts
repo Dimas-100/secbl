@@ -4,8 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { recordMatchMoments } from "@/lib/activity-write";
 import { confirmPendingMatch } from "@/lib/confirm-match";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { clubDateOf } from "@/lib/events";
+import { seasonClosedPayload, seasonOpenedPayload } from "@/lib/push";
+import { notifyAllMembers } from "@/lib/push-send";
 import { validateResult } from "@/lib/race";
+import { seasonChampion } from "@/lib/season";
+import { loadSeasonById, loadSeasonStandings } from "@/lib/season-data";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { assertPublicFeedUrl, syncAllSources } from "@/lib/sync-sources";
 
 async function setStatus(formData: FormData, status: "approved" | "rejected") {
@@ -254,4 +259,74 @@ export async function setSchoolLogo(schoolId: string, url: string | null): Promi
   if (error) return { error: error.message };
   revalidatePath("/", "layout");
   return { error: null };
+}
+
+// --- Seasons (spec 2026-10-06-seasons-feed-live §1) ---------------------------
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export async function openSeason(formData: FormData) {
+  const { supabase, user } = await requireAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  const startsOn = String(formData.get("starts_on") ?? "");
+  const endsOn = String(formData.get("ends_on") ?? "").trim();
+  if (!name) redirect(`/admin?error=${encodeURIComponent("A season needs a name.")}`);
+  if (!DATE.test(startsOn)) redirect(`/admin?error=${encodeURIComponent("Pick a start date.")}`);
+  if (endsOn && !DATE.test(endsOn)) redirect(`/admin?error=${encodeURIComponent("That end date isn't valid.")}`);
+  // The function enforces the invariants (one open season, dates in order).
+  const { data: id, error } = await supabase.rpc("open_season", {
+    p_name: name,
+    p_starts_on: startsOn,
+    p_ends_on: endsOn || null,
+  });
+  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  await notifyAllMembers(createServiceClient(), {
+    category: "league",
+    excludeId: user.id,
+    payload: seasonOpenedPayload({ seasonId: String(id), name, endsOn: endsOn || null }),
+  });
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/leaderboard");
+  redirect(`/admin?message=${encodeURIComponent(`${name} is open.`)}`);
+}
+
+export async function endSeason(formData: FormData) {
+  const { supabase, user } = await requireAdmin();
+  const seasonId = String(formData.get("season_id") ?? "");
+  const season = await loadSeasonById(supabase, seasonId);
+  if (!season || season.status !== "open") {
+    redirect(`/admin?error=${encodeURIComponent("That season is not open.")}`);
+  }
+  const standings = await loadSeasonStandings(supabase, season);
+  const champion = seasonChampion(standings);
+  const podium = standings
+    .filter((s) => s.played > 0)
+    .slice(0, 3)
+    .map((s) => ({ id: s.id, points: s.points }));
+  const { error } = await supabase.rpc("close_season", {
+    p_season_id: seasonId,
+    p_champion_id: champion?.id ?? null,
+    p_today: clubDateOf(new Date().toISOString()),
+    p_podium: podium,
+  });
+  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  await notifyAllMembers(createServiceClient(), {
+    category: "league",
+    excludeId: user.id,
+    payload: seasonClosedPayload({
+      seasonId,
+      name: season.name,
+      championName: champion?.display_name ?? null,
+      points: champion?.points ?? 0,
+    }),
+  });
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/leaderboard");
+  redirect(
+    `/admin?message=${encodeURIComponent(
+      champion ? `${season.name} closed — ${champion.display_name} is champion.` : `${season.name} closed.`
+    )}`
+  );
 }
