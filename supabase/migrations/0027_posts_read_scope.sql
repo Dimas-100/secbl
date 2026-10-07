@@ -25,14 +25,16 @@ as $$
 $$;
 grant execute on function public.post_photo_visible(text) to authenticated, service_role;
 
-create or replace function public.post_photo_count(p_profile_id uuid)
+-- The caller's own count only: a parameter would let a member count
+-- another member's uploads.
+create or replace function public.post_photo_count()
 returns int
 language sql stable security definer set search_path = storage, public
 as $$
   select count(*)::int from storage.objects o
-  where o.bucket_id = 'posts' and (storage.foldername(o.name))[1] = p_profile_id::text;
+  where o.bucket_id = 'posts' and (storage.foldername(o.name))[1] = (select auth.uid())::text;
 $$;
-grant execute on function public.post_photo_count(uuid) to authenticated, service_role;
+grant execute on function public.post_photo_count() to authenticated, service_role;
 
 drop policy if exists "members upload own post photos" on storage.objects;
 create policy "members upload own post photos"
@@ -41,7 +43,7 @@ create policy "members upload own post photos"
     bucket_id = 'posts'
     and public.is_approved()
     and (storage.foldername(name))[1] = (select auth.uid())::text
-    and public.post_photo_count((select auth.uid())) < 60
+    and public.post_photo_count() < 60
   );
 
 drop policy if exists "members read post photos" on storage.objects;
