@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIVE_STALE_MS, isFresh, liveLine, recentlySent, validateLive, type LiveInput } from "@/lib/live";
+import { LIVE_SHOWN, LIVE_STALE_MS, isFresh, liveLine, orderLiveGames, recentlySent, validateLive, type LiveInput } from "@/lib/live";
 
 const ok: LiveInput = { opponentId: "b", gameType: "9ball", raceTo: 5, spot: 0, spotTo: null, you: 3, them: 2 };
 
@@ -53,5 +53,28 @@ describe("isFresh", () => {
     expect(LIVE_STALE_MS).toBe(3 * 3_600_000);
     expect(isFresh("2026-10-06T17:01:00Z", now)).toBe(true);
     expect(isFresh("2026-10-06T16:59:00Z", now)).toBe(false);
+  });
+});
+
+describe("orderLiveGames", () => {
+  const g = (reporter: string, opponent: string, schools: [string, string], updated: string) => ({
+    reporter_id: reporter,
+    opponent_id: opponent,
+    reporter_school: schools[0],
+    opponent_school: schools[1],
+    updated_at: updated,
+  });
+  it("puts your table first, then tables you are playing at, then your school's, newest first within each", () => {
+    const rows = [
+      g("x", "y", ["GT", "GT"], "2026-10-07T20:05:00Z"),
+      g("p", "q", ["UGA", "GT"], "2026-10-07T20:04:00Z"),
+      g("r", "me", ["GT", "UGA"], "2026-10-07T20:01:00Z"),
+      g("me", "s", ["UGA", "GT"], "2026-10-07T19:50:00Z"),
+      g("t", "u", ["UGA", "UGA"], "2026-10-07T20:06:00Z"),
+    ];
+    expect(orderLiveGames(rows, { meId: "me", mySchool: "UGA" }).map((r) => r.reporter_id)).toEqual(["me", "r", "t", "p", "x"]);
+  });
+  it("shows three before the fold", () => {
+    expect(LIVE_SHOWN).toBe(3);
   });
 });

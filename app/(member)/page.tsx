@@ -20,8 +20,8 @@ import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { freshMatch, headline } from "@/lib/celebration";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
-import { FEED_SELECT, one, type FeedPerson, type FeedRow } from "@/lib/feed";
-import { LIVE_STALE_MS } from "@/lib/live";
+import { FEED_SELECT, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
+import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
 import { xpCaption, type TitleName } from "@/lib/levels";
 import { formatLabel } from "@/lib/race";
@@ -70,7 +70,7 @@ export default async function HomePage({
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, display_name, rating, matches_played, avatar_url, ball")
+      .select("id, display_name, rating, matches_played, avatar_url, ball, schools(short_name)")
       .eq("id", user.id)
       .single(),
     // Rank, wins and losses come from the same view the leaderboard renders,
@@ -115,7 +115,7 @@ export default async function HomePage({
     supabase
       .from("live_games")
       .select(
-        "reporter_id, opponent_id, game_type, race_to, spot, spot_to, reporter_score, opponent_score, updated_at, reporter:profiles!live_games_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!live_games_opponent_id_fkey(id, display_name, avatar_url, ball)"
+        "reporter_id, opponent_id, game_type, race_to, spot, spot_to, reporter_score, opponent_score, updated_at, reporter:profiles!live_games_reporter_id_fkey(id, display_name, avatar_url, ball, schools(short_name)), opponent:profiles!live_games_opponent_id_fkey(id, display_name, avatar_url, ball, schools(short_name))"
       )
       .gte("updated_at", new Date(now.getTime() - LIVE_STALE_MS).toISOString())
       .order("updated_at", { ascending: false }),
@@ -171,11 +171,15 @@ export default async function HomePage({
       };
     }
   }
-  const live = (liveRows ?? []).map((g) => ({
-    ...g,
-    reporter: one(g.reporter as FeedPerson | FeedPerson[] | null),
-    opponent: one(g.opponent as FeedPerson | FeedPerson[] | null),
-  }));
+  const mySchool = one(me?.schools as { short_name: string } | { short_name: string }[] | null)?.short_name ?? null;
+  const live = orderLiveGames(
+    (liveRows ?? []).map((g) => {
+      const reporter = one(g.reporter as FeedPerson | FeedPerson[] | null);
+      const opponent = one(g.opponent as FeedPerson | FeedPerson[] | null);
+      return { ...g, reporter, opponent, reporter_school: schoolOf(reporter), opponent_school: schoolOf(opponent) };
+    }),
+    { meId: user.id, mySchool }
+  );
   // Your place in the running season, for the strip under the stats.
   const mine = openSeason ? (await loadSeasonStandings(supabase, openSeason)).find((s) => s.id === user.id) ?? null : null;
 
@@ -248,9 +252,13 @@ export default async function HomePage({
             <span aria-hidden="true" className="bg-win motion-safe:animate-pulse size-2 rounded-full" />
             Live now
           </span>
-          {live.map((g) => (
-            <LiveGameCard key={g.reporter_id} row={g} viewerId={user.id} />
-          ))}
+          <ShowMore
+            initial={LIVE_SHOWN}
+            label="Show {hidden} more tables"
+            items={live.map((g) => (
+              <LiveGameCard key={g.reporter_id} row={g} viewerId={user.id} />
+            ))}
+          />
         </section>
       )}
 

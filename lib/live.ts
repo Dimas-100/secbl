@@ -8,6 +8,8 @@ export const LIVE_STALE_MS = 3 * 3_600_000;
 // still in flight says.
 export const SENT_WINDOW_MS = 60_000;
 export const GAME_TYPES = ["8ball", "9ball", "10ball", "other"] as const;
+// Cards above the fold on Home; the rest sit behind "Show more".
+export const LIVE_SHOWN = 3;
 
 export interface LiveInput {
   opponentId: string;
@@ -51,6 +53,27 @@ export function liveLine(row: { reporter_score: number; opponent_score: number; 
     opponent,
     need: lead >= row.race_to ? "Finished" : `First to ${row.race_to} · leader needs ${row.race_to - lead}`,
   };
+}
+
+// Home's order for live tables: yours, then the ones you are playing at,
+// then your school's, then everyone else's — newest touched first within
+// each group, so a league night with ten tables still leads with what you
+// care about.
+export interface LiveOrderRow {
+  reporter_id: string;
+  opponent_id: string;
+  reporter_school: string | null;
+  opponent_school: string | null;
+  updated_at: string;
+}
+export function orderLiveGames<T extends LiveOrderRow>(rows: T[], viewer: { meId: string; mySchool: string | null }): T[] {
+  const group = (r: T) => {
+    if (r.reporter_id === viewer.meId) return 0;
+    if (r.opponent_id === viewer.meId) return 1;
+    if (viewer.mySchool && (r.reporter_school === viewer.mySchool || r.opponent_school === viewer.mySchool)) return 2;
+    return 3;
+  };
+  return [...rows].sort((a, b) => group(a) - group(b) || Date.parse(b.updated_at) - Date.parse(a.updated_at));
 }
 
 export function recentlySent(createdAt: string | null, now: Date): boolean {
