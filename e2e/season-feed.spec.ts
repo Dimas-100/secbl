@@ -128,7 +128,7 @@ test("a season runs from open to champion with the feed and live now along the w
   await pageB.getByRole("button", { name: "Confirm" }).click();
   // A cold dev compile of the confirm path can take a while the first time.
   await expect(pageB.getByText(/ratings updated/i)).toBeVisible({ timeout: 20_000 });
-  await expect(pageB.getByText("Lost 0–3")).toBeVisible();
+  await expect(pageB.getByText("Lost 0–3", { exact: true })).toBeVisible();
 
   // Standings: 3 for the win, 1 for the loss.
   await pageB.goto("/leaderboard?tab=season");
