@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { AvatarStack } from "@/components/avatar-stack";
 import { ActivityRow } from "@/components/activity-row";
@@ -18,6 +19,8 @@ import { FEED_SELECT, type FeedRow } from "@/lib/feed";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
 import { xpCaption } from "@/lib/levels";
 import { formatLabel } from "@/lib/race";
+import { seasonCountdownLabel } from "@/lib/season";
+import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
 import { overallRank, ratingChangeSince, seasonLabel, winRate } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { loadXp } from "@/lib/xp-data";
@@ -55,6 +58,7 @@ export default async function HomePage({
     { data: feed },
     { data: scheduledEvents },
     { xp, level },
+    openSeason,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -98,7 +102,10 @@ export default async function HomePage({
       .order("starts_at")
       .limit(5),
     loadXp(supabase, user.id),
+    loadOpenSeason(supabase),
   ]);
+  // Your place in the running season, for the strip under the stats.
+  const mine = openSeason ? (await loadSeasonStandings(supabase, openSeason)).find((s) => s.id === user.id) ?? null : null;
 
   const rating = me?.rating ?? 450;
   const played = me?.matches_played ?? 0;
@@ -161,7 +168,7 @@ export default async function HomePage({
       <NotifyPrompt />
 
       <section className="flex flex-col gap-[18px]">
-        <span className="eyebrow">Rating · {seasonLabel(today)}</span>
+        <span className="eyebrow">Rating · {openSeason?.name ?? seasonLabel(today)}</span>
         <div className="flex items-end justify-between gap-4">
           <span className="hero-number">{rating}</span>
           {change !== null && (
@@ -185,6 +192,23 @@ export default async function HomePage({
             note={`${Math.round((level.intoLevel / level.needed) * 100)}% to ${level.level + 1}`}
           />
         </StatGrid>
+        {openSeason && mine && (
+          <Link
+            href="/leaderboard?tab=season"
+            className="press bg-card flex items-center justify-between gap-3 rounded-[20px] px-5 py-4 shadow-[inset_0_0_0_1px_var(--hairline-row)]"
+          >
+            <span className="flex min-w-0 flex-col gap-1.5">
+              <span className="eyebrow">{openSeason.name}</span>
+              <span className="stat-number text-[20px] leading-none">
+                {mine.played > 0 ? `#${mine.rank} · ${mine.points} pts` : "No games yet"}
+              </span>
+            </span>
+            <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-[12px]">
+              {seasonCountdownLabel(openSeason, today)}
+              <ChevronRight className="size-4" strokeWidth={1.7} />
+            </span>
+          </Link>
+        )}
       </section>
 
       {(toConfirm ?? []).length > 0 && (
