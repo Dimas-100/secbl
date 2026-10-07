@@ -109,6 +109,10 @@ export function ReportMatchForm({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const buzzed = useRef<Side | null>(null);
+  // The pending live publish, so Send can cancel it: a publish landing after
+  // the report's delete would leave a finished table on everyone's Home.
+  const publishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sent = useRef(false);
 
   // Mirror every change so a locked phone does not lose the race.
   useEffect(() => {
@@ -122,11 +126,15 @@ export function ReportMatchForm({
   // Everyone on Home sees this table while an opponent is picked (spec §3).
   // Debounced so a run of taps is one write; a restored draft republishes.
   useEffect(() => {
-    if (!opponentId) return;
-    const timer = setTimeout(() => {
+    if (!opponentId || sent.current) return;
+    publishTimer.current = setTimeout(() => {
+      publishTimer.current = null;
+      if (sent.current) return;
       void publishLiveGame({ opponentId, gameType: game, raceTo, spot, spotTo: spotTo === "you" ? "me" : spotTo, you, them });
     }, 600);
-    return () => clearTimeout(timer);
+    return () => {
+      if (publishTimer.current) clearTimeout(publishTimer.current);
+    };
   }, [opponentId, game, raceTo, spot, spotTo, you, them]);
 
   const selected = opponents.find((o) => o.id === opponentId) ?? null;
@@ -223,6 +231,8 @@ export function ReportMatchForm({
     <form
       action={reportMatch}
       onSubmit={() => {
+        sent.current = true;
+        if (publishTimer.current) clearTimeout(publishTimer.current);
         try {
           localStorage.removeItem(draftKey);
         } catch {
