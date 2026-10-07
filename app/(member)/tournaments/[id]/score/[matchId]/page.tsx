@@ -28,7 +28,7 @@ export default async function ScoreMatchPage({
   const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (me?.role !== "admin") redirect(`/tournaments/${id}`);
 
-  const [{ data: tournament }, { data: match }, { data: entrants }, { data: lastRound }] = await Promise.all([
+  const [{ data: tournament, error: tErr }, { data: match, error: mErr }, { data: entrants }, { data: lastRound }] = await Promise.all([
     supabase.from("tournaments").select("id, name, status, race_to").eq("id", id).single(),
     supabase
       .from("tournament_matches")
@@ -39,7 +39,10 @@ export default async function ScoreMatchPage({
     supabase.from("tournament_players").select("profile_id, seed, profiles(display_name)").eq("tournament_id", id),
     supabase.from("tournament_matches").select("round").eq("tournament_id", id).order("round", { ascending: false }).limit(1).maybeSingle(),
   ]);
-  if (!tournament || !match) notFound();
+  if (!tournament || !match) {
+    console.error("score page lookup failed", { id, matchId, tErr: tErr?.message, mErr: mErr?.message });
+    notFound();
+  }
   if (!match.player1_id || !match.player2_id) redirect(`/tournaments/${id}`);
 
   const who = new Map<string, { name: string; seed: number | null }>();
