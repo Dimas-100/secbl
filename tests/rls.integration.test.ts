@@ -219,6 +219,7 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
     const { error } = await client.rpc("create_tournament", {
       p_name: "unauthorized",
       p_event_id: null,
+      p_race_to: 5,
     });
     expect(error).not.toBeNull();
   });
@@ -314,7 +315,7 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
 
         const { data: createdId, error: createError } = await adminActor.rpc(
           "create_tournament",
-          { p_name: `rls-bracket-${stamp}`, p_event_id: null }
+          { p_name: `rls-bracket-${stamp}`, p_event_id: null, p_race_to: 5 }
         );
         expect(createError).toBeNull();
         tournamentId = createdId as string;

@@ -78,6 +78,8 @@ export interface Tournament {
   name: string;
   format: TournamentFormat;
   status: TournamentStatus;
+  // Every match in the cup is a race to this many games.
+  race_to: number;
   event_id: string | null;
   created_by: string;
   created_at: string;
