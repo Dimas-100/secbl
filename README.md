@@ -40,6 +40,9 @@ Web Push (VAPID) · Vitest · Playwright · Vercel
   ladder passes into the top 10, cups starting and finishing, seasons opening and closing, new
   members. Written by database triggers and stored with the match that caused them, so a voided
   result takes its moments with it. Updates live.
+- **The result moment.** When a game is confirmed, Home opens with a card: the rating counts to its
+  new value, the XP bar fills by what the game earned, a badge unlocked or a streak mark gets its
+  line. Dismissed per device. A flame beside your name tracks a win streak from 3 games on.
 - **Live now.** A scoreboard being played publishes itself: everyone on Home sees the table, the
   score and the rails move, and it disappears when the result is sent.
 - **Events and RSVP**, including feeds synced from school calendars.
