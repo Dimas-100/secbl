@@ -159,4 +159,13 @@ test("a season runs from open to champion with the feed and live now along the w
   await expect(pageB.getByRole("link", { name: new RegExp(`${seasonName}.*${a.name}`) })).toBeVisible();
   await pageB.getByRole("link", { name: new RegExp(`${seasonName}.*${a.name}`) }).click();
   await expect(pageB.getByText(`${a.name} · champion`)).toBeVisible();
+
+  // Presence: Alpha still has the app open, so Bravo sees the green dot on
+  // Alpha's avatar; once Alpha's browser closes, the dot goes.
+  await pageB.goto("/leaderboard?tab=players");
+  await expect(pageB.locator(`[data-online-id="${a.id}"]`).first()).toBeVisible({ timeout: 15_000 });
+  await ctxA.close();
+  await expect
+    .poll(async () => pageB.locator(`[data-online-id="${a.id}"]`).count(), { timeout: 30_000 })
+    .toBe(0);
 });

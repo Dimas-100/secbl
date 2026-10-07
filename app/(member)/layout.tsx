@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { PresenceProvider } from "@/components/presence-provider";
 import { TabBar } from "@/components/tab-bar";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,9 +21,11 @@ export default async function MemberLayout({ children }: { children: React.React
   return (
     // w-full matters: body is a flex column, and a flex child with mx-auto
     // shrink-wraps its content instead of stretching.
-    <div className="mx-auto w-full max-w-3xl px-6 pb-32">
-      {children}
-      <TabBar profileHref={`/players/${profile.id}`} />
-    </div>
+    <PresenceProvider meId={profile.id}>
+      <div className="mx-auto w-full max-w-3xl px-6 pb-32">
+        {children}
+        <TabBar profileHref={`/players/${profile.id}`} />
+      </div>
+    </PresenceProvider>
   );
 }
