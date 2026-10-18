@@ -22,9 +22,9 @@ import {
   type Side,
 } from "@/lib/race";
 import { isFresh } from "@/lib/live";
-import { recentOpponents } from "@/lib/report-form";
+import { duplicateNotice, recentOpponents, type DuplicateGame } from "@/lib/report-form";
 import { cn } from "@/lib/utils";
-import { reportMatch } from "./actions";
+import { confirmTheirs, findDuplicateReport, reportMatch } from "./actions";
 import { clearLiveGame, publishLiveGame } from "./live-actions";
 
 const GAME_TYPES = [
@@ -114,6 +114,11 @@ export function ReportMatchForm({
   // the report's delete would leave a finished table on everyone's Home.
   const publishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sent = useRef(false);
+  // Send first asks the server for a game between you two that day
+  // (lib/report-form findDuplicate); a hit replaces Send with a notice.
+  const [dup, setDup] = useState<(DuplicateGame & { key: string }) | null>(null);
+  const [checking, setChecking] = useState(false);
+  const checked = useRef(false);
 
   // Mirror every change so a locked phone does not lose the race.
   useEffect(() => {
@@ -150,6 +155,10 @@ export function ReportMatchForm({
   }
   const firstName = (o: OpponentOption | null) => (o ? o.display_name.split(" ")[0] : null);
   const first = firstName(selected) ?? "Them";
+  // A notice belongs to the opponent and day it was found for.
+  const dupKey = `${opponentId}|${date}`;
+  const shownDup = dup?.key === dupKey ? dup : null;
+  const notice = shownDup ? duplicateNotice(shownDup, first, today) : null;
 
   const race: RaceState = { you, them, raceTo, spot, spotTo };
   const done = finished(race);
@@ -234,7 +243,30 @@ export function ReportMatchForm({
   return (
     <form
       action={reportMatch}
-      onSubmit={() => {
+      onSubmit={(e) => {
+        // A choice from the notice goes straight through; a plain Send
+        // checks first and resubmits when clear.
+        const submitter = (e.nativeEvent as SubmitEvent).submitter;
+        if (!submitter?.hasAttribute("data-duplicate-choice") && !checked.current) {
+          e.preventDefault();
+          if (checking || !opponentId) return;
+          const form = e.currentTarget;
+          const key = dupKey;
+          setChecking(true);
+          findDuplicateReport(opponentId, date)
+            .catch(() => null) // reportMatch checks again on the server
+            .then((found) => {
+              setChecking(false);
+              if (found) {
+                setDup({ ...found, key });
+                return;
+              }
+              checked.current = true;
+              form.requestSubmit();
+            });
+          return;
+        }
+        checked.current = false;
         sent.current = true;
         if (publishTimer.current) clearTimeout(publishTimer.current);
         try {
@@ -243,7 +275,7 @@ export function ReportMatchForm({
           // ignore
         }
       }}
-      className="flex flex-col gap-8 pb-36"
+      className={cn("flex flex-col gap-8", notice ? "pb-72" : "pb-36")}
     >
       <section className="flex flex-col gap-3.5">
         <span className="eyebrow">Opponent</span>
@@ -445,12 +477,57 @@ export function ReportMatchForm({
 
       <div className="bg-background border-hairline fixed inset-x-0 bottom-0 z-10 border-t">
         <div className="mx-auto flex max-w-3xl flex-col gap-2.5 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-          <SubmitButton size="xl" className="w-full" disabled={s.disabled} pendingChildren="Sending…">
-            {s.label}
-          </SubmitButton>
-          <p className="text-muted-foreground text-center text-[12px]">
-            {s.reason ?? `Results post once ${firstName(selected) ?? "your opponent"} confirms.`}
-          </p>
+          {notice && shownDup ? (
+            <>
+              <div role="alert" className="flex flex-col gap-1 pb-1">
+                <p className="text-[15px] font-medium">{notice.title}</p>
+                <p className="text-muted-foreground text-[13px]">{notice.detail}</p>
+              </div>
+              {notice.canConfirm && (
+                <>
+                  {/* Not the button's own name/value: React drops those when
+                      the button carries its own formAction. */}
+                  <input type="hidden" name="match_id" value={shownDup.id} />
+                  <SubmitButton
+                    size="xl"
+                    className="w-full"
+                    formAction={confirmTheirs}
+                    data-duplicate-choice=""
+                    pendingChildren="Confirming…"
+                  >
+                    {`Confirm ${first}'s result`}
+                  </SubmitButton>
+                </>
+              )}
+              <SubmitButton
+                size="xl"
+                variant={notice.canConfirm ? "ghost" : "default"}
+                className="w-full"
+                name="allow_duplicate"
+                value="1"
+                data-duplicate-choice=""
+                pendingChildren="Sending…"
+              >
+                Log as a new game
+              </SubmitButton>
+              <button
+                type="button"
+                onClick={() => setDup(null)}
+                className="text-muted-foreground press self-center py-1 text-[12px]"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <SubmitButton size="xl" className="w-full" disabled={s.disabled || checking} pendingChildren="Sending…">
+                {checking ? "Sending…" : s.label}
+              </SubmitButton>
+              <p className="text-muted-foreground text-center text-[12px]">
+                {s.reason ?? `Results post once ${firstName(selected) ?? "your opponent"} confirms.`}
+              </p>
+            </>
+          )}
         </div>
       </div>
 

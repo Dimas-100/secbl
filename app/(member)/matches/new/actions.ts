@@ -1,14 +1,59 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { GAME_LABEL } from "@/lib/identity";
 import { matchReportedPayload } from "@/lib/push";
 import { notify } from "@/lib/push-send";
 import { formatShort, validateResult } from "@/lib/race";
+import { findDuplicate, type DuplicateGame, type PairMatchRow } from "@/lib/report-form";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { confirmMatch } from "../actions";
 
 function fail(message: string): never {
   redirect(`/matches/new?error=${encodeURIComponent(message)}`);
+}
+
+// A pending or confirmed game between these two on that day, if any. Both
+// directions: the pair is matched with two IN lists (reporter ≠ opponent is a
+// table constraint), so no user input is spliced into a filter string.
+async function loadDuplicate(
+  supabase: SupabaseClient,
+  meId: string,
+  opponentId: string,
+  playedAt: string
+): Promise<DuplicateGame | null> {
+  if (!opponentId || !playedAt) return null;
+  const { data } = await supabase
+    .from("matches")
+    .select("id, status, reporter_id, opponent_id, reporter_score, opponent_score, played_at, created_at")
+    .eq("played_at", playedAt)
+    .in("status", ["pending", "confirmed"])
+    .in("reporter_id", [meId, opponentId])
+    .in("opponent_id", [meId, opponentId]);
+  return findDuplicate((data ?? []) as PairMatchRow[], meId, opponentId, playedAt);
+}
+
+// Asked by the form when Send is tapped, before anything is written.
+export async function findDuplicateReport(opponentId: string, playedAt: string): Promise<DuplicateGame | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  return loadDuplicate(supabase, user.id, String(opponentId), String(playedAt));
+}
+
+// "Confirm theirs" from the duplicate notice: the board is finished with, so
+// it leaves Live now, then the opponent's report is confirmed as from Home.
+export async function confirmTheirs(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  await createServiceClient().from("live_games").delete().eq("reporter_id", user.id);
+  await confirmMatch(formData);
 }
 
 export async function reportMatch(formData: FormData) {
@@ -50,6 +95,13 @@ export async function reportMatch(formData: FormData) {
   });
   if (problem) fail(problem);
 
+  // The form already asked; this catches two players sending the same game
+  // at the same moment. "Log as a new game" is the deliberate way past it.
+  const playedAt = String(formData.get("played_at"));
+  if (formData.get("allow_duplicate") !== "1" && (await loadDuplicate(supabase, user.id, opponentId, playedAt))) {
+    fail("You two already have a game logged that day — check Home before sending it again.");
+  }
+
   const gameType = String(formData.get("game_type") ?? "8ball");
   const { data: created, error } = await supabase
     .from("matches")
@@ -60,7 +112,7 @@ export async function reportMatch(formData: FormData) {
       reporter_score: myScore,
       opponent_score: theirScore,
       game_type: gameType,
-      played_at: String(formData.get("played_at")),
+      played_at: playedAt,
       race_to: raceTo,
       spot,
       spot_to: spotTo,

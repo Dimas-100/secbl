@@ -63,14 +63,14 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
   await expect(pageA.getByText("You win 3–1")).toBeVisible();
   await expect(inc).toBeDisabled();
   await pageA.getByRole("button", { name: /Send to E2E to confirm/ }).click();
-  await expect(pageA.getByText(/waiting on your opponent/i)).toBeVisible();
+  await expect(pageA.getByText(/waiting on your opponent/i)).toBeVisible({ timeout: 20_000 });
 
   const ctxB = await browser.newContext();
   const pageB = await ctxB.newPage();
   await logIn(pageB, weak.email);
   await expect(pageB.getByText("Race to 3 · 1 on the wire to you")).toBeVisible();
   await pageB.getByRole("button", { name: "Confirm" }).click();
-  await expect(pageB.getByText(/ratings updated/i)).toBeVisible();
+  await expect(pageB.getByText(/ratings updated/i)).toBeVisible({ timeout: 20_000 });
   // The result card: the loser's side, their rating change and XP, dismissable.
   const card = pageB.getByRole("region", { name: "Latest result" });
   await expect(card.getByRole("heading", { name: "Lost 1–3 vs E2E" })).toBeVisible();

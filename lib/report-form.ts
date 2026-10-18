@@ -1,6 +1,9 @@
 // Pure logic for the one-screen report form, kept out of the component so
 // vitest covers it without DOM tooling.
 
+import { formatClubDate } from "@/lib/season";
+import type { MatchStatus } from "@/lib/types";
+
 export function recentOpponents<T extends { id: string; display_name: string }>(
   matchOpponentIds: string[],
   all: T[],
@@ -52,4 +55,83 @@ export function resultLine(
   return you > them
     ? { text: `Win ${you}–${them}`, tone: "win" }
     : { text: `Loss ${you}–${them}`, tone: "loss" };
+}
+
+// --- Same game logged twice -------------------------------------------------
+// On 2026-10-15 both players logged one race seconds apart; confirming the
+// second copy would have counted the game twice. Before a report goes in, the
+// form looks for a game between the same two players on the same day that is
+// still live (pending) or already counted (confirmed).
+
+export interface PairMatchRow {
+  id: string;
+  status: MatchStatus;
+  reporter_id: string;
+  opponent_id: string;
+  reporter_score: number;
+  opponent_score: number;
+  played_at: string;
+  created_at: string;
+}
+
+export interface DuplicateGame {
+  id: string;
+  status: "pending" | "confirmed";
+  reportedByMe: boolean;
+  myScore: number;
+  theirScore: number;
+  playedAt: string;
+}
+
+// The opponent's report waiting on you comes first (confirming it is the
+// fix); otherwise the newest game.
+export function findDuplicate(
+  rows: PairMatchRow[],
+  meId: string,
+  opponentId: string,
+  playedAt: string
+): DuplicateGame | null {
+  const same = rows
+    .filter(
+      (r) =>
+        r.played_at === playedAt &&
+        (r.status === "pending" || r.status === "confirmed") &&
+        ((r.reporter_id === meId && r.opponent_id === opponentId) ||
+          (r.reporter_id === opponentId && r.opponent_id === meId))
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const pick = same.find((r) => r.status === "pending" && r.opponent_id === meId) ?? same[0];
+  if (!pick) return null;
+  const mine = pick.reporter_id === meId;
+  return {
+    id: pick.id,
+    status: pick.status as DuplicateGame["status"],
+    reportedByMe: mine,
+    myScore: mine ? pick.reporter_score : pick.opponent_score,
+    theirScore: mine ? pick.opponent_score : pick.reporter_score,
+    playedAt: pick.played_at,
+  };
+}
+
+export function duplicateNotice(
+  dup: DuplicateGame,
+  opponentFirst: string,
+  today: string
+): { title: string; detail: string; canConfirm: boolean } {
+  const when = dup.playedAt === today ? "today" : `on ${formatClubDate(dup.playedAt)}`;
+  const line =
+    dup.myScore > dup.theirScore
+      ? `You won ${dup.myScore}–${dup.theirScore}`
+      : `${opponentFirst} won ${dup.theirScore}–${dup.myScore}`;
+  if (dup.status === "confirmed") {
+    return {
+      title: `You and ${opponentFirst} already have a game ${when}`,
+      detail: `${line} — confirmed.`,
+      canConfirm: false,
+    };
+  }
+  if (dup.reportedByMe) {
+    return { title: "You already sent this game", detail: `${line} ${when} — waiting on ${opponentFirst}.`, canConfirm: false };
+  }
+  return { title: `${opponentFirst} already logged this game`, detail: `${line} ${when} — waiting on you.`, canConfirm: true };
 }
