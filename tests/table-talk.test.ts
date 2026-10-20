@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   PUSH_QUIET_MS,
+  addNames,
   mergeComments,
   shouldPushComment,
   shouldResetLive,
@@ -25,6 +26,30 @@ describe("mergeComments", () => {
     expect(mergeComments([c(1), c(-1)], [c(2)]).map((x) => x.id)).toEqual([1, 2, -1]);
     expect(mergeComments([c(1), c(-1)], [c(-2)]).map((x) => x.id)).toEqual([1, -1, -2]);
     expect(mergeComments([c(1)], [c(2), c(2)]).map((x) => x.id)).toEqual([1, 2]);
+  });
+});
+
+describe("mergeComments with the sender", () => {
+  it("lets your own comment's Realtime echo replace its optimistic copy", () => {
+    const pending = c(-1, "Nice shot", "me");
+    expect(mergeComments([c(1), pending], [c(5, " Nice shot ", "me")], "me").map((x) => x.id)).toEqual([1, 5]);
+    // Someone else saying the same thing does not swallow yours.
+    expect(mergeComments([pending], [c(5, "Nice shot", "them")], "me").map((x) => x.id)).toEqual([5, -1]);
+    // Two identical sends: one echo replaces only the first.
+    expect(mergeComments([pending, c(-2, "Nice shot", "me")], [c(5, "Nice shot", "me")], "me").map((x) => x.id)).toEqual([5, -2]);
+  });
+});
+
+describe("addNames", () => {
+  it("adds what was fetched, settles the rest as Member, and keeps the same object when nothing changes", () => {
+    const have = { a: "Player A" };
+    expect(addNames(have, ["b", "c"], [{ id: "b", display_name: "Player B" }])).toEqual({
+      a: "Player A",
+      b: "Player B",
+      c: "Member",
+    });
+    expect(addNames(have, ["a"], [{ id: "a", display_name: "Player A" }])).toBe(have);
+    expect(addNames(have, [], [])).toBe(have);
   });
 });
 

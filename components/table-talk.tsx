@@ -5,7 +5,7 @@ import { ArrowUp } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
-import { mergeComments, validateComment, type LiveComment } from "@/lib/table-talk";
+import { addNames, mergeComments, validateComment, type LiveComment } from "@/lib/table-talk";
 import { cn } from "@/lib/utils";
 import { postLiveComment } from "@/app/(member)/live/actions";
 
@@ -32,12 +32,16 @@ export function useLiveComments(
   const tempCounter = useRef(0);
   const comments = useMemo(() => (state.gameId === gameId ? state.comments : []), [state, gameId]);
 
-  const absorb = useCallback((forGame: string, incoming: LiveComment[]) => {
-    setState((s) => ({
-      gameId: forGame,
-      comments: mergeComments(s.gameId === forGame ? s.comments : [], incoming),
-    }));
-  }, []);
+  // meId lets the Realtime echo of your own comment replace its optimistic row.
+  const absorb = useCallback(
+    (forGame: string, incoming: LiveComment[]) => {
+      setState((s) => ({
+        gameId: forGame,
+        comments: mergeComments(s.gameId === forGame ? s.comments : [], incoming, meId),
+      }));
+    },
+    [meId]
+  );
 
   useEffect(() => {
     if (!gameId) return;
@@ -87,12 +91,9 @@ export function useLiveComments(
       .select("id, display_name")
       .in("id", missing)
       .then(({ data }) => {
-        if (cancelled || !data) return;
-        setNames((have) => {
-          const next = { ...have };
-          for (const p of data) next[p.id] = p.display_name;
-          return next;
-        });
+        if (cancelled) return;
+        // Unreadable authors settle as "Member", so this never refetches them.
+        setNames((have) => addNames(have, missing, data ?? []));
       });
     return () => {
       cancelled = true;
@@ -107,7 +108,14 @@ export function useLiveComments(
       tempCounter.current -= 1;
       const tempId = tempCounter.current;
       absorb(gameId, [{ id: tempId, game_id: gameId, author_id: meId, body: body.trim(), created_at: new Date().toISOString() }]);
-      const res = await postLiveComment({ gameId, body });
+      let res: Awaited<ReturnType<typeof postLiveComment>>;
+      try {
+        res = await postLiveComment({ gameId, body });
+      } catch {
+        // The request never made it (pool-hall signal): drop the ghost row
+        // and say so; the composer keeps the draft for a retry.
+        res = { error: "Couldn't send — try again." };
+      }
       setState((s) =>
         s.gameId !== gameId
           ? s

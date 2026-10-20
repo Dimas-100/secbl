@@ -61,9 +61,27 @@ test("a spectator talks to a live table and the talk ends with the game", async 
   await logIn(pageC, c.email);
   await pageC.locator(`a[href="/live/${a.id}"]`).click();
   await expect(pageC).toHaveURL(new RegExp(`/live/${a.id}$`));
+
+  // Pool-hall signal: the first send never reaches the server. The composer
+  // says so and keeps the draft; the retry goes through, once.
+  let dropped = false;
+  await pageC.route("**/live/**", async (route) => {
+    const req = route.request();
+    if (!dropped && req.method() === "POST" && (await req.headerValue("next-action"))) {
+      dropped = true;
+      await route.abort();
+    } else {
+      await route.continue();
+    }
+  });
   await pageC.getByLabel("Say something to the table").fill("Nice shot");
   await pageC.getByRole("button", { name: "Send comment" }).click();
-  await expect(pageC.getByText("Nice shot")).toBeVisible();
+  await expect(pageC.getByText("Couldn't send — try again.")).toBeVisible();
+  await expect(pageC.getByLabel("Say something to the table")).toHaveValue("Nice shot");
+  await pageC.unroute("**/live/**");
+  await pageC.getByRole("button", { name: "Send comment" }).click();
+  await expect(pageC.getByText("Nice shot", { exact: true })).toHaveCount(1);
+  await expect(pageC.getByText("Couldn't send — try again.")).toHaveCount(0);
 
   // The scorekeeper sees it on the board, and can open the thread.
   await expect(pageA.getByRole("button", { name: /Table talk/ })).toBeVisible({ timeout: 15_000 });

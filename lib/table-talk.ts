@@ -15,20 +15,55 @@ export const PUSH_QUIET_MS = 2 * 60_000;
 const BODY_MAX = 280;
 
 // Real comments sort by id; optimistic rows (negative id) stay at the end in
-// send order. There is no client_id: the sender swaps its optimistic row for
-// the comment the action returns, and a Realtime copy that beat it is
-// deduped here by id.
-export function mergeComments(have: LiveComment[], incoming: LiveComment[]): LiveComment[] {
+// send order. There is no client_id, so when the sender (`meId`) is given,
+// the Realtime echo of their own comment replaces the oldest optimistic row
+// with the same text — otherwise it would show twice until the action
+// returns. The action's returned comment is deduped here by id.
+export function mergeComments(have: LiveComment[], incoming: LiveComment[], meId?: string): LiveComment[] {
   const byId = new Map<number, LiveComment>();
-  const pending: LiveComment[] = [];
-  for (const m of [...have, ...incoming]) {
+  let pending: LiveComment[] = [];
+  for (const m of have) {
+    if (m.id < 0) pending.push(m);
+    else byId.set(m.id, m);
+  }
+  for (const m of incoming) {
     if (m.id < 0) {
       if (!pending.some((p) => p.id === m.id)) pending.push(m);
-    } else {
-      byId.set(m.id, m);
+      continue;
     }
+    if (meId && m.author_id === meId && !byId.has(m.id)) {
+      const twin = pending.find((p) => p.author_id === meId && p.body.trim() === m.body.trim());
+      if (twin) pending = pending.filter((p) => p !== twin);
+    }
+    byId.set(m.id, m);
   }
   return [...[...byId.values()].sort((a, b) => a.id - b.id), ...pending];
+}
+
+// Names after a profiles fetch. Ids the fetch could not see (a member
+// suspended mid-game, say) settle as "Member", so they are never fetched
+// again; and nothing new means the same object, so an effect keyed on the
+// names does not run again.
+export function addNames(
+  have: Record<string, string>,
+  requested: string[],
+  fetched: { id: string; display_name: string }[]
+): Record<string, string> {
+  const next = { ...have };
+  let changed = false;
+  for (const p of fetched) {
+    if (next[p.id] !== p.display_name) {
+      next[p.id] = p.display_name;
+      changed = true;
+    }
+  }
+  for (const id of requested) {
+    if (!(id in next)) {
+      next[id] = "Member";
+      changed = true;
+    }
+  }
+  return changed ? next : have;
 }
 
 // The one line under a live card and on the scoreboard strip.
