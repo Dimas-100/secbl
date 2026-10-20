@@ -29,14 +29,25 @@ async function loadDuplicate(
   playedAt: string
 ): Promise<DuplicateGame | null> {
   if (!opponentId || !playedAt) return null;
-  const { data } = await supabase
-    .from("matches")
-    .select("id, status, reporter_id, opponent_id, reporter_score, opponent_score, played_at, created_at")
-    .eq("played_at", playedAt)
-    .in("status", ["pending", "confirmed"])
-    .in("reporter_id", [meId, opponentId])
-    .in("opponent_id", [meId, opponentId]);
-  return findDuplicate((data ?? []) as PairMatchRow[], meId, opponentId, playedAt);
+  const [{ data }, { data: calledAt }] = await Promise.all([
+    supabase
+      .from("matches")
+      .select("id, status, reporter_id, opponent_id, reporter_score, opponent_score, played_at, created_at")
+      .eq("played_at", playedAt)
+      .in("status", ["pending", "confirmed"])
+      .in("reporter_id", [meId, opponentId])
+      .in("opponent_id", [meId, opponentId]),
+    // When you two were called to a club-night table, if you were: a game
+    // logged before that is not this one.
+    supabase.rpc("night_table_call", { p_other: opponentId }),
+  ]);
+  return findDuplicate(
+    (data ?? []) as PairMatchRow[],
+    meId,
+    opponentId,
+    playedAt,
+    typeof calledAt === "string" ? calledAt : null
+  );
 }
 
 // Asked by the form when Send is tapped, before anything is written.

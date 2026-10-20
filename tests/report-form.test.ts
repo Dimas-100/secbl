@@ -4,10 +4,12 @@ import {
   findDuplicate,
   recentOpponents,
   resultLine,
+  startBoard,
   stepScore,
   submitState,
   type PairMatchRow,
 } from "@/lib/report-form";
+import { suggestedSpot } from "@/lib/race";
 
 const roster = [
   { id: "a", display_name: "Ana" },
@@ -106,6 +108,25 @@ function row(over: Partial<PairMatchRow>): PairMatchRow {
     ...over,
   };
 }
+
+describe("findDuplicate since a club-night table call", () => {
+  it("ignores games logged before the pair was called to the table", () => {
+    const earlier = row({ status: "confirmed", created_at: "2026-10-15T20:00:00Z" });
+    expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", "2026-10-15T21:00:00Z")).toBeNull();
+    expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", "2026-10-15T19:00:00Z")).toMatchObject({ id: "m1" });
+    expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", null)).toMatchObject({ id: "m1" });
+  });
+});
+
+describe("startBoard", () => {
+  it("sets up the board a newly picked opponent gets: suggested spot, starting scores", () => {
+    expect(startBoard(450, 450, 5)).toEqual({ raceTo: 5, spot: 0, spotTo: null, you: 0, them: 0 });
+    const s = suggestedSpot(5, 450, 650);
+    const board = startBoard(650, 450, 5);
+    expect(s.spot).toBeGreaterThan(0);
+    expect(board).toEqual({ raceTo: 5, spot: s.spot, spotTo: "you", you: s.spot, them: 0 });
+  });
+});
 
 describe("findDuplicate", () => {
   it("finds the opponent's pending report of the same day, from your side", () => {
