@@ -21,6 +21,7 @@ import { TitleBadge } from "@/components/title-badge";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, disputeAgreedMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { AGREED_WINDOW_MS, canFlag, flagDeadlineLabel } from "@/lib/agreed";
+import { talkSummary, type LiveComment } from "@/lib/table-talk";
 import { freshMatch, headline } from "@/lib/celebration";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { FEED_SELECT, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
@@ -119,7 +120,7 @@ export default async function HomePage({
     supabase
       .from("live_games")
       .select(
-        "reporter_id, opponent_id, game_type, race_to, spot, spot_to, reporter_score, opponent_score, updated_at, reporter:profiles!live_games_reporter_id_fkey(id, display_name, avatar_url, ball, schools(short_name)), opponent:profiles!live_games_opponent_id_fkey(id, display_name, avatar_url, ball, schools(short_name))"
+        "id, reporter_id, opponent_id, game_type, race_to, spot, spot_to, reporter_score, opponent_score, updated_at, reporter:profiles!live_games_reporter_id_fkey(id, display_name, avatar_url, ball, schools(short_name)), opponent:profiles!live_games_opponent_id_fkey(id, display_name, avatar_url, ball, schools(short_name))"
       )
       .gte("updated_at", new Date(now.getTime() - LIVE_STALE_MS).toISOString())
       .order("updated_at", { ascending: false }),
@@ -206,6 +207,27 @@ export default async function HomePage({
     }),
     { meId: user.id, mySchool }
   );
+  // Table talk under each live card: the count and the newest line.
+  const talkByGame = new Map<string, ReturnType<typeof talkSummary>>();
+  if (live.length > 0) {
+    const { data: talkRows } = await supabase
+      .from("live_comments")
+      .select("id, game_id, author_id, body, created_at, author:profiles!live_comments_author_id_fkey(display_name)")
+      .in(
+        "game_id",
+        live.map((g) => g.id as string)
+      )
+      .order("id", { ascending: true })
+      .limit(200);
+    const perGame = new Map<string, LiveComment[]>();
+    const talkNames: Record<string, string> = {};
+    for (const r of talkRows ?? []) {
+      perGame.set(r.game_id, [...(perGame.get(r.game_id) ?? []), r as LiveComment]);
+      const author = one(r.author as { display_name: string } | { display_name: string }[] | null);
+      if (author) talkNames[r.author_id] = author.display_name;
+    }
+    for (const [gameId, comments] of perGame) talkByGame.set(gameId, talkSummary(comments, talkNames));
+  }
   // Your place in the running season, for the strip under the stats.
   const mine = openSeason ? (await loadSeasonStandings(supabase, openSeason)).find((s) => s.id === user.id) ?? null : null;
 
@@ -282,7 +304,7 @@ export default async function HomePage({
             initial={LIVE_SHOWN}
             label="Show {hidden} more tables"
             items={live.map((g) => (
-              <LiveGameCard key={g.reporter_id} row={g} viewerId={user.id} />
+              <LiveGameCard key={g.reporter_id} row={g} viewerId={user.id} talk={talkByGame.get(g.id as string)} />
             ))}
           />
         </section>

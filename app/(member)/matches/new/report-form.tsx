@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "radix-ui";
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronRight, MessageCircle, Search } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { TableTalk, useLiveComments } from "@/components/table-talk";
 import { Input } from "@/components/ui/input";
 import { ScoreStepper } from "@/components/score-stepper";
 import { SubmitButton } from "@/components/submit-button";
@@ -23,6 +24,7 @@ import {
 } from "@/lib/race";
 import { isFresh } from "@/lib/live";
 import { duplicateNotice, recentOpponents, type DuplicateGame } from "@/lib/report-form";
+import { talkSummary } from "@/lib/table-talk";
 import { cn } from "@/lib/utils";
 import { confirmTheirs, findDuplicateReport, reportMatch } from "./actions";
 import { clearLiveGame, publishLiveGame } from "./live-actions";
@@ -124,6 +126,12 @@ export function ReportMatchForm({
   // the duplicate check and resubmitted with requestSubmit(), which has no
   // submitter. The duplicate notice's "Log as a new game" keeps the choice.
   const [agreed, setAgreed] = useState(false);
+  // Table talk on this table (spec 2026-10-20-table-talk §5): the game id
+  // comes back from each publish; clearing or sending the board ends it.
+  const [gameId, setGameId] = useState<string | null>(null);
+  const [talkOpen, setTalkOpen] = useState(false);
+  const talk = useLiveComments(gameId, meId, [], {});
+  const talkLine = talkSummary(talk.comments, talk.names);
 
   // Mirror every change so a locked phone does not lose the race.
   useEffect(() => {
@@ -144,7 +152,11 @@ export function ReportMatchForm({
     publishTimer.current = setTimeout(() => {
       publishTimer.current = null;
       if (sent.current) return;
-      void publishLiveGame({ opponentId, gameType: game, raceTo, spot, spotTo: spotTo === "you" ? "me" : spotTo, you, them });
+      void publishLiveGame({ opponentId, gameType: game, raceTo, spot, spotTo: spotTo === "you" ? "me" : spotTo, you, them }).then(
+        (r) => {
+          if (r.gameId && !sent.current) setGameId(r.gameId);
+        }
+      );
     }, 600);
     return () => {
       if (publishTimer.current) clearTimeout(publishTimer.current);
@@ -164,6 +176,8 @@ export function ReportMatchForm({
   const dupKey = `${opponentId}|${date}`;
   const shownDup = dup?.key === dupKey ? dup : null;
   const notice = shownDup ? duplicateNotice(shownDup, first, today) : null;
+  // The duplicate notice owns the footer while it is up.
+  const talkShown = talkLine.count > 0 && !notice;
 
   const race: RaceState = { you, them, raceTo, spot, spotTo };
   const done = finished(race);
@@ -208,6 +222,8 @@ export function ReportMatchForm({
     setEditingDate(false);
     setD(freshDraft(today));
     buzzed.current = null;
+    setGameId(null);
+    setTalkOpen(false);
     void clearLiveGame();
     try {
       localStorage.removeItem(draftKey);
@@ -280,7 +296,10 @@ export function ReportMatchForm({
           // ignore
         }
       }}
-      className={cn("flex flex-col gap-8", notice ? "pb-72" : s.disabled ? "pb-36" : "pb-56")}
+      className={cn(
+        "flex flex-col gap-8",
+        notice ? "pb-72" : s.disabled ? (talkShown ? "pb-56" : "pb-36") : talkShown ? "pb-80" : "pb-56"
+      )}
     >
       <section className="flex flex-col gap-3.5">
         <span className="eyebrow">Opponent</span>
@@ -483,6 +502,23 @@ export function ReportMatchForm({
 
       <div className="bg-background border-hairline fixed inset-x-0 bottom-0 z-10 border-t">
         <div className="mx-auto flex max-w-3xl flex-col gap-2.5 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          {talkShown && talkLine.latest && (
+            <button
+              type="button"
+              onClick={() => setTalkOpen(true)}
+              className="press bg-card flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-left shadow-[inset_0_0_0_1px_var(--hairline-row)]"
+            >
+              <MessageCircle className="text-brass size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="eyebrow">Table talk</span>
+                <span className="truncate text-[13px]">
+                  {talkLine.latest.name}: {talkLine.latest.body}
+                </span>
+              </span>
+              <span className="text-muted-foreground stat-number text-[12px]">{talkLine.count}</span>
+              <ChevronRight className="text-muted-foreground size-4 shrink-0" strokeWidth={1.7} />
+            </button>
+          )}
           {notice && shownDup ? (
             <>
               <div role="alert" className="flex flex-col gap-1 pb-1">
@@ -563,6 +599,19 @@ export function ReportMatchForm({
           )}
         </div>
       </div>
+
+      <Dialog.Root open={talkOpen} onOpenChange={setTalkOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-20 bg-black/40" />
+          <Dialog.Content
+            aria-describedby={undefined}
+            className="bg-background fixed inset-x-0 bottom-0 z-30 flex max-h-[75vh] flex-col gap-3 rounded-t-[24px] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          >
+            <Dialog.Title className="text-[17px] font-semibold tracking-[-0.01em]">Table talk</Dialog.Title>
+            <TableTalk meId={meId} comments={talk.comments} names={talk.names} onSend={talk.send} />
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       <Dialog.Root open={pickerOpen} onOpenChange={setPickerOpen}>
         <Dialog.Portal>

@@ -35,6 +35,7 @@ export function LiveHome() {
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "comments" }, refresh)
         .on("postgres_changes", { event: "DELETE", schema: "public", table: "comments" }, refresh)
         .on("postgres_changes", { event: "*", schema: "public", table: "live_games" }, refresh)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "live_comments" }, refresh)
         .subscribe();
     })();
     const onVisible = () => {
