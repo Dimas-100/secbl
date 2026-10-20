@@ -8,6 +8,7 @@ import {
   matchDisputedPayload,
   matchReportedPayload,
   messagePayload,
+  nightCalledPayload,
   promptDecision,
   recipientsFor,
   seasonClosedPayload,
@@ -111,6 +112,18 @@ describe("payloads", () => {
       matchReportedPayload({ matchId: "m", reporterName: "Dennis Ho", reporterScore: 1, opponentScore: 3, gameLabel: "9-ball", format: null })
         .body
     ).toBe("Dennis 1–3 you · 9-ball. Confirm?");
+  });
+  it("calls a player to a table and says who keeps score", () => {
+    expect(nightCalledPayload({ nightId: "n1", tableNo: 2, opponentName: "Player B", keepsScore: true })).toEqual({
+      title: "You're up on table 2",
+      body: "vs Player B. You keep score — tap Start game at the table.",
+      url: "/night",
+      tag: "night:n1",
+      category: "matches",
+    });
+    expect(nightCalledPayload({ nightId: "n1", tableNo: 2, opponentName: "Player A", keepsScore: false }).body).toBe(
+      "vs Player A. Player keeps score."
+    );
   });
   it("tells a player someone said something on their game", () => {
     expect(liveCommentPayload({ gameId: "g1", authorName: "Player C", body: "Nice\nshot", url: "/live/r1" })).toEqual({

@@ -127,6 +127,25 @@ export function matchReportedPayload(input: {
   };
 }
 
+// Club night (spec 2026-10-20-club-night §2): you've been called to a table.
+// The one who joined the line first keeps score.
+export function nightCalledPayload(input: {
+  nightId: string;
+  tableNo: number;
+  opponentName: string;
+  keepsScore: boolean;
+}): PushPayload {
+  return {
+    title: `You're up on table ${input.tableNo}`,
+    body: input.keepsScore
+      ? `vs ${input.opponentName}. You keep score — tap Start game at the table.`
+      : `vs ${input.opponentName}. ${first(input.opponentName)} keeps score.`,
+    url: "/night",
+    tag: `night:${input.nightId}`,
+    category: "matches",
+  };
+}
+
 // Table talk (spec 2026-10-20-table-talk §4): someone said something on a
 // game you're playing. One tag per game, and the sender throttles it.
 export function liveCommentPayload(input: { gameId: string; authorName: string; body: string; url: string }): PushPayload {
