@@ -119,6 +119,11 @@ export function ReportMatchForm({
   const [dup, setDup] = useState<(DuplicateGame & { key: string }) | null>(null);
   const [checking, setChecking] = useState(false);
   const checked = useRef(false);
+  // "We agreed — count it" vs "Send to … to confirm". Carried in a hidden
+  // input, not the buttons' own name/value: a plain Send is intercepted for
+  // the duplicate check and resubmitted with requestSubmit(), which has no
+  // submitter. The duplicate notice's "Log as a new game" keeps the choice.
+  const [agreed, setAgreed] = useState(false);
 
   // Mirror every change so a locked phone does not lose the race.
   useEffect(() => {
@@ -275,7 +280,7 @@ export function ReportMatchForm({
           // ignore
         }
       }}
-      className={cn("flex flex-col gap-8", notice ? "pb-72" : "pb-36")}
+      className={cn("flex flex-col gap-8", notice ? "pb-72" : s.disabled ? "pb-36" : "pb-56")}
     >
       <section className="flex flex-col gap-3.5">
         <span className="eyebrow">Opponent</span>
@@ -474,6 +479,7 @@ export function ReportMatchForm({
       <input type="hidden" name="spot" value={spot} />
       <input type="hidden" name="spot_to" value={spotTo === "you" ? "me" : spotTo === "them" ? "them" : ""} />
       {!editingDate && <input type="hidden" name="played_at" value={date} />}
+      <input type="hidden" name="agreed" value={agreed ? "1" : ""} />
 
       <div className="bg-background border-hairline fixed inset-x-0 bottom-0 z-10 border-t">
         <div className="mx-auto flex max-w-3xl flex-col gap-2.5 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
@@ -518,13 +524,40 @@ export function ReportMatchForm({
                 Cancel
               </button>
             </>
+          ) : s.disabled ? (
+            <>
+              <SubmitButton size="xl" className="w-full" disabled pendingChildren="Sending…">
+                {s.label}
+              </SubmitButton>
+              <p className="text-muted-foreground text-center text-[12px]">{s.reason}</p>
+            </>
           ) : (
             <>
-              <SubmitButton size="xl" className="w-full" disabled={s.disabled || checking} pendingChildren="Sending…">
-                {checking ? "Sending…" : s.label}
+              {/* Both players agreed the score at the table: it counts now,
+                  and the opponent can flag it for a day (spec
+                  2026-10-20-agreed-results). Sending stays for when they've
+                  already left. */}
+              <SubmitButton
+                size="xl"
+                className="w-full"
+                disabled={checking}
+                onClick={() => setAgreed(true)}
+                pendingChildren={agreed ? "Counting…" : "We agreed — count it"}
+              >
+                {checking && agreed ? "Counting…" : "We agreed — count it"}
+              </SubmitButton>
+              <SubmitButton
+                size="xl"
+                variant="ghost"
+                className="w-full"
+                disabled={checking}
+                onClick={() => setAgreed(false)}
+                pendingChildren={agreed ? s.label : "Sending…"}
+              >
+                {checking && !agreed ? "Sending…" : s.label}
               </SubmitButton>
               <p className="text-muted-foreground text-center text-[12px]">
-                {s.reason ?? `Results post once ${firstName(selected) ?? "your opponent"} confirms.`}
+                {`Count it if you both agree the score. ${first} can flag it for 24 hours.`}
               </p>
             </>
           )}

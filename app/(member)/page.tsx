@@ -18,7 +18,8 @@ import { StatGrid, StatTile } from "@/components/stat-tile";
 import { StreakFlame } from "@/components/streak-flame";
 import { TitleBadge } from "@/components/title-badge";
 import { createClient } from "@/lib/supabase/server";
-import { confirmMatch, rejectMatch } from "@/app/(member)/matches/actions";
+import { confirmMatch, disputeAgreedMatch, rejectMatch } from "@/app/(member)/matches/actions";
+import { AGREED_WINDOW_MS, canFlag, flagDeadlineLabel } from "@/lib/agreed";
 import { freshMatch, headline } from "@/lib/celebration";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { FEED_SELECT, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
@@ -68,6 +69,7 @@ export default async function HomePage({
     openSeason,
     { data: liveRows },
     { data: myMatches },
+    { data: agreedForMe },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -131,7 +133,19 @@ export default async function HomePage({
       .order("confirmed_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(30),
+    // Games the other player counted on the spot that you can still flag.
+    supabase
+      .from("matches")
+      .select(
+        "id, status, agreed_at, confirmed_at, opponent_id, reporter_score, opponent_score, game_type, winner_id, race_to, spot, spot_to, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball)"
+      )
+      .eq("opponent_id", user.id)
+      .eq("status", "confirmed")
+      .not("agreed_at", "is", null)
+      .gte("confirmed_at", new Date(now.getTime() - AGREED_WINDOW_MS).toISOString())
+      .order("confirmed_at", { ascending: false }),
   ]);
+  const flaggable = (agreedForMe ?? []).filter((m) => canFlag(m, user.id, now));
   const mine30 = (myMatches ?? []) as (StatMatch & { reporter: unknown; opponent: unknown })[];
   const streak = currentStreak(mine30, user.id);
   const streakLength = streak?.kind === "W" ? streak.length : 0;
@@ -360,6 +374,39 @@ export default async function HomePage({
                       </button>
                     </form>
                   </span>
+                }
+              />
+            );
+          })}
+        </section>
+      )}
+
+      {flaggable.length > 0 && (
+        <section className="flex flex-col gap-1.5">
+          <SectionHeading>Logged for you</SectionHeading>
+          {flaggable.map((m) => {
+            const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
+            const theyWon = m.winner_id === reporter?.id;
+            return (
+              <ListRow
+                key={m.id}
+                leading={<Avatar person={reporter ?? { id: "unknown", display_name: null }} size="md" />}
+                title={
+                  <>
+                    {reporter?.display_name ?? "Member"} · {theyWon ? "beat you" : "lost to you"}{" "}
+                    <span className="stat-number">
+                      {m.reporter_score}–{m.opponent_score}
+                    </span>
+                  </>
+                }
+                meta={`Counted · flag until ${flagDeadlineLabel(m.confirmed_at!, now)}`}
+                trailing={
+                  <form action={disputeAgreedMatch}>
+                    <input type="hidden" name="match_id" value={m.id} />
+                    <button type="submit" className="text-muted-foreground press text-[13px]">
+                      Not right?
+                    </button>
+                  </form>
                 }
               />
             );
