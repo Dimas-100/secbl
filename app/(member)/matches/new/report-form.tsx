@@ -23,7 +23,7 @@ import {
   type Side,
 } from "@/lib/race";
 import { isFresh } from "@/lib/live";
-import { duplicateNotice, recentOpponents, type DuplicateGame } from "@/lib/report-form";
+import { duplicateNotice, recentOpponents, startBoard, type DuplicateGame } from "@/lib/report-form";
 import { talkSummary } from "@/lib/table-talk";
 import { cn } from "@/lib/utils";
 import { confirmTheirs, findDuplicateReport, reportMatch } from "./actions";
@@ -90,18 +90,28 @@ export function ReportMatchForm({
   today,
   meId,
   myRating,
+  initialOpponentId,
 }: {
   opponents: OpponentOption[];
   recentIds: string[];
   today: string;
   meId: string;
   myRating: number;
+  initialOpponentId?: string;
 }) {
   const draftKey = `secbl:draft-game:${meId}`;
   // One state object for the board, lazily restored from the draft. This
   // component is loaded client-only (see page.tsx), so reading localStorage
-  // in the initialiser is safe and there is no hydration mismatch.
-  const [d, setD] = useState<Draft>(() => loadDraft(draftKey, opponents, today));
+  // in the initialiser is safe and there is no hydration mismatch. Called to
+  // a club-night table, the board opens on that opponent — unless the draft
+  // is already a game against them.
+  const [d, setD] = useState<Draft>(() => {
+    const draft = loadDraft(draftKey, opponents, today);
+    const called = initialOpponentId ? opponents.find((o) => o.id === initialOpponentId) : undefined;
+    if (!called || draft.opponentId === called.id) return draft;
+    const board = startBoard(called.rating, myRating, DEFAULT_RACE);
+    return { ...freshDraft(today), opponentId: called.id, ...board };
+  });
   const { opponentId, game, raceTo, spot, spotTo, you, them, date } = d;
   const patch = (next: Partial<Draft>) => setD((cur) => ({ ...cur, ...next, at: Date.now() }));
   const setYou = (v: number) => patch({ you: v });

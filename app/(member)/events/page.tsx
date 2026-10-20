@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { SectionHeading } from "@/components/section-heading";
 import { SubmitButton } from "@/components/submit-button";
 import { UnderlineTabs } from "@/components/underline-tabs";
+import { loadNight } from "@/lib/night-data";
 import { createClient } from "@/lib/supabase/server";
 import { CLUB_TIMEZONE, eventMentionsSchool, formatEventWhen, partitionEvents } from "@/lib/events";
 import { cn } from "@/lib/utils";
@@ -223,6 +224,8 @@ export default async function EventsPage({
   const admin = me?.role === "admin";
 
   const now = new Date();
+  // The club night row at the top: on now, or the way to start one.
+  const nightData = await loadNight(supabase, user.id, now);
   const { upcoming, past } = partitionEvents((events ?? []) as EventRow[], now);
   const list =
     tab === "past"
@@ -262,6 +265,23 @@ export default async function EventsPage({
           </div>
         )}
       </PageHeader>
+      <ListRow
+        href="/night"
+        leading={
+          <span className="flex size-10 items-center justify-center">
+            <span
+              aria-hidden="true"
+              className={cn("size-2.5 rounded-full", nightData.night ? "bg-win motion-safe:animate-pulse" : "bg-hairline-strong")}
+            />
+          </span>
+        }
+        title="Club night"
+        meta={
+          nightData.night
+            ? `On now · ${nightData.line.length === 0 ? "nobody" : nightData.line.length} in line`
+            : "Start the line for the tables"
+        }
+      />
       <UnderlineTabs
         ariaLabel="Event filter"
         value={tab}

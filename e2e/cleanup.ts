@@ -114,6 +114,12 @@ export async function cleanupTracked() {
   for (const name of seasonNames) {
     await service.from("seasons").delete().eq("name", name);
   }
+  // A night's opener is ON DELETE SET NULL, so a test night would survive its
+  // user and sit open (it is only ever in a school with no real members, but
+  // it would still block the next run there).
+  for (const id of userIds) {
+    await service.from("club_nights").delete().eq("opened_by", id);
+  }
   // Messages and memberships cascade from the user, but a DM channel does
   // not (it belongs to the pair), so it would survive as an empty room.
   for (const id of userIds) {
