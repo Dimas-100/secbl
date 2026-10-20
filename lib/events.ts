@@ -32,6 +32,11 @@ function clubTime(iso: string): string {
   return normalize(timeFormatter.format(new Date(iso)));
 }
 
+// "9:14 PM" in club time, for callers outside this module.
+export function formatClubTime(iso: string): string {
+  return clubTime(iso);
+}
+
 export function formatEventWhen(startsAt: string, endsAt: string | null): string {
   const startDate = clubDate(startsAt);
   const startTime = clubTime(startsAt);
