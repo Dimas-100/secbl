@@ -127,6 +127,27 @@ export function matchReportedPayload(input: {
   };
 }
 
+// A game the scorekeeper counted on the spot (spec 2026-10-20-agreed-results §4):
+// nothing to confirm, but the opponent has a day to say it's wrong.
+export function matchAgreedPayload(input: {
+  matchId: string;
+  reporterName: string;
+  reporterScore: number;
+  opponentScore: number;
+  gameLabel: string;
+  format: string | null;
+}): PushPayload {
+  const parts = [`${first(input.reporterName)} ${input.reporterScore}–${input.opponentScore} you`, input.gameLabel];
+  if (input.format) parts.push(input.format);
+  return {
+    title: `${input.reporterName} logged your game`,
+    body: `${parts.join(" · ")}. Counted — not right? Flag it within 24 hours.`,
+    url: "/",
+    tag: `match:${input.matchId}`,
+    category: "matches",
+  };
+}
+
 export function matchConfirmedPayload(input: {
   matchId: string;
   opponentName: string;

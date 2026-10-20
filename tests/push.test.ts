@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   eventPayload,
   isKnownPushEndpoint,
+  matchAgreedPayload,
   matchConfirmedPayload,
   matchDisputedPayload,
   matchReportedPayload,
@@ -109,6 +110,24 @@ describe("payloads", () => {
       matchReportedPayload({ matchId: "m", reporterName: "Dennis Ho", reporterScore: 1, opponentScore: 3, gameLabel: "9-ball", format: null })
         .body
     ).toBe("Dennis 1–3 you · 9-ball. Confirm?");
+  });
+  it("tells the opponent a game counted on the spot and how to flag it", () => {
+    expect(
+      matchAgreedPayload({
+        matchId: "m1",
+        reporterName: "Player A",
+        reporterScore: 5,
+        opponentScore: 3,
+        gameLabel: "8-ball",
+        format: "race to 5",
+      })
+    ).toEqual({
+      title: "Player A logged your game",
+      body: "Player 5–3 you · 8-ball · race to 5. Counted — not right? Flag it within 24 hours.",
+      url: "/",
+      tag: "match:m1",
+      category: "matches",
+    });
   });
   it("describes a confirmation and a dispute", () => {
     expect(matchConfirmedPayload({ matchId: "m", opponentName: "Sam Lee", won: true, myScore: 3, theirScore: 1, delta: 12 })).toMatchObject({
