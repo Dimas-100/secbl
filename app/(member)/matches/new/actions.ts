@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { recordMatchMoments } from "@/lib/activity-write";
 import { confirmPendingMatch } from "@/lib/confirm-match";
 import { GAME_LABEL } from "@/lib/identity";
+import { freeTableAfterReport } from "@/lib/night-data";
 import { matchAgreedPayload, matchReportedPayload } from "@/lib/push";
 import { notify } from "@/lib/push-send";
 import { formatShort, validateResult } from "@/lib/race";
@@ -56,7 +57,18 @@ export async function confirmTheirs(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  await createServiceClient().from("live_games").delete().eq("reporter_id", user.id);
+  const service = createServiceClient();
+  await service.from("live_games").delete().eq("reporter_id", user.id);
+  // Confirming their report ends the game, so a club-night table the two of
+  // you hold is free now. Before confirmMatch, which ends in a redirect.
+  const { data: theirs } = await service
+    .from("matches")
+    .select("reporter_id, opponent_id")
+    .eq("id", String(formData.get("match_id") ?? ""))
+    .maybeSingle();
+  if (theirs && theirs.opponent_id === user.id) {
+    await freeTableAfterReport(supabase, service, theirs.reporter_id, user.id);
+  }
   await confirmMatch(formData);
 }
 
@@ -156,6 +168,8 @@ export async function reportMatch(formData: FormData) {
       console.error("agreed confirmation failed", err);
     }
   }
+  // The result is in either way: a club-night table you two hold is free now.
+  await freeTableAfterReport(supabase, service, opponentId, user.id);
   if (counted) {
     await recordMatchMoments(service, created.id);
     await notify(service, {
