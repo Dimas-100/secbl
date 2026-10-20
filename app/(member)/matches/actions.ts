@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { recordMatchMoments } from "@/lib/activity-write";
-import { canFlag } from "@/lib/agreed";
+import { canFlag, flagOutcome } from "@/lib/agreed";
 import { confirmPendingMatch } from "@/lib/confirm-match";
 import { buildRecomputePayload } from "@/lib/recompute";
 import { matchConfirmedPayload, matchDisputedPayload } from "@/lib/push";
@@ -123,7 +123,17 @@ export async function disputeAgreedMatch(formData: FormData) {
   } catch (err) {
     failure = err instanceof Error ? err.message : "Could not flag that game — try again.";
   }
-  if (failure) redirect(`/?error=${encodeURIComponent(failure)}`);
+  const success = `/?message=${encodeURIComponent("Taken out of the ratings — an admin will sort it out.")}`;
+  if (failure) {
+    // A second tap or tab can lose to the first: the game is already out,
+    // so this member's flag stands and the reporter has already been told.
+    const { data: after } = await service.from("matches").select("status, agreed_at").eq("id", match.id).maybeSingle();
+    if (flagOutcome(failure, after) === "flagged") {
+      revalidatePath("/");
+      redirect(success);
+    }
+    redirect(`/?error=${encodeURIComponent(failure)}`);
+  }
 
   const { data: opponent } = await service.from("profiles").select("display_name").eq("id", user.id).single();
   await notify(service, {
@@ -134,5 +144,5 @@ export async function disputeAgreedMatch(formData: FormData) {
   });
 
   revalidatePath("/");
-  redirect(`/?message=${encodeURIComponent("Taken out of the ratings — an admin will sort it out.")}`);
+  redirect(success);
 }

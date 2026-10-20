@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AGREED_WINDOW_MS, canFlag, flagDeadlineLabel } from "@/lib/agreed";
+import { AGREED_WINDOW_MS, canFlag, flagDeadlineLabel, flagOutcome } from "@/lib/agreed";
 
 // Counted Oct 19, 9:14 PM EDT → the window closes Oct 20, 9:14 PM EDT.
 const base = {
@@ -19,6 +19,17 @@ describe("canFlag", () => {
     expect(canFlag({ ...base, agreed_at: null }, "opp", at("2026-10-20T14:00:00Z"))).toBe(false);
     expect(canFlag({ ...base, status: "disputed" }, "opp", at("2026-10-20T14:00:00Z"))).toBe(false);
     expect(canFlag({ ...base, confirmed_at: null }, "opp", at("2026-10-20T14:00:00Z"))).toBe(false);
+  });
+});
+
+describe("flagOutcome", () => {
+  it("treats a refusal for a game that is already out as a successful flag", () => {
+    expect(flagOutcome(null, null)).toBe("flagged");
+    // The second tap of a double tap: the first one already took it out.
+    expect(flagOutcome("that game is not an agreed result", { status: "disputed", agreed_at: null })).toBe("flagged");
+    expect(flagOutcome("the ladder changed while this result was being prepared — try again", { status: "confirmed", agreed_at: "2026-10-20T01:14:00Z" })).toBe("failed");
+    expect(flagOutcome("anything", null)).toBe("failed");
+    expect(flagOutcome("anything", { status: "rejected", agreed_at: null })).toBe("failed");
   });
 });
 

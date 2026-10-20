@@ -16,6 +16,7 @@ import { ShowMore } from "@/components/show-more";
 import { Sparkline } from "@/components/sparkline";
 import { StatGrid, StatTile } from "@/components/stat-tile";
 import { StreakFlame } from "@/components/streak-flame";
+import { SubmitButton } from "@/components/submit-button";
 import { TitleBadge } from "@/components/title-badge";
 import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, disputeAgreedMatch, rejectMatch } from "@/app/(member)/matches/actions";
@@ -403,9 +404,15 @@ export default async function HomePage({
                 trailing={
                   <form action={disputeAgreedMatch}>
                     <input type="hidden" name="match_id" value={m.id} />
-                    <button type="submit" className="text-muted-foreground press text-[13px]">
+                    {/* Disabled while in flight: a double tap must not send two flags. */}
+                    <SubmitButton
+                      variant="link"
+                      size="xs"
+                      className="text-muted-foreground px-0 text-[13px] font-normal no-underline"
+                      pendingChildren="Flagging…"
+                    >
                       Not right?
-                    </button>
+                    </SubmitButton>
                   </form>
                 }
               />
