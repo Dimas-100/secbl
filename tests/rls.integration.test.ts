@@ -539,4 +539,33 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
       .insert({ ...base, reporter_score: 3, opponent_score: 2, race_to: 3, spot: 2, spot_to: pendingId });
     expect(okErr).toBeNull();
   });
+
+  // Agreed results (spec 2026-10-20-agreed-results §1): only the confirmation
+  // function writes agreed_at, and the undo takes a whole recompute payload,
+  // so a member must not be able to call it and write any rating they like.
+  it("a member cannot mark a report agreed or undo an agreed game themselves", async () => {
+    const me = await signIn(memberEmail);
+    const { error: insertErr } = await me.from("matches").insert({
+      reporter_id: memberId,
+      opponent_id: pendingId,
+      winner_id: memberId,
+      reporter_score: 3,
+      opponent_score: 1,
+      game_type: "8ball",
+      played_at: "2026-10-20",
+      agreed_at: new Date().toISOString(),
+    });
+    expect(insertErr?.message).toMatch(/row-level security/);
+    const { error: undoErr } = await me.rpc("undo_agreed_match", {
+      p_match_id: "00000000-0000-0000-0000-000000000000",
+      p_opponent_id: memberId,
+      p_standings: [{ profile_id: memberId, rating: 9999, matches_played: 0 }],
+      p_history: [],
+      p_deltas: [],
+      p_expected_confirmed: 0,
+    });
+    expect(undoErr?.message).toMatch(/permission denied/);
+    const { data } = await admin.from("profiles").select("rating").eq("id", memberId).single();
+    expect(data!.rating).not.toBe(9999);
+  });
 });

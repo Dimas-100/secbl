@@ -33,9 +33,7 @@ Only the confirmation function writes it. The insert policy "approved report own
 
 ### Confirmation function
 
-`apply_match_confirmation(uuid, int, int)` gains a fourth parameter, `p_agreed boolean default false`. When true it also sets `agreed_at = now()` in the same `update matches` that sets `status = 'confirmed'`. Everything else stays byte-for-byte the same as the live definition (copy it from `pg_get_functiondef` rather than a migration file, so nothing drifts; the live one takes `pg_advisory_xact_lock(hashtext('secbl_ratings'))`).
-
-Postgres treats the new signature as a different function, so the migration must `drop function public.apply_match_confirmation(uuid, int, int)` before `create function ... (uuid, int, int, boolean default false)`, then re-apply `revoke ... from public, anon, authenticated` / `grant ... to service_role`. With the default, the deployed code's 3-argument RPC call keeps resolving between migration and deploy.
+A new wrapper, `apply_agreed_confirmation(p_match_id uuid, p_reporter_delta int, p_opponent_delta int)`, performs the unchanged `apply_match_confirmation` and then sets `agreed_at = now()` on the match, in one call and one transaction. Service role only, like the function it wraps. (As built: an earlier draft added a `p_agreed` parameter to `apply_match_confirmation` itself, which needs a `drop function`; the Supabase MCP refuses destructive statements without an interactive confirmation, and an overload instead of a drop would make PostgREST's named-argument call ambiguous. The wrapper leaves the deployed function untouched. The insert policy is changed with `alter policy` for the same reason.)
 
 ### Undo function
 
@@ -70,7 +68,7 @@ Reads a new form field `agreed` (`"1"` or absent). Validation, the duplicate bac
 
 When `agreed === "1"`:
 1. Insert as today, then delete the live game as today. The insert's `.select()` must return the full row (`*`), not just `id`: `confirmPendingMatch` reads `reporter_id`, `opponent_id` and `winner_id`, and the untyped client would not flag a missing column — every agreed send would silently fall back to step 4.
-2. `confirmPendingMatch(service, created, { agreed: true })` — `confirmPendingMatch` gains an optional `{ agreed?: boolean }` third argument passed through as `p_agreed`.
+2. `confirmPendingMatch(service, created, { agreed: true })` — `confirmPendingMatch` gains an optional `{ agreed?: boolean }` third argument; when true it calls `apply_agreed_confirmation` instead of `apply_match_confirmation` (same arguments).
 3. On success: `recordMatchMoments(service, id)`, push the opponent the new **agreed** payload (§4), `revalidatePath("/")`, redirect `/?message=Counted — ratings updated.`
 4. If step 2 throws, the match is still a normal pending report: push the ordinary "reported a game" payload and redirect `/?message=Couldn't count it right away — sent to {first} to confirm instead.` Never leave the reporter without a message.
 
