@@ -19,6 +19,11 @@ const CARD = "bg-card rounded-[20px] shadow-[inset_0_0_0_1px_var(--hairline-row)
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 
+// The last sheet data, per member, kept outside the component: the tab bar
+// unmounts on the scoreboard, so state alone would lose it after every game
+// and the next open would start from the skeleton again.
+const lastData = new Map<string, PlaySheetData>();
+
 // The tab bar's Play button and its sheet (spec 2026-10-21-play-and-progress
 // §1): the game in progress, tonight's club night, and the people you play.
 // Its data is fetched on open, so no page's server render pays for it; the
@@ -33,10 +38,15 @@ export function PlaySheet({ meId }: { meId: string }) {
   if (openOn !== null && openOn !== pathname) setOpenOn(null);
   const open = openOn === pathname;
   const [draft, setDraft] = useState<ResumableDraft | null>(null);
-  const [data, setData] = useState<PlaySheetData | null>(null);
+  const [data, setData] = useState<PlaySheetData | null>(() => lastData.get(meId) ?? null);
   const [failed, setFailed] = useState(false);
   const [, startLoading] = useTransition();
   const content = useRef<HTMLDivElement>(null);
+  // The path the sheet opened on, and whether one of its links or forms is
+  // taking the member somewhere: after a navigation, focus is left to the
+  // new page instead of jumping back to the Play button in the tab bar.
+  const openedOn = useRef<string | null>(null);
+  const leaving = useRef(false);
   const nightHeading = useId();
   const facesHeading = useId();
 
@@ -47,11 +57,14 @@ export function PlaySheet({ meId }: { meId: string }) {
     startLoading(async () => {
       try {
         const next = await loadPlaySheet(d?.opponentId ?? null);
+        lastData.set(meId, next);
         startLoading(() => {
           setData(next);
           setFailed(false);
         });
-      } catch {
+      } catch (err) {
+        // The retry button is the member's way out; the cause is for us.
+        console.warn("Play sheet: couldn't load", err);
         startLoading(() => setFailed(true));
       }
     });
@@ -63,6 +76,8 @@ export function PlaySheet({ meId }: { meId: string }) {
       return;
     }
     setOpenOn(pathname);
+    openedOn.current = pathname;
+    leaving.current = false;
     let d: ResumableDraft | null = null;
     try {
       d = resumableDraft(localStorage.getItem(draftKey(meId)), new Date().getTime());
@@ -99,10 +114,22 @@ export function PlaySheet({ meId }: { meId: string }) {
             e.preventDefault();
             content.current?.focus();
           }}
+          // Escape or a tap outside returns focus to the Play button; a close
+          // caused by navigating (a link, Get in line's redirect, Back) leaves
+          // it to the new page.
+          onCloseAutoFocus={(e) => {
+            if (leaving.current || window.location.pathname !== openedOn.current) e.preventDefault();
+          }}
           // A link to the page already open (/night from /night) changes no
           // pathname, so every link tap closes the sheet explicitly too.
           onClick={(e) => {
-            if ((e.target as Element).closest("a")) close();
+            if ((e.target as Element).closest("a")) {
+              leaving.current = true;
+              close();
+            }
+          }}
+          onSubmit={() => {
+            leaving.current = true;
           }}
           className="bg-background fixed inset-x-0 bottom-0 z-30 flex max-h-[85vh] flex-col overflow-y-auto overscroll-contain rounded-t-[24px] px-4 pt-2.5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] outline-none"
         >
@@ -163,8 +190,8 @@ export function PlaySheet({ meId }: { meId: string }) {
                 {!data && !failed
                   ? Array.from({ length: SKELETON_FACES }, (_, i) => (
                       <li key={i} aria-hidden="true" className="flex flex-col items-center gap-2">
-                        <span className="bg-card size-12 animate-pulse rounded-full" />
-                        <span className="bg-card h-3 w-9 animate-pulse rounded" />
+                        <span className="bg-card size-12 rounded-full motion-safe:animate-pulse" />
+                        <span className="bg-card h-3 w-9 rounded motion-safe:animate-pulse" />
                       </li>
                     ))
                   : (shown?.faces ?? []).map((p) => (

@@ -60,7 +60,13 @@ export async function loadPlaySheet(resumeOpponentId: string | null): Promise<Pl
       .limit(30),
     loadNight(supabase, user.id, now),
   ]);
-  if (members.error || me.error || matches.error) throw new Error("Couldn't load the Play sheet");
+  const failures = [members.error, me.error, matches.error].filter((e) => e !== null);
+  if (failures.length > 0) {
+    // The client only sees the generic message; the PostgREST cause goes to
+    // the server log.
+    console.error("loadPlaySheet: couldn't read", failures);
+    throw new Error("Couldn't load the Play sheet");
+  }
 
   const people = (members.data ?? []) as (PlayPerson & { school_id: string | null })[];
   const byId = new Map(people.map((p) => [p.id, p]));
