@@ -356,7 +356,9 @@ export default async function HomePage({
                       <p className="text-muted-foreground truncate text-[12px] leading-tight">
                         {confirmMeta({
                           reporterName: name,
-                          reporterWon: m.winner_id === reporter?.id,
+                          // You are always the opponent here; the reporter join
+                          // can be null (RLS hides a non-approved profile).
+                          reporterWon: m.winner_id !== user.id,
                           reporterScore: m.reporter_score,
                           opponentScore: m.opponent_score,
                           gameType: m.game_type,
@@ -402,7 +404,8 @@ export default async function HomePage({
             <h2 className="eyebrow">Logged for you</h2>
             {flaggable.map((m) => {
               const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
-              const theyWon = m.winner_id === reporter?.id;
+              // As above: you are the opponent, so anything but you winning is theirs.
+              const theyWon = m.winner_id !== user.id;
               return (
                 <ListRow
                   key={m.id}
