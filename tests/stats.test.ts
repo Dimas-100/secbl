@@ -5,15 +5,12 @@ import {
   byPlayOrder,
   currentStreak,
   groupByPlayedDate,
-  headToHead,
   labelPlayedDate,
   longestWinStreak,
   movementSince,
   peakRating,
   ratingChangeSince,
   seasonLabel,
-  sparklinePoints,
-  winRate,
   type StatMatch,
 } from "@/lib/stats";
 
@@ -77,13 +74,6 @@ describe("currentStreak", () => {
   });
 });
 
-describe("winRate", () => {
-  it("rounds to a whole percent and handles zero", () => {
-    expect(winRate(5, 2)).toBe(71);
-    expect(winRate(0, 0)).toBeNull();
-  });
-});
-
 describe("ratingChangeSince", () => {
   const history = [
     { rating_before: 450, rating_after: 470, created_at: "2026-09-01T00:00:00Z" },
@@ -117,22 +107,6 @@ describe("peakRating", () => {
   });
 });
 
-describe("sparklinePoints", () => {
-  it("maps ratings onto the box, newest on the right, with a flat line for one point", () => {
-    expect(sparklinePoints([450], 100, 40)).toEqual([
-      [0, 20],
-      [100, 20],
-    ]);
-    const pts = sparklinePoints([400, 500, 450], 100, 40);
-    expect(pts[0]).toEqual([0, 40]);
-    expect(pts[1]).toEqual([50, 0]);
-    expect(pts[2]).toEqual([100, 20]);
-  });
-  it("is empty for no data", () => {
-    expect(sparklinePoints([], 100, 40)).toEqual([]);
-  });
-});
-
 describe("bestWin", () => {
   it("is the win over the highest-rated opponent", () => {
     const ratings = { a: 600, b: 700, c: 800 };
@@ -143,17 +117,6 @@ describe("bestWin", () => {
     ];
     expect(bestWin(matches, "me", ratings)).toEqual({ matchId: "2", opponentId: "b", rating: 700 });
     expect(bestWin([m("4", "x", "me", "x")], "me", { x: 1 })).toBeNull();
-  });
-});
-
-describe("headToHead", () => {
-  it("counts wins and losses against one opponent only", () => {
-    const matches = [
-      m("1", "me", "me", "them"),
-      m("2", "them", "them", "me"),
-      m("3", "me", "me", "other"),
-    ];
-    expect(headToHead(matches, "me", "them")).toEqual({ wins: 1, losses: 1 });
   });
 });
 

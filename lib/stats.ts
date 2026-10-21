@@ -58,12 +58,6 @@ export function currentStreak(
   return { kind, length };
 }
 
-export function winRate(wins: number, losses: number): number | null {
-  const total = wins + losses;
-  if (total === 0) return null;
-  return Math.round((wins / total) * 100);
-}
-
 // Rating now minus the rating just before the first change inside the window.
 export function ratingChangeSince(
   history: HistoryPoint[],
@@ -86,21 +80,6 @@ export function peakRating(
     if (h.rating_after > best.rating) best = { rating: h.rating_after, at: h.created_at };
   }
   return best;
-}
-
-// Ratings oldest → newest, scaled into a width × height box. A single value
-// draws as a flat line so the hero never shows an empty chart.
-export function sparklinePoints(ratings: number[], width: number, height: number): [number, number][] {
-  if (ratings.length === 0) return [];
-  const series = ratings.length === 1 ? [ratings[0], ratings[0]] : ratings;
-  const min = Math.min(...series);
-  const max = Math.max(...series);
-  const flat = max === min;
-  return series.map((r, i) => {
-    const x = (i / (series.length - 1)) * width;
-    const y = flat ? height / 2 : height - ((r - min) / (max - min)) * height;
-    return [Number(x.toFixed(2)), Number(y.toFixed(2))];
-  });
 }
 
 // "Today" / "Yesterday" / "Sat, Oct 3" for a played_at calendar date, given
@@ -135,10 +114,6 @@ export function groupByPlayedDate<T extends { played_at: string }>(
   return groups;
 }
 
-export function sparklinePath(points: [number, number][]): string {
-  return points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x} ${y}`).join(" ");
-}
-
 // The win over the highest-rated opponent (by their current rating).
 export function bestWin(
   matches: StatMatch[],
@@ -154,22 +129,6 @@ export function bestWin(
     if (!best || rating > best.rating) best = { matchId: m.id, opponentId: opp, rating };
   }
   return best;
-}
-
-export function headToHead(
-  matches: StatMatch[],
-  viewerId: string,
-  otherId: string
-): { wins: number; losses: number } {
-  let wins = 0;
-  let losses = 0;
-  for (const m of matches) {
-    const pair = new Set([m.reporter_id, m.opponent_id]);
-    if (!pair.has(viewerId) || !pair.has(otherId)) continue;
-    if (m.winner_id === viewerId) wins += 1;
-    else losses += 1;
-  }
-  return { wins, losses };
 }
 
 // Per-player movement for the leaderboard: current rating minus the rating
