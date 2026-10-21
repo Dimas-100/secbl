@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aboveOf,
+  boardAtMatch,
   boardBefore,
   compareRank,
   isPlaced,
@@ -131,5 +132,20 @@ describe("boardBefore", () => {
     const copy = after.map((r) => ({ ...r }));
     boardBefore(after, "w", "l", before);
     expect(after).toEqual(copy);
+  });
+});
+
+describe("boardAtMatch", () => {
+  it("puts the two players at this game's rating_after and leaves everyone else as today", () => {
+    const today: RankRow[] = [row("me", 515, 3, 1), row("t", 540, 6, 2), row("x", 505, 2, 2)];
+    expect(boardAtMatch(today, new Map([["me", 510], ["t", 485]]))).toEqual([
+      row("me", 510, 3, 1),
+      row("t", 485, 6, 2),
+      row("x", 505, 2, 2),
+    ]);
+  });
+  it("leaves a player with no rating_history row for the game as is", () => {
+    const today: RankRow[] = [row("me", 515, 3, 1), row("t", 540, 6, 2)];
+    expect(boardAtMatch(today, new Map([["me", 510]]))).toEqual([row("me", 510, 3, 1), row("t", 540, 6, 2)]);
   });
 });

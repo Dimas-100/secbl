@@ -36,7 +36,7 @@ import { myNightStatus } from "@/lib/night";
 import { fetchAllPages } from "@/lib/paging";
 import { playFaces } from "@/lib/play";
 import { formatShort } from "@/lib/race";
-import { aboveOf, boardBefore, leadOf, toRankRow, type RankRow } from "@/lib/ranking";
+import { aboveOf, boardAtMatch, boardBefore, leadOf, toRankRow, type RankRow } from "@/lib/ranking";
 import { firstWinOver, momentLines, rankMove, rematchHref, resultHeadline, secondAction } from "@/lib/result-moment";
 import { seasonCountdownLabel, seasonStrip } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
@@ -249,7 +249,12 @@ export default async function HomePage({
   let moment: GameCountsProps | null = null;
   if (fresh) {
     const opponentId = fresh.reporter_id === user.id ? fresh.opponent_id : fresh.reporter_id;
-    const [{ data: hist }, { data: moments }, { data: peakRow, error: peakError }, allMine] = await Promise.all([
+    const [
+      { data: hist, error: histError },
+      { data: moments, error: momentsError },
+      { data: peakRow, error: peakError },
+      allMine,
+    ] = await Promise.all([
       // Both players' ratings going in: the ladder before this game.
       supabase.from("rating_history").select("profile_id, rating_before, rating_after").eq("match_id", fresh.id),
       // The badge and streak rows this game wrote for you.
@@ -282,6 +287,11 @@ export default async function HomePage({
         return null;
       }),
     ]);
+    // A failed read keeps its fallback (no screen without your rating
+    // history; no badge, streak or achievement lines), but is never silent.
+    if (histError) console.error("home: couldn't read the result's rating history", histError);
+    if (momentsError) console.error("home: couldn't read the result's badge and streak rows", momentsError);
+    if (peakError) console.error("home: couldn't read your best rating for the result screen", peakError);
     const mine = (hist ?? []).find((h) => h.profile_id === user.id);
     const iReported = fresh.reporter_id === user.id;
     const opponent = one((iReported ? fresh.opponent : fresh.reporter) as FeedPerson | FeedPerson[] | null);
@@ -289,34 +299,37 @@ export default async function HomePage({
       const won = fresh.winner_id === user.id;
       const opponentFirst = firstName(opponent.display_name);
 
-      // The ladder now against the ladder with this game taken back out.
+      // The ladder as this game left it against the ladder with it taken
+      // back out (ruling S4-R3): games either player played on since are not
+      // this game's doing.
+      const ladderAfter = boardAtMatch(rankRows, new Map((hist ?? []).map((h) => [h.profile_id, h.rating_after])));
       const ratingsGoingIn = new Map((hist ?? []).map((h) => [h.profile_id, h.rating_before]));
-      const ladderBefore = boardBefore(rankRows, fresh.winner_id, won ? opponentId : user.id, ratingsGoingIn);
-      const move = boardError ? null : rankMove(ladderBefore, rankRows, user.id);
+      const ladderBefore = boardBefore(ladderAfter, fresh.winner_id, won ? opponentId : user.id, ratingsGoingIn);
+      const move = boardError ? null : rankMove(ladderBefore, ladderAfter, user.id);
 
       // Your games as they were played (ruling S3-R7), this one included.
-      const played = allMine?.some((m) => m.id === fresh.id) ? [...allMine].sort(byPlayOrder) : null;
+      const byPlay = allMine?.some((m) => m.id === fresh.id) ? [...allMine].sort(byPlayOrder) : null;
       let achievementsUnlocked: string[] = [];
-      if (played && !peakError) {
+      if (byPlay && !peakError) {
         // With and without this game, everything else as it is now. Cup and
         // season titles are the feed's to announce, so neither side counts them.
         const opponentRatings: Record<string, number> = {};
-        for (const m of played) {
+        for (const m of byPlay) {
           for (const p of [one(m.reporter), one(m.opponent)]) if (p) opponentRatings[p.id] = p.rating;
         }
-        const rating = me?.rating ?? mine.rating_after;
-        const base = { viewerId: user.id, rating, opponentRatings, tournamentsWon: 0, seasonsWon: 0 };
+        const ratingNow = me?.rating ?? mine.rating_after;
+        const base = { viewerId: user.id, rating: ratingNow, opponentRatings, tournamentsWon: 0, seasonsWon: 0 };
         const peakWithout = Math.max(peakRow?.rating_after ?? mine.rating_before, mine.rating_before);
-        const peakWith = Math.max(peakWithout, mine.rating_after, rating);
-        const without = played.filter((m) => m.id !== fresh.id);
+        const peakWith = Math.max(peakWithout, mine.rating_after, ratingNow);
+        const without = byPlay.filter((m) => m.id !== fresh.id);
         const had = new Set(earnedAchievements({ ...base, peak: peakWithout, matches: without }).map((a) => a.id));
-        achievementsUnlocked = earnedAchievements({ ...base, peak: peakWith, matches: played })
+        achievementsUnlocked = earnedAchievements({ ...base, peak: peakWith, matches: byPlay })
           .filter((a) => !had.has(a.id))
           .map((a) => a.label);
       }
-      const split = played ? gameSplits(played, user.id).find((s) => s.game === fresh.game_type) : undefined;
+      const split = byPlay ? gameSplits(byPlay, user.id).find((s) => s.game === fresh.game_type) : undefined;
 
-      const badgeRow = (moments ?? []).find((r) => r.kind === "badge");
+      const badgeTitle = (moments ?? []).find((r) => r.kind === "badge")?.data?.title;
       const streakRow = (moments ?? []).find((r) => r.kind === "streak");
       const streakRun = streakRow ? Number((streakRow.data as { length?: number }).length) : NaN;
       const xpEarned = xp.perMatch.get(fresh.id) ?? 0;
@@ -356,9 +369,9 @@ export default async function HomePage({
           // total is the level before it.
           levelBefore: levelFromXp(xp.total - xpEarned).level,
           levelAfter: level.level,
-          titleUnlocked: badgeRow ? String((badgeRow.data as { title?: string }).title) : null,
+          titleUnlocked: typeof badgeTitle === "string" ? badgeTitle : null,
           achievementsUnlocked,
-          firstWinOver: played && firstWinOver(played, user.id, fresh.id) ? opponentFirst : null,
+          firstWinOver: byPlay && firstWinOver(byPlay, user.id, fresh.id) ? opponentFirst : null,
           winStreak: Number.isFinite(streakRun) ? streakRun : null,
           gameRecord: split ? { label: split.label, wins: split.wins, losses: split.losses } : null,
         }),

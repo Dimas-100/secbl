@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RankRow } from "@/lib/ranking";
+import { boardAtMatch, boardBefore, type RankRow } from "@/lib/ranking";
 import {
   firstWinOver,
   momentLines,
@@ -218,5 +218,41 @@ describe("signedChange", () => {
     expect(signedChange(14)).toBe("+14");
     expect(signedChange(-9)).toBe("−9");
     expect(signedChange(0)).toBe("+0");
+  });
+});
+
+describe("the rank line reads this game only (ruling S4-R3)", () => {
+  // Before the game: me 500 (#1), Taylor 495 (#2). I beat Taylor: 510 / 485,
+  // so nothing moved. Taylor then won on and is 540 today.
+  const today = [row("me", 510, 2, 1), row("t", 540, 5, 2)];
+  const goingIn = new Map([["me", 500], ["t", 495]]);
+  const after = new Map([["me", 510], ["t", 485]]);
+  it("today's board would claim Taylor passed me on a win over Taylor", () => {
+    expect(rankMove(boardBefore(today, "me", "t", goingIn), today, "me")).toEqual({
+      kind: "down",
+      to: 2,
+      otherId: "t",
+    });
+  });
+  it("the board at the game says nothing moved", () => {
+    const atMatch = boardAtMatch(today, after);
+    expect(rankMove(boardBefore(atMatch, "me", "t", goingIn), atMatch, "me")).toBeNull();
+  });
+  it("and a real pass in this game still reads as one", () => {
+    // Before: Taylor 520 (#1), me 500 (#2); I win 515 / 505; Taylor 540 today.
+    const atMatch = boardAtMatch([row("me", 515, 2, 1), row("t", 540, 5, 2)], new Map([["me", 515], ["t", 505]]));
+    const before = boardBefore(atMatch, "me", "t", new Map([["me", 500], ["t", 520]]));
+    expect(rankMove(before, atMatch, "me")).toEqual({ kind: "up", to: 1, otherId: "t" });
+  });
+});
+
+describe("momentLines, a title and an achievement with the same name (ruling S4-R2)", () => {
+  it("drops the achievement line whose label is the unlocked title", () => {
+    expect(
+      momentLines({ ...none, levelAfter: 5, titleUnlocked: "Regular", achievementsUnlocked: ["Regular", "Shutout"] })
+    ).toEqual(["Regular badge unlocked", "Shutout unlocked"]);
+  });
+  it("keeps it when no title came with the game", () => {
+    expect(momentLines({ ...none, achievementsUnlocked: ["Regular"] })).toEqual(["Regular unlocked"]);
   });
 });

@@ -47,6 +47,19 @@ export function boardBefore(
   });
 }
 
+// The ladder as this game left it, for the game-counts rank line (ruling
+// S4-R3): the two players back at this game's rating_after, everyone else as
+// today. Without it, games either player played on afterwards would be told as
+// this game's doing. Win/loss counts stay today's (they only break rating
+// ties). A player with no rating_history row for the game is left as is.
+// Returns new rows; then boardBefore() takes the game itself back out.
+export function boardAtMatch(today: RankRow[], ratingAfter: Map<string, number>): RankRow[] {
+  return today.map((p) => {
+    const rating = ratingAfter.get(p.id);
+    return rating === undefined ? p : { ...p, rating };
+  });
+}
+
 function placed(rows: RankRow[]): RankRow[] {
   return rows.filter(isPlaced).sort(compareRank);
 }

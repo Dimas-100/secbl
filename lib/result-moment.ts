@@ -59,7 +59,11 @@ export function momentLines(input: {
   }
   if (input.levelAfter > input.levelBefore && !input.titleUnlocked) lines.push(`Level ${input.levelAfter}`);
   if (input.titleUnlocked) lines.push(`${input.titleUnlocked} badge unlocked`);
-  for (const label of input.achievementsUnlocked) lines.push(`${label} unlocked`);
+  // Ruling S4-R2: an achievement named like the title just unlocked ("Regular")
+  // would read as the same news twice; the badge line says it.
+  for (const label of input.achievementsUnlocked) {
+    if (label !== input.titleUnlocked) lines.push(`${label} unlocked`);
+  }
   if (input.firstWinOver) lines.push(`Your first win over ${input.firstWinOver}`);
   const k = input.winStreak;
   if (k !== null && (k === 3 || k === 5 || k >= 10)) lines.push(`${k} wins in a row`);
