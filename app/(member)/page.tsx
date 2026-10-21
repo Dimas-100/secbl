@@ -12,7 +12,6 @@ import { MessagesButton } from "@/components/messages-button";
 import { NightCard } from "@/components/night-card";
 import { loadNight } from "@/lib/night-data";
 import { NotifyPrompt } from "@/components/notify-prompt";
-import { PostComposer } from "@/components/post-composer";
 import { SectionHeading } from "@/components/section-heading";
 import { ShowMore } from "@/components/show-more";
 import { Sparkline } from "@/components/sparkline";
@@ -29,9 +28,9 @@ import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/
 import { FEED_SELECT, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
 import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
-import { xpCaption, type TitleName } from "@/lib/levels";
+import type { TitleName } from "@/lib/levels";
 import { formatLabel } from "@/lib/race";
-import { seasonCountdownLabel } from "@/lib/season";
+import { seasonCountdownLabel, seasonStrip } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
 import { currentStreak, overallRank, ratingChangeSince, seasonLabel, winRate, type StatMatch } from "@/lib/stats";
 import { cn } from "@/lib/utils";
@@ -78,7 +77,7 @@ export default async function HomePage({
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, display_name, rating, matches_played, avatar_url, ball, role, schools(short_name)")
+      .select("id, display_name, rating, matches_played, avatar_url, ball, schools(short_name)")
       .eq("id", user.id)
       .single(),
     // Rank, wins and losses come from the same view the leaderboard renders,
@@ -104,8 +103,15 @@ export default async function HomePage({
       .eq("reporter_id", user.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
-    // The league feed: results, badges, streaks, passes, cups, seasons, joins.
-    supabase.from("activity").select(FEED_SELECT).order("created_at", { ascending: false }).limit(30),
+    // The league feed: results, badges, streaks, cups, seasons, joins. A pass
+    // ("X passed Y for #1") lands with nearly every win in a club this size,
+    // so it repeats the result above it; the Ranks tab tells that story.
+    supabase
+      .from("activity")
+      .select(FEED_SELECT)
+      .neq("kind", "pass")
+      .order("created_at", { ascending: false })
+      .limit(30),
     // Bound the fetch, but let partitionEvents make the actual upcoming/past
     // call so the home card and the calendar can never disagree.
     supabase
@@ -193,15 +199,7 @@ export default async function HomePage({
       };
     }
   }
-  // Post photos live in a private bucket: sign every path on this render, in one call.
   const feedRows = (feed ?? []) as unknown as FeedRow[];
-  const imagePaths = feedRows.map((r) => one(r.post)?.image_path).filter((p): p is string => !!p);
-  const signed = new Map<string, string>();
-  if (imagePaths.length > 0) {
-    const { data: urls } = await supabase.storage.from("posts").createSignedUrls(imagePaths, 3600);
-    for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
-  }
-  const isAdmin = me?.role === "admin";
 
   const mySchool = one(me?.schools as { short_name: string } | { short_name: string }[] | null)?.short_name ?? null;
   const live = orderLiveGames(
@@ -233,8 +231,8 @@ export default async function HomePage({
     }
     for (const [gameId, comments] of perGame) talkByGame.set(gameId, talkSummary(comments, talkNames));
   }
-  // Your place in the running season, for the strip under the stats.
-  const mine = openSeason ? (await loadSeasonStandings(supabase, openSeason)).find((s) => s.id === user.id) ?? null : null;
+  // Your place in the running season and who leads it, for the strip under the stats.
+  const strip = openSeason ? seasonStrip(await loadSeasonStandings(supabase, openSeason), user.id) : null;
 
   const rating = me?.rating ?? 450;
   const played = me?.matches_played ?? 0;
@@ -353,21 +351,19 @@ export default async function HomePage({
             note={`${Math.round((level.intoLevel / level.needed) * 100)}% to ${level.level + 1}`}
           />
         </StatGrid>
-        {openSeason && mine && (
+        {openSeason && strip && (
           <Link
             href="/leaderboard?tab=season"
             className="press bg-card flex items-center justify-between gap-3 rounded-[20px] px-5 py-4 shadow-[inset_0_0_0_1px_var(--hairline-row)]"
           >
             <span className="flex min-w-0 flex-col gap-1.5">
-              <span className="eyebrow">{openSeason.name}</span>
-              <span className="stat-number text-[20px] leading-none">
-                {mine.played > 0 ? `#${mine.rank} · ${mine.points} pts` : "No games yet"}
+              <span className="eyebrow">
+                {openSeason.name} · {seasonCountdownLabel(openSeason, today)}
               </span>
+              <span className="stat-number truncate text-[20px] leading-none">{strip.primary}</span>
+              <span className="text-muted-foreground truncate text-[12px] leading-tight">{strip.secondary}</span>
             </span>
-            <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-[12px]">
-              {seasonCountdownLabel(openSeason, today)}
-              <ChevronRight className="size-4" strokeWidth={1.7} />
-            </span>
+            <ChevronRight className="text-muted-foreground size-4 shrink-0" strokeWidth={1.7} />
           </Link>
         )}
       </section>
@@ -510,10 +506,7 @@ export default async function HomePage({
       )}
 
       <section className="flex flex-col gap-1.5">
-        <SectionHeading action={{ href: `/players/${user.id}`, label: "All games" }}>Recent</SectionHeading>
-        <div className="mb-2">
-          <PostComposer meId={user.id} />
-        </div>
+        <SectionHeading action={{ href: `/players/${user.id}`, label: "Your games" }}>Recent</SectionHeading>
         {(feed ?? []).length === 0 && (
           <p className="text-muted-foreground py-6 text-center text-sm">
             No results yet this season.{" "}
@@ -525,16 +518,7 @@ export default async function HomePage({
         <ShowMore
           label="Show {hidden} more"
           items={feedRows.map((row) => (
-            <ActivityRow
-              key={row.id}
-              row={row}
-              viewerId={user.id}
-              today={today}
-              now={now}
-              caption={row.match_id ? xpCaption(row.match_id, xp) : undefined}
-              signedUrl={row.post ? (signed.get(one(row.post)?.image_path ?? "") ?? null) : null}
-              isAdmin={isAdmin}
-            />
+            <ActivityRow key={row.id} row={row} viewerId={user.id} now={now} />
           ))}
         />
       </section>

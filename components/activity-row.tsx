@@ -3,56 +3,17 @@ import { FlameMark } from "@/components/flame-mark";
 import { Avatar } from "@/components/avatar";
 import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
-import { PostCard } from "@/components/post-card";
 import { TitleBadge } from "@/components/title-badge";
 import { describeActivity, feedStamp, one, type FeedPerson, type FeedRow } from "@/lib/feed";
-import { winnerDelta } from "@/lib/form";
 import { GAME_LABEL } from "@/lib/identity";
 import type { TitleName } from "@/lib/levels";
-import { formatShort } from "@/lib/race";
-import { labelPlayedDate } from "@/lib/stats";
 
 // One feed row. A confirmed result is the familiar MatchRow (your games
 // read "Won 5–3", everyone else's read league-wide); every other moment is
-// a hairline ListRow with a mark on the left and the stamp on the right.
-export function ActivityRow({
-  row,
-  viewerId,
-  today,
-  now,
-  caption,
-  signedUrl,
-  isAdmin = false,
-}: {
-  row: FeedRow;
-  viewerId: string;
-  today: string;
-  now: Date;
-  caption?: React.ReactNode;
-  // A post's photo, signed for this render.
-  signedUrl?: string | null;
-  isAdmin?: boolean;
-}) {
-  if (row.kind === "post") {
-    const p = one(row.post);
-    if (!p) return null;
-    return (
-      <PostCard
-        post={{
-          id: p.id,
-          author_id: p.author_id,
-          caption: p.caption,
-          signedUrl: signedUrl ?? null,
-          likes: p.likes ?? [],
-          comments: (p.comments ?? []).map((c) => ({ ...c, author: one(c.author) })),
-        }}
-        author={one(row.actor)}
-        stamp={feedStamp(row.created_at, now)}
-        meId={viewerId}
-        isAdmin={isAdmin}
-      />
-    );
-  }
+// a hairline ListRow with a mark on the left. Every row keeps its time on the
+// right. Rating and XP changes stay on the profile and the result card.
+export function ActivityRow({ row, viewerId, now }: { row: FeedRow; viewerId: string; now: Date }) {
+  const stamp = feedStamp(row.created_at, now);
   if (row.kind === "match") {
     const m = one(row.match);
     if (!m) return null;
@@ -65,13 +26,13 @@ export function ActivityRow({
         loser={reporterWon ? opponent : reporter}
         winnerScore={Math.max(m.reporter_score, m.opponent_score)}
         loserScore={Math.min(m.reporter_score, m.opponent_score)}
-        delta={winnerDelta(m)}
+        delta={null}
         viewerId={viewerId}
         perspectiveId={viewerId}
         gameType={GAME_LABEL[m.game_type] ?? m.game_type}
-        format={formatShort(m.race_to, m.spot)}
-        meta={labelPlayedDate(m.played_at, today)}
-        caption={caption}
+        // The race is the winner's score, so only a spot is worth the room.
+        format={m.spot > 0 ? `${m.spot} spot` : null}
+        stamp={stamp}
       />
     );
   }
@@ -82,7 +43,7 @@ export function ActivityRow({
       leading={<Mark row={row} actor={one(row.actor)} />}
       title={title}
       meta={meta ?? undefined}
-      trailing={<span className="text-muted-foreground text-[12px]">{feedStamp(row.created_at, now)}</span>}
+      trailing={<span className="text-muted-foreground text-[12px]">{stamp}</span>}
     />
   );
 }

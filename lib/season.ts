@@ -97,6 +97,23 @@ export function seasonChampion(standings: Standing[]): Standing | null {
   return standings.find((s) => s.played > 0) ?? null;
 }
 
+const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
+
+// The Home strip: your place first, then the race. It always names the
+// leader once anyone has played, so a member who hasn't played yet never
+// reads the season as empty.
+export function seasonStrip(standings: Standing[], meId: string): { primary: string; secondary: string } {
+  const leader = seasonChampion(standings);
+  if (!leader) return { primary: "No games yet", secondary: `${POINTS_WIN} pts a win, ${POINTS_LOSS} a loss` };
+  const leads = `${firstName(leader.display_name)} leads · ${leader.points} pts`;
+  const mine = standings.find((s) => s.id === meId);
+  if (!mine || mine.played === 0) return { primary: leads, secondary: "Your first game puts you on the board" };
+  return {
+    primary: `#${mine.rank} · ${mine.points} pts`,
+    secondary: mine.id === leader.id ? "You lead the season" : leads,
+  };
+}
+
 function utc(date: string): number {
   const [y, m, d] = date.split("-").map(Number);
   return Date.UTC(y, m - 1, d);
