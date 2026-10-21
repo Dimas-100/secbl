@@ -247,7 +247,16 @@ export function ReportMatchForm({
     buzzed.current = null;
   }
 
+  // A chip or the picker. The opponent already on the board changes nothing
+  // (re-picking them used to restart the board and drop its score). Someone
+  // else, mid-game, raises the same switch guard as arriving with
+  // ?opponent= does: a scored game is never dropped without asking.
   function pickOpponent(o: OpponentOption) {
+    if (o.id === opponentId) return;
+    if (openingBoard(d, o.id) === "ask") {
+      setAskId(o.id);
+      return;
+    }
     setAskId(null);
     applyFormat({ opponent: o });
   }
