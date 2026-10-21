@@ -7,7 +7,7 @@ import { badgeMoment, passMoment, streakMoment } from "@/lib/activity";
 import { clubWeekOf } from "@/lib/events";
 import { levelFromXp, xpFromMatches } from "@/lib/levels";
 import { fetchAllPages } from "@/lib/paging";
-import { toRankRow, type RankRow } from "@/lib/ranking";
+import { boardBefore, toRankRow, type RankRow } from "@/lib/ranking";
 import type { StatMatch } from "@/lib/stats";
 import { loadXpMatches } from "@/lib/xp-data";
 
@@ -49,10 +49,8 @@ export async function recordMatchMoments(service: SupabaseClient, matchId: strin
     const streak = streakMoment((hist ?? []) as StatMatch[], winner);
     if (streak) rows.push({ kind: "streak", actor_id: winner, match_id: matchId, data: streak });
 
-    // Pass: the ladder with this match taken back out vs the ladder now. The
-    // leaderboard view already counts the confirmed match, so the "before" board
-    // uses both players' pre-match ratings, the winner's wins - 1 and the
-    // loser's losses - 1 (lib/ranking.ts decides who holds a rank).
+    // Pass: the ladder with this match taken back out (boardBefore) vs the
+    // ladder now (lib/ranking.ts decides who holds a rank).
     const board = await fetchAllPages<RankRow>((from, to) =>
       service
         .from("leaderboard")
@@ -66,15 +64,8 @@ export async function recordMatchMoments(service: SupabaseClient, matchId: strin
       .select("profile_id, rating_before")
       .eq("match_id", matchId);
     const beforeRating = new Map((hrows ?? []).map((h) => [h.profile_id as string, h.rating_before as number]));
-    const before = board.map((p) => {
-      if (!beforeRating.has(p.id)) return p;
-      return {
-        id: p.id,
-        rating: beforeRating.get(p.id)!,
-        wins: p.id === winner ? p.wins - 1 : p.wins,
-        losses: p.id === winner ? p.losses : p.losses - 1,
-      };
-    });
+    const loser = (m.reporter_id === winner ? m.opponent_id : m.reporter_id) as string;
+    const before = boardBefore(board, winner, loser, beforeRating);
     const pass = passMoment(before, board, winner);
     if (pass) {
       rows.push({ kind: "pass", actor_id: winner, other_id: pass.otherId, match_id: matchId, data: { rank: pass.rank } });

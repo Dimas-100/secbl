@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { aboveOf, compareRank, isPlaced, leadOf, rankOf, rankedIds, toRankRow, type RankRow } from "@/lib/ranking";
+import {
+  aboveOf,
+  boardBefore,
+  compareRank,
+  isPlaced,
+  leadOf,
+  rankOf,
+  rankedIds,
+  toRankRow,
+  type RankRow,
+} from "@/lib/ranking";
 
 const row = (id: string, rating: number, wins: number, losses = 0): RankRow => ({ id, rating, wins, losses });
 
@@ -75,5 +85,51 @@ describe("leadOf", () => {
   it("is null with a single placed member or an unplaced one", () => {
     expect(leadOf([row("a", 500, 1), row("d", 450, 0)], "a")).toBeNull();
     expect(leadOf(rows, "d")).toBeNull();
+  });
+});
+
+describe("boardBefore", () => {
+  // The board after w beat l: the view already counts that game.
+  const after: RankRow[] = [row("w", 470, 4, 2), row("l", 480, 3, 3), row("x", 475, 2, 2), row("n", 450, 0, 0)];
+  const before = new Map([
+    ["w", 455],
+    ["l", 495],
+  ]);
+
+  it("takes the game back out: both players' pre-game ratings, one win and one loss fewer", () => {
+    expect(boardBefore(after, "w", "l", before)).toEqual([
+      row("w", 455, 3, 2),
+      row("l", 495, 3, 2),
+      row("x", 475, 2, 2),
+      row("n", 450, 0, 0),
+    ]);
+  });
+
+  it("leaves the winner unplaced before their first game", () => {
+    const first = [row("w", 466, 1, 0), row("l", 480, 3, 3)];
+    const was = boardBefore(first, "w", "l", new Map([["w", 450], ["l", 496]]));
+    expect(was[0]).toEqual(row("w", 450, 0, 0));
+    expect(isPlaced(was[0])).toBe(false);
+    expect(rankedIds(was)).toEqual(["l"]);
+  });
+
+  it("leaves the loser unplaced before their first game", () => {
+    const first = [row("w", 510, 5, 1), row("l", 434, 0, 1)];
+    const was = boardBefore(first, "w", "l", new Map([["w", 494], ["l", 450]]));
+    expect(was[1]).toEqual(row("l", 450, 0, 0));
+    expect(isPlaced(was[1])).toBe(false);
+    expect(rankedIds(was)).toEqual(["w"]);
+  });
+
+  it("leaves a player's row unchanged when their rating_history row is missing", () => {
+    const was = boardBefore(after, "w", "l", new Map([["w", 455]]));
+    expect(was[0]).toEqual(row("w", 455, 3, 2));
+    expect(was[1]).toEqual(after[1]);
+  });
+
+  it("does not change the board it was given", () => {
+    const copy = after.map((r) => ({ ...r }));
+    boardBefore(after, "w", "l", before);
+    expect(after).toEqual(copy);
   });
 });

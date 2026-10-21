@@ -24,6 +24,29 @@ export function toRankRow(r: { id: unknown; rating: unknown; wins: unknown; loss
   return { id: String(r.id), rating: Number(r.rating), wins: Number(r.wins), losses: Number(r.losses) };
 }
 
+// The ladder with a just-confirmed game taken back out, for the feed's pass
+// moment: the leaderboard view already counts the game, so both players go
+// back to their rating_before, the winner has one win fewer and the loser one
+// loss fewer (a first game leaves them unplaced again). A player with no
+// rating_history row for the game is left as is. Returns new rows.
+export function boardBefore(
+  after: RankRow[],
+  winnerId: string,
+  loserId: string,
+  ratingBefore: Map<string, number>
+): RankRow[] {
+  return after.map((p) => {
+    const rating = ratingBefore.get(p.id);
+    if (rating === undefined) return p;
+    return {
+      id: p.id,
+      rating,
+      wins: p.id === winnerId ? p.wins - 1 : p.wins,
+      losses: p.id === loserId ? p.losses - 1 : p.losses,
+    };
+  });
+}
+
 function placed(rows: RankRow[]): RankRow[] {
   return rows.filter(isPlaced).sort(compareRank);
 }
