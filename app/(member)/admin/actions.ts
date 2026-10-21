@@ -129,6 +129,8 @@ export async function adminResolveMatch(formData: FormData) {
       reporter_score: reporterScore,
       opponent_score: opponentScore,
       status: "pending",
+      // An admin-resolved game is not one the opponent can flag again.
+      agreed_at: null,
     })
     .eq("id", matchId)
     .select()

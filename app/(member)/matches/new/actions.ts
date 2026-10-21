@@ -1,13 +1,17 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { recordMatchMoments } from "@/lib/activity-write";
+import { confirmPendingMatch } from "@/lib/confirm-match";
 import { GAME_LABEL } from "@/lib/identity";
-import { matchReportedPayload } from "@/lib/push";
+import { matchAgreedPayload, matchReportedPayload } from "@/lib/push";
 import { notify } from "@/lib/push-send";
 import { formatShort, validateResult } from "@/lib/race";
 import { findDuplicate, type DuplicateGame, type PairMatchRow } from "@/lib/report-form";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import type { Match } from "@/lib/types";
 import { confirmMatch } from "../actions";
 
 function fail(message: string): never {
@@ -103,6 +107,8 @@ export async function reportMatch(formData: FormData) {
   }
 
   const gameType = String(formData.get("game_type") ?? "8ball");
+  // The whole row: an agreed game goes straight into confirmPendingMatch,
+  // which reads the players and the winner from it.
   const { data: created, error } = await supabase
     .from("matches")
     .insert({
@@ -117,7 +123,7 @@ export async function reportMatch(formData: FormData) {
       spot,
       spot_to: spotTo,
     })
-    .select("id")
+    .select("*")
     .single();
   if (error || !created) fail(error?.message ?? "Could not save the match");
 
@@ -125,20 +131,53 @@ export async function reportMatch(formData: FormData) {
   const service = createServiceClient();
   await service.from("live_games").delete().eq("reporter_id", user.id);
 
+  const [{ data: reporter }, { data: opponent }] = await Promise.all([
+    service.from("profiles").select("display_name").eq("id", user.id).single(),
+    service.from("profiles").select("display_name").eq("id", opponentId).single(),
+  ]);
+  const game = {
+    matchId: created.id as string,
+    reporterName: reporter?.display_name ?? "A member",
+    reporterScore: myScore,
+    opponentScore: theirScore,
+    gameLabel: GAME_LABEL[gameType] ?? gameType,
+    format: formatShort(raceTo, spot),
+  };
+
+  // "We agreed — count it" (spec 2026-10-20-agreed-results §2): confirmed
+  // now, and the opponent is told they have a day to flag it. If counting
+  // fails the report simply stays pending, as if it had been sent.
+  let counted = false;
+  if (formData.get("agreed") === "1") {
+    try {
+      await confirmPendingMatch(service, created as Match, { agreed: true });
+      counted = true;
+    } catch (err) {
+      console.error("agreed confirmation failed", err);
+    }
+  }
+  if (counted) {
+    await recordMatchMoments(service, created.id);
+    await notify(service, {
+      candidates: [opponentId],
+      category: "matches",
+      excludeId: user.id,
+      payload: matchAgreedPayload(game),
+    });
+    revalidatePath("/");
+    redirect(`/?message=${encodeURIComponent("Counted — ratings updated.")}`);
+  }
+
   // Tell the opponent there is something to confirm.
-  const { data: reporter } = await service.from("profiles").select("display_name").eq("id", user.id).single();
   await notify(service, {
     candidates: [opponentId],
     category: "matches",
     excludeId: user.id,
-    payload: matchReportedPayload({
-      matchId: created.id,
-      reporterName: reporter?.display_name ?? "A member",
-      reporterScore: myScore,
-      opponentScore: theirScore,
-      gameLabel: GAME_LABEL[gameType] ?? gameType,
-      format: formatShort(raceTo, spot),
-    }),
+    payload: matchReportedPayload(game),
   });
+  if (formData.get("agreed") === "1") {
+    const first = (opponent?.display_name ?? "your opponent").trim().split(/\s+/)[0];
+    redirect(`/?message=${encodeURIComponent(`Couldn't count it right away — sent to ${first} to confirm instead.`)}`);
+  }
   redirect(`/?message=${encodeURIComponent("Match reported — waiting on your opponent to confirm.")}`);
 }

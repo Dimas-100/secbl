@@ -4,9 +4,13 @@ import type { Match } from "@/lib/types";
 
 // Computes both players' deltas with the TS rating engine, then applies them
 // atomically via the service-role-only apply_match_confirmation function.
+// `agreed` is a game the scorekeeper counted on the spot: the same
+// confirmation, plus the agreed_at stamp that opens the opponent's 24 hours
+// to flag it (spec 2026-10-20-agreed-results).
 export async function confirmPendingMatch(
   service: SupabaseClient,
-  match: Match
+  match: Match,
+  opts: { agreed?: boolean } = {}
 ): Promise<void> {
   const { data: players, error: playersError } = await service
     .from("profiles")
@@ -32,7 +36,7 @@ export async function confirmPendingMatch(
     opponent.matches_played
   );
 
-  const { error } = await service.rpc("apply_match_confirmation", {
+  const { error } = await service.rpc(opts.agreed ? "apply_agreed_confirmation" : "apply_match_confirmation", {
     p_match_id: match.id,
     p_reporter_delta: reporterResult.delta,
     p_opponent_delta: opponentResult.delta,

@@ -539,4 +539,61 @@ describe.skipIf(!url || !anonKey || !serviceKey)("RLS policies", () => {
       .insert({ ...base, reporter_score: 3, opponent_score: 2, race_to: 3, spot: 2, spot_to: pendingId });
     expect(okErr).toBeNull();
   });
+
+  // Agreed results (spec 2026-10-20-agreed-results §1): only the confirmation
+  // function writes agreed_at, and the undo takes a whole recompute payload,
+  // so a member must not be able to call it and write any rating they like.
+  it("a member cannot mark a report agreed or undo an agreed game themselves", async () => {
+    const me = await signIn(memberEmail);
+    const { error: insertErr } = await me.from("matches").insert({
+      reporter_id: memberId,
+      opponent_id: pendingId,
+      winner_id: memberId,
+      reporter_score: 3,
+      opponent_score: 1,
+      game_type: "8ball",
+      played_at: "2026-10-20",
+      agreed_at: new Date().toISOString(),
+    });
+    expect(insertErr?.message).toMatch(/row-level security/);
+    const { error: undoErr } = await me.rpc("undo_agreed_match", {
+      p_match_id: "00000000-0000-0000-0000-000000000000",
+      p_opponent_id: memberId,
+      p_standings: [{ profile_id: memberId, rating: 9999, matches_played: 0 }],
+      p_history: [],
+      p_deltas: [],
+      p_expected_confirmed: 0,
+    });
+    expect(undoErr?.message).toMatch(/permission denied/);
+    const { data } = await admin.from("profiles").select("rating").eq("id", memberId).single();
+    expect(data!.rating).not.toBe(9999);
+  });
+
+  // A game counted on the spot can only be flagged by an approved opponent,
+  // so it must never count against someone who isn't one.
+  it("a game cannot be counted on the spot against a member who isn't approved", async () => {
+    const me = await signIn(memberEmail);
+    const { data: report, error } = await me
+      .from("matches")
+      .insert({
+        reporter_id: memberId,
+        opponent_id: pendingId,
+        winner_id: memberId,
+        reporter_score: 3,
+        opponent_score: 1,
+        game_type: "8ball",
+        played_at: "2026-10-20",
+      })
+      .select("id")
+      .single();
+    expect(error).toBeNull();
+    const { error: countErr } = await admin.rpc("apply_agreed_confirmation", {
+      p_match_id: report!.id,
+      p_reporter_delta: 10,
+      p_opponent_delta: -10,
+    });
+    expect(countErr?.message).toMatch(/both players must be approved members/);
+    const { data: after } = await admin.from("matches").select("status, agreed_at").eq("id", report!.id).single();
+    expect(after).toEqual({ status: "pending", agreed_at: null });
+  });
 });

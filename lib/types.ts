@@ -44,6 +44,9 @@ export interface Match {
   rating_delta_reporter: number | null;
   rating_delta_opponent: number | null;
   created_at: string;
+  // Set when the scorekeeper counted the game on the spot; opens the
+  // opponent's 24 hours to flag it (lib/agreed.ts).
+  agreed_at: string | null;
 }
 
 export type EventStatus = "scheduled" | "cancelled";
