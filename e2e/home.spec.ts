@@ -1,9 +1,8 @@
-import { expect, test, type Page } from "@playwright/test";
-import { cleanupTracked, serviceClient, trackUser } from "./cleanup";
+import { expect, test } from "@playwright/test";
+import { cleanupTracked, serviceClient } from "./cleanup";
+import { logIn, onTrail, privateSchool, userMaker } from "./private-school";
 
 test.afterEach(cleanupTracked);
-
-const PASSWORD = "e2e-password-123!";
 
 // Spec 2026-10-21-play-and-progress §2: what needs you sits at the top of
 // Home, above a new member's Step 1 card. The test users live in a school
@@ -16,65 +15,10 @@ test("Home puts what needs you first, above the Step 1 card", async ({ page }) =
   const stamp = Date.now();
   const service = serviceClient();
 
-  const { data: schools } = await service.from("schools").select("id");
-  let schoolId: string | null = null;
-  for (const s of schools ?? []) {
-    const { count } = await service
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("school_id", s.id)
-      .eq("status", "approved");
-    if (count === 0) {
-      schoolId = s.id;
-      break;
-    }
-  }
-  test.skip(!schoolId, "every school has a real member — no private school to test in");
-
-  async function makeUser(tag: string) {
-    const email = `e2e-home-${tag}-${stamp}@example.com`;
-    const name = `E2E Home ${tag} ${stamp}`;
-    const { data, error } = await service.auth.admin.createUser({
-      email,
-      password: PASSWORD,
-      email_confirm: true,
-      user_metadata: { display_name: name, school_id: schoolId },
-    });
-    if (error) throw error;
-    trackUser(data.user!.id);
-    await service.from("profiles").update({ status: "approved", rating: 450 }).eq("id", data.user!.id);
-    return { id: data.user!.id, email, name };
-  }
+  const schoolId = await privateSchool(service);
+  const makeUser = userMaker(service, schoolId, "Home", stamp);
   const a = await makeUser("A");
   const b = await makeUser("B");
-
-  async function logIn(p: Page, email: string) {
-    await p.goto("/login");
-    await p.fill('input[name="email"]', email);
-    await p.fill('input[name="password"]', PASSWORD);
-    await Promise.all([
-      p.waitForURL((u) => !u.pathname.startsWith("/login")),
-      p.click('button[type="submit"]'),
-    ]);
-    await expect(p.getByRole("heading", { name: /^recent$/i })).toBeVisible();
-  }
-
-  // NavHistory adds a page to the per-tab trail (sessionStorage "secbl:nav")
-  // from an effect, so the entry being there means the page has hydrated.
-  async function onTrail(p: Page, entry: string) {
-    await p.waitForFunction(
-      (want) => {
-        try {
-          const trail: unknown = JSON.parse(sessionStorage.getItem("secbl:nav") ?? "[]");
-          return Array.isArray(trail) && trail.includes(want);
-        } catch {
-          return false;
-        }
-      },
-      entry,
-      { timeout: 30_000 }
-    );
-  }
 
   await logIn(page, a.email);
   await onTrail(page, "/");
