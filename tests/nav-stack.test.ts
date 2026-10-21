@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NAV_MAX, canGoBack, nextNavStack, parseNavStack } from "@/lib/nav-stack";
+import { NAV_MAX, canGoBack, nextNavStack, parseNavStack, shouldResetStack } from "@/lib/nav-stack";
 
 describe("nextNavStack", () => {
   it("starts a stack", () => {
@@ -39,5 +39,33 @@ describe("canGoBack", () => {
     expect(canGoBack(["/"])).toBe(false);
     expect(canGoBack([])).toBe(false);
     expect(canGoBack(["/", "/x"])).toBe(true);
+  });
+});
+
+describe("entries with a query string", () => {
+  it("push and pop like paths", () => {
+    const a = nextNavStack(["/"], "/leaderboard?tab=players");
+    expect(a).toEqual(["/", "/leaderboard?tab=players"]);
+    const b = nextNavStack(a, "/leaderboard?tab=schools");
+    expect(b).toEqual(["/", "/leaderboard?tab=players", "/leaderboard?tab=schools"]);
+    expect(nextNavStack(b, "/leaderboard?tab=players")).toEqual(["/", "/leaderboard?tab=players"]);
+    expect(nextNavStack(b, "/leaderboard?tab=schools")).toBe(b);
+  });
+});
+
+describe("shouldResetStack", () => {
+  const origin = "https://secbl.example";
+  it("resets a fresh navigation from outside the app", () => {
+    expect(shouldResetStack("navigate", "https://other.example/x", origin)).toBe(true);
+    expect(shouldResetStack("navigate", "", origin)).toBe(true);
+    expect(shouldResetStack("navigate", "not a url", origin)).toBe(true);
+  });
+  it("keeps the trail for a same-origin navigation", () => {
+    expect(shouldResetStack("navigate", `${origin}/players/x`, origin)).toBe(false);
+  });
+  it("keeps the trail on reload, back/forward or unknown type", () => {
+    expect(shouldResetStack("reload", "", origin)).toBe(false);
+    expect(shouldResetStack("back_forward", "", origin)).toBe(false);
+    expect(shouldResetStack(undefined, "", origin)).toBe(false);
   });
 });

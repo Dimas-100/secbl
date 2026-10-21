@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { NavHistory } from "@/components/nav-history";
 import { PresenceProvider } from "@/components/presence-provider";
@@ -24,7 +25,9 @@ export default async function MemberLayout({ children }: { children: React.React
     // shrink-wraps its content instead of stretching.
     <PresenceProvider meId={profile.id}>
       <div className="mx-auto w-full max-w-3xl px-6 pb-32">
-        <NavHistory />
+        <Suspense fallback={null}>
+          <NavHistory />
+        </Suspense>
         {children}
         <TabBar profileHref={`/players/${profile.id}`} meId={profile.id} />
       </div>

@@ -1,24 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { ChevronLeft, X } from "lucide-react";
-import { NAV_KEY, canGoBack, nextNavStack, parseNavStack } from "@/lib/nav-stack";
+import { NAV_KEY, canGoBack, nextNavStack, parseNavStack, shouldResetStack } from "@/lib/nav-stack";
 import { cn } from "@/lib/utils";
 
-// Mounted once in the member layout. Keeps a per-tab trail of visited paths
+// First run in this document (module state outlives client navigations, so
+// this is once per page load, not once per mount).
+let firstRun = true;
+
+// Mounted once in the member layout (inside a Suspense boundary, for
+// useSearchParams). Keeps a per-tab trail of visited pathname+search entries
 // in sessionStorage; it writes storage only, never React state.
 export function NavHistory() {
   const pathname = usePathname();
+  const search = useSearchParams().toString();
+  const entry = pathname + (search ? `?${search}` : "");
   useEffect(() => {
     try {
-      const stack = parseNavStack(sessionStorage.getItem(NAV_KEY));
-      sessionStorage.setItem(NAV_KEY, JSON.stringify(nextNavStack(stack, pathname)));
+      let stack = parseNavStack(sessionStorage.getItem(NAV_KEY));
+      if (firstRun) {
+        firstRun = false;
+        const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+        if (shouldResetStack(nav?.type, document.referrer, location.origin)) stack = [];
+      }
+      sessionStorage.setItem(NAV_KEY, JSON.stringify(nextNavStack(stack, entry)));
     } catch {
       // Storage can be blocked; Back then just follows its fallback link.
     }
-  }, [pathname]);
+  }, [entry]);
   return null;
 }
 
