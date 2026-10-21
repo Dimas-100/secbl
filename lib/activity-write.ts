@@ -7,7 +7,7 @@ import { badgeMoment, passMoment, streakMoment } from "@/lib/activity";
 import { clubWeekOf } from "@/lib/events";
 import { levelFromXp, xpFromMatches } from "@/lib/levels";
 import { fetchAllPages } from "@/lib/paging";
-import type { RankRow } from "@/lib/ranking";
+import { toRankRow, type RankRow } from "@/lib/ranking";
 import type { StatMatch } from "@/lib/stats";
 import { loadXpMatches } from "@/lib/xp-data";
 
@@ -59,14 +59,7 @@ export async function recordMatchMoments(service: SupabaseClient, matchId: strin
         .select("id, rating, wins, losses")
         .order("id")
         .range(from, to)
-        .then(({ data }) =>
-          (data ?? []).map((r) => ({
-            id: r.id as string,
-            rating: Number(r.rating),
-            wins: Number(r.wins),
-            losses: Number(r.losses),
-          }))
-        )
+        .then(({ data }) => (data ?? []).map(toRankRow))
     );
     const { data: hrows } = await service
       .from("rating_history")

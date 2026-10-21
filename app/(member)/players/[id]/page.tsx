@@ -20,7 +20,7 @@ import { ACHIEVEMENTS, earnedAchievements } from "@/lib/achievements";
 import { GAME_LABEL } from "@/lib/identity";
 import { nextBadge, xpCaption } from "@/lib/levels";
 import { formatShort } from "@/lib/race";
-import { rankOf } from "@/lib/ranking";
+import { rankOf, toRankRow } from "@/lib/ranking";
 import { createClient } from "@/lib/supabase/server";
 import { startDm } from "@/app/(member)/chat/actions";
 import { clubDateOf } from "@/lib/events";
@@ -123,15 +123,7 @@ export default async function PlayerPage({
   const wins = Number(boardRow?.wins ?? 0);
   const losses = Number(boardRow?.losses ?? 0);
   const rate = winRate(wins, losses);
-  const rank = rankOf(
-    (board ?? []).map((r) => ({
-      id: r.id as string,
-      rating: Number(r.rating),
-      wins: Number(r.wins),
-      losses: Number(r.losses),
-    })),
-    id
-  );
+  const rank = rankOf((board ?? []).map(toRankRow), id);
   const bestStreak = longestWinStreak(all, id);
   const peak = peakRating(history ?? [], profile.rating);
   const change = ratingChangeSince(history ?? [], monthAgo, profile.rating);

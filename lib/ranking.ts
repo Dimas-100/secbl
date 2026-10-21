@@ -18,6 +18,12 @@ export function compareRank(a: RankRow, b: RankRow): number {
   return b.rating - a.rating || b.wins - a.wins || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
+// A leaderboard-view row to a RankRow. PostgREST sends bigint counts (wins,
+// losses) as strings, so coerce here instead of at every call site.
+export function toRankRow(r: { id: unknown; rating: unknown; wins: unknown; losses: unknown }): RankRow {
+  return { id: String(r.id), rating: Number(r.rating), wins: Number(r.wins), losses: Number(r.losses) };
+}
+
 function placed(rows: RankRow[]): RankRow[] {
   return rows.filter(isPlaced).sort(compareRank);
 }

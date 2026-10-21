@@ -30,7 +30,7 @@ import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
 import type { TitleName } from "@/lib/levels";
 import { formatLabel } from "@/lib/race";
-import { rankOf, type RankRow } from "@/lib/ranking";
+import { rankOf, toRankRow, type RankRow } from "@/lib/ranking";
 import { seasonCountdownLabel, seasonStrip } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
 import { currentStreak, ratingChangeSince, seasonLabel, winRate, type StatMatch } from "@/lib/stats";
@@ -239,12 +239,7 @@ export default async function HomePage({
   const played = me?.matches_played ?? 0;
   const provisional = played < 10;
 
-  const rankRows: RankRow[] = (board ?? []).map((r) => ({
-    id: r.id as string,
-    rating: Number(r.rating),
-    wins: Number(r.wins),
-    losses: Number(r.losses),
-  }));
+  const rankRows: RankRow[] = (board ?? []).map(toRankRow);
   const myRow = rankRows.find((r) => r.id === user.id);
   const wins = myRow?.wins ?? 0;
   const losses = myRow?.losses ?? 0;

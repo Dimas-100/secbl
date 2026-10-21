@@ -1,9 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { aboveOf, compareRank, isPlaced, leadOf, rankOf, rankedIds, type RankRow } from "@/lib/ranking";
+import { aboveOf, compareRank, isPlaced, leadOf, rankOf, rankedIds, toRankRow, type RankRow } from "@/lib/ranking";
 
 const row = (id: string, rating: number, wins: number, losses = 0): RankRow => ({ id, rating, wins, losses });
 
 const rows: RankRow[] = [row("a", 500, 2), row("b", 500, 3), row("c", 520, 0, 1), row("d", 450, 0, 0)];
+
+describe("toRankRow", () => {
+  it("turns PostgREST string counts into numbers", () => {
+    expect(toRankRow({ id: "a", rating: 512, wins: "3", losses: "1" })).toEqual({
+      id: "a",
+      rating: 512,
+      wins: 3,
+      losses: 1,
+    });
+    expect(toRankRow({ id: "b", rating: "450", wins: 0, losses: 0 })).toEqual({
+      id: "b",
+      rating: 450,
+      wins: 0,
+      losses: 0,
+    });
+  });
+});
 
 describe("isPlaced", () => {
   it("is true once a member has a confirmed game", () => {
