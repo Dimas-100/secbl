@@ -120,15 +120,24 @@ export function clubMonthStart(now: Date): Date {
 // DST can move the day.
 const monthNameFormatter = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "long" });
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+const shortDateYearFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
 // "October": the club month an instant falls in (the You page's month card).
 export function clubMonthName(iso: string): string {
   return monthNameFormatter.format(new Date(`${clubDateOf(iso).slice(0, 7)}-01T12:00:00Z`));
 }
 
-// "Oct 13" for a club date "YYYY-MM-DD" (a match's played_at).
-export function shortClubDate(clubDate: string): string {
-  return shortDateFormatter.format(new Date(`${clubDate}T12:00:00Z`));
+// "Oct 13" for a club date "YYYY-MM-DD" (a match's played_at), or
+// "Dec 12, 2025" when it isn't in today's club year (todayClubDate, from
+// clubDateOf), so an old date never reads as this year's.
+export function shortClubDate(clubDate: string, todayClubDate: string): string {
+  const formatter = clubDate.slice(0, 4) === todayClubDate.slice(0, 4) ? shortDateFormatter : shortDateYearFormatter;
+  return formatter.format(new Date(`${clubDate}T12:00:00Z`));
 }
 
 // The Monday that starts the club week (Mon 00:00 – Sun 23:59 club time)

@@ -204,7 +204,7 @@ export default async function PlayerPage({
   const monthStart = clubMonthStart(now);
 
   const [
-    { data: profile },
+    { data: profile, error: profileError },
     all,
     history,
     { data: board },
@@ -263,6 +263,9 @@ export default async function PlayerPage({
     loadOpenSeason(supabase),
     isMe ? loadClubRows(supabase) : null,
   ]);
+  // A failed read is an error, not a missing member (ruling S3-R6): only a
+  // profile that genuinely isn't there (or that RLS hides) is a 404.
+  if (profileError) throw new Error(`player page: couldn't read the profile: ${profileError.message}`);
   if (!profile) notFound();
   const school = Array.isArray(profile.schools) ? profile.schools[0] : profile.schools;
   const first = firstName(profile.display_name);
@@ -279,7 +282,8 @@ export default async function PlayerPage({
   // out of order; the match history list keeps its confirmed order.
   const played = [...all].sort(byPlayOrder);
 
-  // Everyone this member has played: names, faces and current ratings.
+  // Everyone this member has played whose profile the viewer can read (RLS
+  // hides suspended members): names, faces and current ratings.
   const people = new Map<string, PlayerRef>();
   const ratingBefore = new Map<string, Map<string, number>>();
   for (const m of all) {
@@ -328,7 +332,8 @@ export default async function PlayerPage({
       ? [{ key: "lower", label: "vs lower-rated", ...vsRated.lower, pct: null }]
       : []),
   ];
-  const rivalRows = rivals(played, id, 3);
+  // Only opponents whose profile the viewer can read (ruling S3-R9).
+  const rivalRows = rivals(played, id, 3, new Set(people.keys()));
 
   // Someone else's page: your record against them, from your side.
   const together =
@@ -349,12 +354,17 @@ export default async function PlayerPage({
     // sentence keeps its counts and drops the rank clause.
     const sentence = monthSentence({
       month,
+      today,
       games: thisMonth.length,
       wins: thisMonth.filter((m) => m.winner_id === id).length,
       rankStart: club ? rankAsOf(club.memberIds, club.history, club.matches, monthStart.toISOString(), id) : null,
       rankNow: club ? rankAsOf(club.memberIds, club.history, club.matches, ALL_SO_FAR, id) : null,
+      // An opponent whose profile can't be read is left unnamed (S3-R9).
       last: last
-        ? { playedAt: last.played_at, opponent: nameOf(last.reporter_id === id ? last.opponent_id : last.reporter_id) }
+        ? {
+            playedAt: last.played_at,
+            opponent: people.get(last.reporter_id === id ? last.opponent_id : last.reporter_id)?.display_name ?? null,
+          }
         : null,
     });
     // "October so far: 7 games, 5 wins." shows "October so far" as the

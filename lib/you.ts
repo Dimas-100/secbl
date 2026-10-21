@@ -76,11 +76,15 @@ export function ratingSplits(
 }
 
 // The opponents played most (then most recently), with the current streak
-// between the two when it is at least two games long.
+// between the two when it is at least two games long. visible: the opponents
+// whose profile the viewer can read; anyone else (RLS hides suspended members
+// from non-admins) is skipped before the top n are taken, so a rival is never
+// shown as "Member" with a link that 404s (ruling S3-R9).
 export function rivals(
   newestFirst: YouMatch[],
   ownerId: string,
-  n = 3
+  n = 3,
+  visible?: ReadonlySet<string>
 ): {
   opponentId: string;
   games: number;
@@ -92,6 +96,7 @@ export function rivals(
   const byOpp = new Map<string, YouMatch[]>();
   for (const m of newestFirst) {
     const opp = opponentOf(m, ownerId);
+    if (visible && !visible.has(opp)) continue;
     const list = byOpp.get(opp);
     if (list) list.push(m);
     else byOpp.set(opp, [m]);
@@ -192,19 +197,23 @@ export function rankAsOf(
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 // The month card on your own page. month is the club month's name
-// (clubMonthName); games and wins count this month's confirmed games; ranks
-// are rankAsOf at the month start and rankOf now; last is the newest game
-// (played_at club date and the opponent's name) for the no-games line. Only a
-// true clause appears: a climb needs a rank at both ends. null: no games ever.
+// (clubMonthName) and today the club date (for the year on an old date);
+// games and wins count this month's confirmed games; ranks are rankAsOf at
+// the month start and now; last is the newest game (played_at club date and
+// the opponent's name, null when their profile can't be read) for the
+// no-games line. Only a true clause appears: a climb needs a rank at both
+// ends, and an unknown opponent is left out, never named "Member" (ruling
+// S3-R9). null: no games ever.
 export function monthSentence(input: {
   month: string;
+  today: string;
   games: number;
   wins: number;
   rankStart: number | null;
   rankNow: number | null;
-  last: { playedAt: string; opponent: string } | null;
+  last: { playedAt: string; opponent: string | null } | null;
 }): string | null {
-  const { month, games, wins, rankStart, rankNow, last } = input;
+  const { month, today, games, wins, rankStart, rankNow, last } = input;
   if (games > 0) {
     const head = `${month} so far: ${plural(games, "game")}, ${plural(wins, "win")}.`;
     if (rankNow !== null && rankStart !== null && rankNow < rankStart) {
@@ -214,7 +223,8 @@ export function monthSentence(input: {
     return head;
   }
   if (!last) return null;
-  return `No games yet in ${month}. Your last was ${shortClubDate(last.playedAt)} vs ${firstName(last.opponent)}.`;
+  const vs = last.opponent === null ? "" : ` vs ${firstName(last.opponent)}`;
+  return `No games yet in ${month}. Your last was ${shortClubDate(last.playedAt, today)}${vs}.`;
 }
 
 export type ChartRange = "month" | "season" | "all";

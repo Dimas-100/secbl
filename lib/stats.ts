@@ -104,8 +104,9 @@ export function sparklinePoints(ratings: number[], width: number, height: number
 }
 
 // "Today" / "Yesterday" / "Sat, Oct 3" for a played_at calendar date, given
-// today's club date (from lib/events clubDateOf). Dates are plain YYYY-MM-DD,
-// so this never touches time zones.
+// today's club date (from lib/events clubDateOf), with the year when it isn't
+// today's club year ("Fri, Dec 12, 2025"). Dates are plain YYYY-MM-DD, so
+// this never touches time zones.
 export function labelPlayedDate(playedAt: string, todayClubDate: string): string {
   if (playedAt === todayClubDate) return "Today";
   const yesterday = new Date(`${todayClubDate}T00:00:00Z`);
@@ -116,6 +117,7 @@ export function labelPlayedDate(playedAt: string, todayClubDate: string): string
     weekday: "short",
     month: "short",
     day: "numeric",
+    ...(playedAt.slice(0, 4) === todayClubDate.slice(0, 4) ? {} : { year: "numeric" }),
   });
 }
 

@@ -270,12 +270,18 @@ describe("clubMonthName", () => {
 });
 
 describe("shortClubDate", () => {
-  it("reads a club date as Mon D", () => {
-    expect(shortClubDate("2026-10-13")).toBe("Oct 13");
-    expect(shortClubDate("2026-09-05")).toBe("Sep 5");
+  const today = "2026-10-21";
+  it("reads a club date in this club year as Mon D", () => {
+    expect(shortClubDate("2026-10-13", today)).toBe("Oct 13");
+    expect(shortClubDate("2026-09-05", today)).toBe("Sep 5");
+  });
+  it("adds the year when the date isn't in today's club year", () => {
+    expect(shortClubDate("2025-12-12", today)).toBe("Dec 12, 2025");
+    expect(shortClubDate("2026-12-31", "2027-01-01")).toBe("Dec 31, 2026");
+    expect(shortClubDate("2027-01-01", "2027-01-01")).toBe("Jan 1");
   });
   it("never shifts the day, whatever the zone", () => {
-    expect(shortClubDate("2026-11-01")).toBe("Nov 1");
-    expect(shortClubDate("2026-12-31")).toBe("Dec 31");
+    expect(shortClubDate("2026-11-01", today)).toBe("Nov 1");
+    expect(shortClubDate("2026-12-31", today)).toBe("Dec 31");
   });
 });

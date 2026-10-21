@@ -127,6 +127,23 @@ describe("rivals", () => {
     const single = rivals([match("a", true)], ME)[0];
     expect(single.run).toBeNull();
   });
+
+  it("skips an opponent whose profile can't be read, then fills to n (ruling S3-R9)", () => {
+    const ms = [
+      match("hidden", true),
+      match("hidden", true),
+      match("hidden", false),
+      match("a", true),
+      match("a", true),
+      match("b", false),
+      match("c", true),
+      match("d", true),
+    ];
+    const visible = new Set(["a", "b", "c", "d"]);
+    expect(rivals(ms, ME, 3, visible).map((r) => r.opponentId)).toEqual(["a", "b", "c"]);
+    expect(rivals(ms, ME, 3).map((r) => r.opponentId)).toEqual(["hidden", "a", "b"]);
+    expect(rivals([match("hidden", true)], ME, 3, new Set())).toEqual([]);
+  });
 });
 
 describe("a batch confirmed out of play order (ruling S3-R7)", () => {
@@ -267,7 +284,7 @@ describe("rankAsOf", () => {
 });
 
 describe("monthSentence", () => {
-  const base = { month: "October", rankStart: null, rankNow: null, last: null };
+  const base = { month: "October", today: "2026-10-21", rankStart: null, rankNow: null, last: null };
 
   it("counts games and wins, singular and plural", () => {
     expect(monthSentence({ ...base, games: 1, wins: 1 })).toBe("October so far: 1 game, 1 win.");
@@ -305,6 +322,18 @@ describe("monthSentence", () => {
         last: { playedAt: "2026-09-28", opponent: "Jordan Avery" },
       })
     ).toBe("No games yet in October. Your last was Sep 28 vs Jordan.");
+  });
+
+  it("leaves the opponent out when their profile can't be read (ruling S3-R9)", () => {
+    expect(
+      monthSentence({ ...base, games: 0, wins: 0, last: { playedAt: "2026-09-28", opponent: null } })
+    ).toBe("No games yet in October. Your last was Sep 28.");
+  });
+
+  it("dates a last game from another year with its year", () => {
+    expect(
+      monthSentence({ ...base, games: 0, wins: 0, last: { playedAt: "2025-12-12", opponent: "Jordan Avery" } })
+    ).toBe("No games yet in October. Your last was Dec 12, 2025 vs Jordan.");
   });
 
   it("is null with no games ever", () => {

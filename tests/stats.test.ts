@@ -24,6 +24,12 @@ describe("labelPlayedDate / groupByPlayedDate", () => {
     expect(labelPlayedDate("2026-10-03", "2026-10-05")).toBe("Sat, Oct 3");
     expect(labelPlayedDate("2026-09-30", "2026-10-01")).toBe("Yesterday");
   });
+  it("adds the year when the date isn't in today's club year", () => {
+    expect(labelPlayedDate("2025-12-12", "2026-10-21")).toBe("Fri, Dec 12, 2025");
+    expect(labelPlayedDate("2026-01-02", "2026-12-30")).toBe("Fri, Jan 2");
+    // Yesterday across New Year is still "Yesterday".
+    expect(labelPlayedDate("2025-12-31", "2026-01-01")).toBe("Yesterday");
+  });
   it("groups consecutive matches by date in order", () => {
     const groups = groupByPlayedDate(
       [
