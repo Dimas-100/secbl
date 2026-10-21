@@ -129,4 +129,33 @@ describe.skipIf(!url || !anonKey || !serviceKey)("club night", () => {
     const { error: late } = await a.rpc("join_night_line", { p_night: night });
     expect(late?.message).toMatch(/over/);
   });
+
+  // A night forgotten overnight with a table still taken must stay over when
+  // that table's game is logged the next morning — not come back to life on
+  // everyone's Home and block a fresh start.
+  it("an idle night is not revived by logging its last game", async () => {
+    if (skip) return;
+    const { a, b } = as;
+    const { data: night } = await a.rpc("open_club_night", { p_tables: 1 });
+    await a.rpc("join_night_line", { p_night: night });
+    await b.rpc("join_night_line", { p_night: night });
+    expect(await count("night_tables", night)).toBe(1);
+    const sevenHoursAgo = new Date(Date.now() - 7 * 3_600_000).toISOString();
+    await admin.from("club_nights").update({ touched_at: sevenHoursAgo }).eq("id", night);
+
+    const { data: freed, error } = await a.rpc("night_game_reported", { p_other: ids.b });
+    expect(error).toBeNull();
+    expect(freed).toEqual([]);
+    expect(await count("night_tables", night)).toBe(1);
+    const { data: still } = await admin.from("club_nights").select("touched_at").eq("id", night).single();
+    expect(Date.parse(still!.touched_at)).toBeLessThan(Date.now() - 6 * 3_600_000);
+    const { data: call } = await b.rpc("night_table_call", { p_other: ids.a });
+    expect(call).toBeNull();
+
+    // The next start closes the idle night and opens a fresh one.
+    const { data: fresh, error: openErr } = await a.rpc("open_club_night", { p_tables: 1 });
+    expect(openErr).toBeNull();
+    expect(fresh).not.toBe(night);
+    await a.rpc("close_club_night", { p_night: fresh });
+  });
 });
