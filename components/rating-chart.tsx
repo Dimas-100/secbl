@@ -38,12 +38,15 @@ export function RatingChart({
   ranges,
   hrefFor,
   bestWin,
+  whose = "your",
 }: {
   series: ChartSeries;
   range: ChartRange;
   ranges: ChartRange[];
   hrefFor: Record<ChartRange, string>;
   bestWin: { index: number; label: string } | null;
+  // "their" on someone else's page ("+42 since their first game").
+  whose?: "your" | "their";
 }) {
   const { points, change, peak } = series;
   const options = ranges.map((r) => ({ value: r, label: CHART_RANGE_LABEL[r], href: hrefFor[r] }));
@@ -136,7 +139,7 @@ export function RatingChart({
     <div className="flex flex-col gap-3">
       {change !== null && (
         <p className={cn("stat-number text-[13px]", change >= 0 ? "text-win" : "text-loss")}>
-          {chartChangeLabel(change, range)}
+          {chartChangeLabel(change, range, whose)}
         </p>
       )}
       {chart}

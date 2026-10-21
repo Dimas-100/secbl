@@ -39,6 +39,9 @@ describe("formSummary", () => {
     expect(formSummary(["W", "W", "L"])).toBe("won 2 of your last 3");
     expect(formSummary(["L", "L"])).toBe("won 0 of your last 2");
   });
+  it("says their on someone else's page", () => {
+    expect(formSummary(["W", "L"], "their")).toBe("won 1 of their last 2");
+  });
 });
 
 describe("gameSplits", () => {
@@ -308,6 +311,18 @@ describe("chartSeries", () => {
     expect(chartSeries(tied, "all", null).peak).toEqual({ index: 1, rating: 470 });
   });
 
+  it("marks a peak only when it is reached inside the range (ruling S3-R4)", () => {
+    // October only lost: the high was the rating going in, never "peak".
+    const falling = [row(500, 490, "2026-10-03T00:00:00Z"), row(490, 484, "2026-10-09T00:00:00Z")];
+    expect(chartSeries(falling, "month", OCT).peak).toBeNull();
+    expect(chartSeries(falling, "month", OCT).change).toBe(-16);
+    // Back to the opening rating but never above it: still no peak.
+    const level = [row(470, 460, "2026-10-03T00:00:00Z"), row(460, 470, "2026-10-09T00:00:00Z")];
+    expect(chartSeries(level, "month", OCT).peak).toBeNull();
+    // One win is a peak at its own point.
+    expect(chartSeries([row(450, 466, "2026-10-02T00:00:00Z")], "month", OCT).peak).toEqual({ index: 1, rating: 466 });
+  });
+
   it("has no change or peak with fewer than 2 points in range", () => {
     expect(chartSeries(rows, "month", "2026-11-01T04:00:00.000Z")).toEqual({ points: [], change: null, peak: null });
     expect(chartSeries([], "all", null)).toEqual({ points: [], change: null, peak: null });
@@ -325,6 +340,11 @@ describe("chart copy", () => {
     expect(chartChangeLabel(12, "month")).toBe("+12 this month");
     expect(chartChangeLabel(-8, "season")).toBe("−8 this season");
     expect(chartChangeLabel(42, "all")).toBe("+42 since your first game");
+  });
+
+  it("says their first game on someone else's page", () => {
+    expect(chartChangeLabel(-44, "all", "their")).toBe("−44 since their first game");
+    expect(chartChangeLabel(12, "month", "their")).toBe("+12 this month");
   });
 
   it("says when a range has no rated games", () => {

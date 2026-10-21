@@ -23,10 +23,11 @@ export interface YouMatch {
 
 const opponentOf = (m: YouMatch, ownerId: string) => (m.reporter_id === ownerId ? m.opponent_id : m.reporter_id);
 
-// "won 7 of your last 10" from formDots' output.
-export function formSummary(dots: ("W" | "L")[]): string {
+// "won 7 of your last 10" from formDots' output; "their" on someone else's
+// page, where "your" would be about the viewer.
+export function formSummary(dots: ("W" | "L")[], whose: "your" | "their" = "your"): string {
   const won = dots.filter((d) => d === "W").length;
-  return `won ${won} of your last ${dots.length}`;
+  return `won ${won} of ${whose} last ${dots.length}`;
 }
 
 // W–L per game type, the most played first (ties keep the more recent game first).
@@ -233,7 +234,10 @@ export interface ChartSeries {
 // for "all", or when startIso is null). The first point is the rating going
 // into the range's first game (its rating_before, matchId null), then one
 // point per game. change = last − first and peak (the max, first reached) are
-// null with fewer than 2 points, so an empty range never reads "+0".
+// null with fewer than 2 points, so an empty range never reads "+0". The peak
+// is also null when the max is the opening point (ruling S3-R4): a rating held
+// since before the range was not reached in it, so a losing month never reads
+// "peak 520". The page never asks for a bounded range with a null start.
 export function chartSeries(
   historyOldestFirst: { match_id: string | null; rating_before: number; rating_after: number; created_at: string }[],
   range: ChartRange,
@@ -251,18 +255,19 @@ export function chartSeries(
   points.forEach((p, index) => {
     if (p.rating > peak.rating) peak = { index, rating: p.rating };
   });
-  return { points, change: points[points.length - 1].rating - points[0].rating, peak };
+  return { points, change: points[points.length - 1].rating - points[0].rating, peak: peak.index > 0 ? peak : null };
 }
 
-const RANGE_SPAN: Record<ChartRange, string> = {
+const RANGE_SPAN: Record<Exclude<ChartRange, "all">, string> = {
   month: "this month",
   season: "this season",
-  all: "since your first game",
 };
 
-// "+12 this month", "−8 this season" (U+2212), "+42 since your first game".
-export function chartChangeLabel(change: number, range: ChartRange): string {
-  return `${change >= 0 ? "+" : "−"}${Math.abs(change)} ${RANGE_SPAN[range]}`;
+// "+12 this month", "−8 this season" (U+2212), "+42 since your first game";
+// "since their first game" on someone else's page.
+export function chartChangeLabel(change: number, range: ChartRange, whose: "your" | "their" = "your"): string {
+  const span = range === "all" ? `since ${whose} first game` : RANGE_SPAN[range];
+  return `${change >= 0 ? "+" : "−"}${Math.abs(change)} ${span}`;
 }
 
 // In place of the chart when a range has fewer than 2 points. The page hides
