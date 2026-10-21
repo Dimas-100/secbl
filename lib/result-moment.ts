@@ -2,6 +2,7 @@
 // the ladder did to one member, the at-most-three true "what changed" lines,
 // which second button to show, and the rematch link. No DOM, no clock.
 import { rankedIds, type RankRow } from "@/lib/ranking";
+import { opponentOf, type StatMatch } from "@/lib/stats";
 
 export type RankMoveKind = "up" | "down" | "entered";
 
@@ -82,6 +83,32 @@ export function secondAction(input: {
   const confirmed = Date.parse(input.confirmedAt);
   if (Number.isNaN(opened) || Number.isNaN(confirmed)) return "rematch";
   return confirmed > opened ? "back_in_line" : "rematch";
+}
+
+// The XP row: what the game earned and where the level bar starts filling.
+// A game that crossed a level fills the new one from empty; a capped game
+// earned nothing, so it says so and the bar does not move.
+export function xpRow(p: { xpEarned: number; xpCapped: boolean; intoLevel: number }): {
+  label: string;
+  barFrom: number;
+} {
+  if (p.xpCapped) return { label: "No XP · weekly limit", barFrom: p.intoLevel };
+  return { label: `+${p.xpEarned} XP`, barFrom: Math.max(0, p.intoLevel - p.xpEarned) };
+}
+
+// A rating change with its sign: "+14", or "−9" with a true minus (U+2212).
+export function signedChange(delta: number): string {
+  return `${delta < 0 ? "−" : "+"}${Math.abs(delta)}`;
+}
+
+// "Your first win over {first}": this game is a win, and no game before it in
+// play order (ruling S3-R7) was a win over the same opponent. newestFirst is
+// sorted with byPlayOrder, so "before" is everything after it in the list.
+export function firstWinOver(newestFirst: StatMatch[], meId: string, matchId: string): boolean {
+  const i = newestFirst.findIndex((m) => m.id === matchId);
+  if (i === -1 || newestFirst[i].winner_id !== meId) return false;
+  const them = opponentOf(newestFirst[i], meId);
+  return !newestFirst.slice(i + 1).some((m) => m.winner_id === meId && opponentOf(m, meId) === them);
 }
 
 export function rematchHref(m: { opponentId: string; gameType: string; raceTo: number | null }): string {

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { RankRow } from "@/lib/ranking";
-import { momentLines, rankMove, rematchHref, resultHeadline, secondAction } from "@/lib/result-moment";
+import {
+  firstWinOver,
+  momentLines,
+  rankMove,
+  rematchHref,
+  resultHeadline,
+  secondAction,
+  signedChange,
+  xpRow,
+} from "@/lib/result-moment";
 
 const row = (id: string, rating: number, wins = 1, losses = 0): RankRow => ({ id, rating, wins, losses });
 const none = {
@@ -154,5 +163,60 @@ describe("rematchHref", () => {
     expect(rematchHref({ opponentId: "abc", gameType: "nine_ball", raceTo: null })).toBe(
       "/matches/new?opponent=abc&game=nine_ball&race=open&rematch=1"
     );
+  });
+});
+
+describe("firstWinOver", () => {
+  // Newest first in play order (byPlayOrder), as Home passes them.
+  const g = (id: string, opponent: string, winner: "me" | "them") => ({
+    id,
+    reporter_id: "me",
+    opponent_id: opponent,
+    winner_id: winner === "me" ? "me" : opponent,
+    reporter_score: winner === "me" ? 3 : 1,
+    opponent_score: winner === "me" ? 1 : 3,
+    confirmed_at: "2026-10-21T20:00:00Z",
+  });
+  it("true for a win with no earlier win over that opponent", () => {
+    expect(firstWinOver([g("now", "b", "me"), g("old", "b", "them"), g("other", "c", "me")], "me", "now")).toBe(true);
+  });
+  it("false when an earlier game in play order was already a win over them", () => {
+    expect(firstWinOver([g("now", "b", "me"), g("old", "b", "me")], "me", "now")).toBe(false);
+  });
+  it("a win over them played later does not count as earlier", () => {
+    expect(firstWinOver([g("later", "b", "me"), g("now", "b", "me")], "me", "now")).toBe(true);
+  });
+  it("false for a loss, and for a game not in the list", () => {
+    expect(firstWinOver([g("now", "b", "them")], "me", "now")).toBe(false);
+    expect(firstWinOver([g("now", "b", "me")], "me", "missing")).toBe(false);
+  });
+  it("reads my side when I was the opponent on the report", () => {
+    const asOpponent = { ...g("now", "b", "me"), reporter_id: "b", opponent_id: "me" };
+    const earlier = { ...g("old", "b", "me"), reporter_id: "b", opponent_id: "me" };
+    expect(firstWinOver([asOpponent], "me", "now")).toBe(true);
+    expect(firstWinOver([asOpponent, earlier], "me", "now")).toBe(false);
+  });
+});
+
+describe("xpRow", () => {
+  it("says what the game earned and fills the bar from where it was", () => {
+    expect(xpRow({ xpEarned: 80, xpCapped: false, intoLevel: 210 })).toEqual({ label: "+80 XP", barFrom: 130 });
+  });
+  it("a game that crossed a level fills the new level from empty", () => {
+    expect(xpRow({ xpEarned: 200, xpCapped: false, intoLevel: 60 })).toEqual({ label: "+200 XP", barFrom: 0 });
+  });
+  it("the weekly cap says so and never fakes a fill", () => {
+    expect(xpRow({ xpEarned: 0, xpCapped: true, intoLevel: 210 })).toEqual({
+      label: "No XP · weekly limit",
+      barFrom: 210,
+    });
+  });
+});
+
+describe("signedChange", () => {
+  it("a gain reads +n and a drop reads with a true minus sign", () => {
+    expect(signedChange(14)).toBe("+14");
+    expect(signedChange(-9)).toBe("−9");
+    expect(signedChange(0)).toBe("+0");
   });
 });

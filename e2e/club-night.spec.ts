@@ -53,6 +53,12 @@ test("a club night calls the line to the table and frees it on the result", asyn
   for (let i = 0; i < 3; i++) await pageA.getByRole("button", { name: /^Increase You score/ }).click();
   await pageA.getByRole("button", { name: "We agreed — count it" }).click();
   await expect(pageA.getByText(/Counted — ratings updated/)).toBeVisible({ timeout: 20_000 });
+  // The game counts during the night (ruling S4-R1): A is out of the line,
+  // so the screen offers Back in line in place of Rematch.
+  const screen = pageA.getByRole("dialog", { name: "Latest result" });
+  await expect(screen.getByRole("heading", { name: "You beat E2E 3–1" })).toBeVisible();
+  await expect(screen.getByRole("button", { name: "Back in line" })).toBeVisible();
+  await expect(screen.getByRole("link", { name: "Rematch" })).toHaveCount(0);
 
   await pageA.goto("/night");
   await onTrail(pageA, "/night");
@@ -62,7 +68,17 @@ test("a club night calls the line to the table and frees it on the result", asyn
   await expect(nightMain.getByText("Free", { exact: true })).toBeVisible();
   await expect(nightMain.getByText("Nobody in line.")).toBeVisible();
 
+  // Leaving Home did not dismiss the screen; Back in line does, and puts A
+  // at the end of tonight's line.
+  await pageA.goto("/");
+  await screen.getByRole("button", { name: "Back in line" }).click();
+  await expect(screen).toHaveCount(0);
+  await expect(pageA.getByRole("main").getByText("You're next in line")).toBeVisible({ timeout: 20_000 });
+
   // A started it, so A ends it.
+  await pageA.goto("/night");
+  await onTrail(pageA, "/night");
+  await expect(nightMain.getByText("Free", { exact: true })).toBeVisible();
   pageA.once("dialog", (d) => void d.accept());
   await pageA.getByRole("button", { name: "End club night" }).click();
   await expect(pageA.getByRole("button", { name: "Start club night" })).toBeVisible();

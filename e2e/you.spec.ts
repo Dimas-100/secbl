@@ -71,6 +71,16 @@ test("the You page shows your progress; someone else's page shows you vs them", 
   await page.goto("/");
   await onTrail(page, "/");
   await main.getByRole("button", { name: "Confirm", exact: true }).click();
+  // The game counts: A's first game, a win, says at most three true things in
+  // priority order (on the board, the level it reached, the first achievement
+  // it unlocked), then Done clears the screen off Home.
+  const screen = page.getByRole("dialog", { name: "Latest result" });
+  await expect(screen.getByRole("heading", { name: "You beat E2E 5–3" })).toBeVisible({ timeout: 20_000 });
+  await expect(screen.getByText("Win", { exact: true })).toBeVisible();
+  await expect(screen.getByText("+200 XP")).toBeVisible();
+  await expect(screen.getByRole("listitem")).toHaveText([/^On the board at #\d+$/, "Level 2", "First win unlocked"]);
+  await screen.getByRole("button", { name: "Done" }).click();
+  await expect(screen).toHaveCount(0);
   await expect(main.getByText("Match confirmed — ratings updated.")).toBeVisible({ timeout: 20_000 });
   const { data: confirmed } = await service.from("matches").select("status").eq("reporter_id", b.id).single();
   expect(confirmed?.status).toBe("confirmed");

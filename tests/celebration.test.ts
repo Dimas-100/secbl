@@ -3,7 +3,6 @@ import {
   CELEBRATE_WINDOW_MS,
   dismissedIds,
   freshMatch,
-  headline,
   streakTier,
   withDismissed,
   type CelebrationMatch,
@@ -27,17 +26,6 @@ describe("freshMatch", () => {
     expect(freshMatch([m("old", "2026-10-06T19:00:00Z")], now)).toBeNull();
     expect(freshMatch([m("x", null)], now)).toBeNull();
     expect(freshMatch([], now)).toBeNull();
-  });
-});
-
-describe("headline", () => {
-  it("reads from the viewer's side with the opponent's first name", () => {
-    expect(headline(m("a", null), "me", "Maya Chen")).toBe("Won 5–3 vs Maya");
-    expect(headline(m("a", null, "them"), "me", "Maya Chen")).toBe("Lost 3–5 vs Maya");
-    // The viewer as opponent: scores flip to their side.
-    expect(headline({ ...m("a", null), reporter_id: "them", opponent_id: "me", winner_id: "them" }, "me", "Maya")).toBe(
-      "Lost 3–5 vs Maya"
-    );
   });
 });
 

@@ -3,9 +3,9 @@ import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { AvatarStack } from "@/components/avatar-stack";
-import { CelebrationCard } from "@/components/celebration-card";
 import { ActivityRow } from "@/components/activity-row";
 import { FirstGameCard, type FirstGameFace } from "@/components/first-game-card";
+import { GameCountsScreen, type GameCountsProps } from "@/components/game-counts-screen";
 import { ListRow } from "@/components/list-row";
 import { LiveGameCard } from "@/components/live-game-card";
 import { LiveHome } from "@/components/live-home";
@@ -24,20 +24,25 @@ import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, disputeAgreedMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { AGREED_WINDOW_MS, canFlag, flagDeadlineLabel } from "@/lib/agreed";
 import { talkSummary, type LiveComment } from "@/lib/table-talk";
-import { freshMatch, headline } from "@/lib/celebration";
+import { earnedAchievements } from "@/lib/achievements";
+import { freshMatch } from "@/lib/celebration";
 import { clubDateOf, clubMonthStart, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { FEED_SELECT, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
 import { confirmMeta, facesEyebrow, firstName, formDots, nextLine, playedFrom, xpNote } from "@/lib/home";
 import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
-import { greetingFor } from "@/lib/identity";
-import { nextBadge, type TitleName } from "@/lib/levels";
+import { GAME_LABEL, greetingFor } from "@/lib/identity";
+import { levelFromXp, nextBadge } from "@/lib/levels";
 import { myNightStatus } from "@/lib/night";
+import { fetchAllPages } from "@/lib/paging";
 import { playFaces } from "@/lib/play";
-import { aboveOf, leadOf, toRankRow, type RankRow } from "@/lib/ranking";
+import { formatShort } from "@/lib/race";
+import { aboveOf, boardBefore, leadOf, toRankRow, type RankRow } from "@/lib/ranking";
+import { firstWinOver, momentLines, rankMove, rematchHref, resultHeadline, secondAction } from "@/lib/result-moment";
 import { seasonCountdownLabel, seasonStrip } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
 import { byPlayOrder, currentStreak, ratingChangeSince, type PlayOrdered, type StatMatch } from "@/lib/stats";
 import { cn, GOLD_EDGE } from "@/lib/utils";
+import { gameSplits, type YouMatch } from "@/lib/you";
 import { loadXp } from "@/lib/xp-data";
 import type { RsvpResponse } from "@/lib/types";
 
@@ -46,6 +51,20 @@ type NextRsvp = {
   response: RsvpResponse;
   profile: AvatarIdentity | AvatarIdentity[] | null;
 };
+
+type RatedRef = { id: string; rating: number };
+
+// One of your confirmed games, for what the newest one changed: the record
+// in its game type, a first win over them, the achievements it unlocked.
+type MomentMatch = StatMatch &
+  YouMatch &
+  PlayOrdered & {
+    reporter: RatedRef | RatedRef[] | null;
+    opponent: RatedRef | RatedRef[] | null;
+  };
+
+const MOMENT_COLS =
+  "id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, game_type, played_at, created_at, confirmed_at, reporter:profiles!matches_reporter_id_fkey(id, rating), opponent:profiles!matches_opponent_id_fkey(id, rating)";
 
 export default async function HomePage({
   searchParams,
@@ -141,11 +160,11 @@ export default async function HomePage({
       .gte("updated_at", new Date(now.getTime() - LIVE_STALE_MS).toISOString())
       .order("updated_at", { ascending: false }),
     // Your newest confirmed games: the streak flame, the form dots and the
-    // result card.
+    // game-counts screen.
     supabase
       .from("matches")
       .select(
-        "id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, confirmed_at, played_at, created_at, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
+        "id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, game_type, race_to, spot, confirmed_at, played_at, created_at, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
       )
       .eq("status", "confirmed")
       .or(`reporter_id.eq.${user.id},opponent_id.eq.${user.id}`)
@@ -169,51 +188,16 @@ export default async function HomePage({
   const flaggable = (agreedForMe ?? []).filter((m) => canFlag(m, user.id, now));
   // Called to a table tonight: that card joins what needs you at the top; out
   // of the line or waiting in it, the night stays further down.
-  const atTable = myNightStatus(nightData.night, nightData.line, nightData.tables, user.id, now).kind === "playing";
-  // Newest confirmed first: the result card is the game that just counted.
-  const mine30 = (myMatches ?? []) as (StatMatch & PlayOrdered & { reporter: unknown; opponent: unknown })[];
+  const nightStatus = myNightStatus(nightData.night, nightData.line, nightData.tables, user.id, now);
+  const atTable = nightStatus.kind === "playing";
+  // Newest confirmed first: the game-counts screen is the game that just counted.
+  const mine30 = (myMatches ?? []) as (StatMatch &
+    PlayOrdered & { game_type: string; race_to: number | null; spot: number; reporter: unknown; opponent: unknown })[];
   // The same games as they were played (ruling S3-R7): the flame and the dots
   // read "the last N", so a batch confirmed out of order can't misstate them.
   const mineByPlay = [...mine30].sort(byPlayOrder);
   const streak = currentStreak(mineByPlay, user.id);
   const streakLength = streak?.kind === "W" ? streak.length : 0;
-
-  // The result card: the newest confirmed game in the last day, with what it
-  // did to the rating and XP, and the badge or streak mark it caused.
-  const fresh = freshMatch(mine30, now);
-  let celebration: React.ComponentProps<typeof CelebrationCard> | null = null;
-  if (fresh) {
-    const [{ data: hist }, { data: moments }] = await Promise.all([
-      supabase
-        .from("rating_history")
-        .select("rating_before, rating_after")
-        .eq("match_id", fresh.id)
-        .eq("profile_id", user.id)
-        .maybeSingle(),
-      supabase.from("activity").select("kind, data").eq("match_id", fresh.id).eq("actor_id", user.id),
-    ]);
-    const opponentRaw = fresh.reporter_id === user.id ? fresh.opponent : fresh.reporter;
-    const opponent = one(opponentRaw as FeedPerson | FeedPerson[] | null);
-    const badgeRow = (moments ?? []).find((r) => r.kind === "badge");
-    const streakRow = (moments ?? []).find((r) => r.kind === "streak");
-    if (hist && opponent) {
-      celebration = {
-        matchId: fresh.id,
-        won: fresh.winner_id === user.id,
-        headline: headline(fresh, user.id, opponent.display_name),
-        opponent,
-        ratingBefore: hist.rating_before,
-        ratingAfter: hist.rating_after,
-        xpEarned: xp.perMatch.get(fresh.id) ?? 0,
-        xpCapped: xp.capped.has(fresh.id),
-        level: level.level,
-        intoLevel: level.intoLevel,
-        needed: level.needed,
-        badge: badgeRow ? (String((badgeRow.data as { title?: string }).title) as TitleName) : null,
-        streak: streakRow ? Number((streakRow.data as { length?: number }).length) : null,
-      };
-    }
-  }
   const feedRows = (feed ?? []) as unknown as FeedRow[];
 
   const mySchool = one(me?.schools as { short_name: string } | { short_name: string }[] | null)?.short_name ?? null;
@@ -257,6 +241,134 @@ export default async function HomePage({
     me?.matches_played
   );
   const boardNames = new Map((board ?? []).map((r) => [String(r.id), String(r.display_name ?? "Member")]));
+
+  // The game-counts screen (spec 2026-10-21-play-and-progress §3): the newest
+  // confirmed game in the last day, what it did to the rating and XP, and at
+  // most three true lines about what changed.
+  const fresh = freshMatch(mine30, now);
+  let moment: GameCountsProps | null = null;
+  if (fresh) {
+    const opponentId = fresh.reporter_id === user.id ? fresh.opponent_id : fresh.reporter_id;
+    const [{ data: hist }, { data: moments }, { data: peakRow, error: peakError }, allMine] = await Promise.all([
+      // Both players' ratings going in: the ladder before this game.
+      supabase.from("rating_history").select("profile_id, rating_before, rating_after").eq("match_id", fresh.id),
+      // The badge and streak rows this game wrote for you.
+      supabase.from("activity").select("kind, data").eq("match_id", fresh.id).eq("actor_id", user.id),
+      // Your best rating before this game (the 500 / 600 club).
+      supabase
+        .from("rating_history")
+        .select("rating_after")
+        .eq("profile_id", user.id)
+        .or(`match_id.is.null,match_id.neq.${fresh.id}`)
+        .order("rating_after", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      // Every confirmed game of yours (paged). A failed page drops the lines
+      // that need them rather than counting from a partial list.
+      fetchAllPages<MomentMatch>((from, to) =>
+        supabase
+          .from("matches")
+          .select(MOMENT_COLS)
+          .eq("status", "confirmed")
+          .or(`reporter_id.eq.${user.id},opponent_id.eq.${user.id}`)
+          .order("id")
+          .range(from, to)
+          .then(({ data, error: readError }) => {
+            if (readError) throw new Error(readError.message);
+            return (data ?? []) as MomentMatch[];
+          })
+      ).catch((err: unknown) => {
+        console.error("home: couldn't read your games for the result screen", err);
+        return null;
+      }),
+    ]);
+    const mine = (hist ?? []).find((h) => h.profile_id === user.id);
+    const iReported = fresh.reporter_id === user.id;
+    const opponent = one((iReported ? fresh.opponent : fresh.reporter) as FeedPerson | FeedPerson[] | null);
+    if (mine && opponent) {
+      const won = fresh.winner_id === user.id;
+      const opponentFirst = firstName(opponent.display_name);
+
+      // The ladder now against the ladder with this game taken back out.
+      const ratingsGoingIn = new Map((hist ?? []).map((h) => [h.profile_id, h.rating_before]));
+      const ladderBefore = boardBefore(rankRows, fresh.winner_id, won ? opponentId : user.id, ratingsGoingIn);
+      const move = boardError ? null : rankMove(ladderBefore, rankRows, user.id);
+
+      // Your games as they were played (ruling S3-R7), this one included.
+      const played = allMine?.some((m) => m.id === fresh.id) ? [...allMine].sort(byPlayOrder) : null;
+      let achievementsUnlocked: string[] = [];
+      if (played && !peakError) {
+        // With and without this game, everything else as it is now. Cup and
+        // season titles are the feed's to announce, so neither side counts them.
+        const opponentRatings: Record<string, number> = {};
+        for (const m of played) {
+          for (const p of [one(m.reporter), one(m.opponent)]) if (p) opponentRatings[p.id] = p.rating;
+        }
+        const rating = me?.rating ?? mine.rating_after;
+        const base = { viewerId: user.id, rating, opponentRatings, tournamentsWon: 0, seasonsWon: 0 };
+        const peakWithout = Math.max(peakRow?.rating_after ?? mine.rating_before, mine.rating_before);
+        const peakWith = Math.max(peakWithout, mine.rating_after, rating);
+        const without = played.filter((m) => m.id !== fresh.id);
+        const had = new Set(earnedAchievements({ ...base, peak: peakWithout, matches: without }).map((a) => a.id));
+        achievementsUnlocked = earnedAchievements({ ...base, peak: peakWith, matches: played })
+          .filter((a) => !had.has(a.id))
+          .map((a) => a.label);
+      }
+      const split = played ? gameSplits(played, user.id).find((s) => s.game === fresh.game_type) : undefined;
+
+      const badgeRow = (moments ?? []).find((r) => r.kind === "badge");
+      const streakRow = (moments ?? []).find((r) => r.kind === "streak");
+      const streakRun = streakRow ? Number((streakRow.data as { length?: number }).length) : NaN;
+      const xpEarned = xp.perMatch.get(fresh.id) ?? 0;
+
+      const second = secondAction({
+        nightOpen: nightData.night !== null,
+        nightOpenedAt: nightData.night?.opened_at ?? null,
+        myNightKind: nightStatus.kind,
+        confirmedAt: fresh.confirmed_at!,
+      });
+      moment = {
+        matchId: fresh.id,
+        won,
+        headline: resultHeadline(
+          won,
+          opponentFirst,
+          iReported ? fresh.reporter_score : fresh.opponent_score,
+          iReported ? fresh.opponent_score : fresh.reporter_score
+        ),
+        sub: [GAME_LABEL[fresh.game_type] ?? fresh.game_type, formatShort(fresh.race_to, fresh.spot)]
+          .filter(Boolean)
+          .join(" · "),
+        ratingBefore: mine.rating_before,
+        ratingAfter: mine.rating_after,
+        xpEarned,
+        xpCapped: xp.capped.has(fresh.id),
+        level: level.level,
+        intoLevel: level.intoLevel,
+        needed: level.needed,
+        lines: momentLines({
+          move: move && {
+            kind: move.kind,
+            to: move.to,
+            other: move.otherId ? firstName(boardNames.get(move.otherId) ?? "Member") : null,
+          },
+          // The game is the newest in XP order, so taking its XP off the
+          // total is the level before it.
+          levelBefore: levelFromXp(xp.total - xpEarned).level,
+          levelAfter: level.level,
+          titleUnlocked: badgeRow ? String((badgeRow.data as { title?: string }).title) : null,
+          achievementsUnlocked,
+          firstWinOver: played && firstWinOver(played, user.id, fresh.id) ? opponentFirst : null,
+          winStreak: Number.isFinite(streakRun) ? streakRun : null,
+          gameRecord: split ? { label: split.label, wins: split.wins, losses: split.losses } : null,
+        }),
+        action:
+          second === "back_in_line" && nightData.night
+            ? { kind: "back_in_line", nightId: nightData.night.id }
+            : { kind: "rematch", href: rematchHref({ opponentId, gameType: fresh.game_type, raceTo: fresh.race_to }) },
+      };
+    }
+  }
 
   // Your place in the running season and who leads it, for the strip under
   // the progress card; and for a member with no game yet, the people to play
@@ -347,7 +459,8 @@ export default async function HomePage({
 
       {message && <p className="bg-card rounded-2xl p-3 text-sm">{message}</p>}
       {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
-      {celebration && <CelebrationCard {...celebration} />}
+      {/* Keyed by the game, so a newer one opens fresh. */}
+      {moment && <GameCountsScreen key={moment.matchId} {...moment} />}
 
       {/* What needs you (spec §2), gold-edged, before anything else. The
           resume card renders on the client, so an empty stack hides itself. */}
