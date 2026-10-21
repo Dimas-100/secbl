@@ -4,6 +4,7 @@ import {
   CHART_RANGE_LABEL,
   chartAriaLabel,
   chartChangeLabel,
+  chartChangeTone,
   chartEmptyLabel,
   type ChartRange,
   type ChartSeries,
@@ -13,8 +14,9 @@ import {
 // change over the range, a brass line oldest → newest with the peak (brass)
 // and best win (win colour) marked and labelled, and the Month · Season · All
 // picker. Server-rendered SVG, plain-data props, no client JS: the range lives
-// in the URL. The chart is always 120px tall. The line is drawn in a fixed
-// viewBox stretched to the width (non-scaling stroke, like the old sparkline);
+// in the URL and its links keep the scroll position. The chart is always
+// 120px tall: one role="img" whose label speaks the markers it draws. The line
+// is drawn in a fixed viewBox stretched to the width (non-scaling stroke);
 // markers and labels sit on the outer SVG in px and %, so circles stay round
 // and text never scales on a wide screen.
 const H = 120;
@@ -24,6 +26,8 @@ const PAD_BOTTOM = 22; // room for the best-win label below its marker
 const R = 4;
 
 const round = (n: number) => Number(n.toFixed(2));
+
+const CHANGE_TONE = { win: "text-win", loss: "text-loss", muted: "text-muted-foreground" } as const;
 
 // Labels near an edge grow inward so they never clip.
 function anchorFor(pct: number): { textAnchor: "start" | "middle" | "end"; dx: number } {
@@ -44,7 +48,7 @@ export function RatingChart({
   range: ChartRange;
   ranges: ChartRange[];
   hrefFor: Record<ChartRange, string>;
-  bestWin: { index: number; label: string } | null;
+  bestWin: { index: number; label: string; first: string } | null;
   // "their" on someone else's page ("+42 since their first game").
   whose?: "your" | "their";
 }) {
@@ -75,7 +79,7 @@ export function RatingChart({
           width="100%"
           height={H}
           role="img"
-          aria-label={chartAriaLabel(series, range)}
+          aria-label={chartAriaLabel(series, range, win)}
           className="block overflow-visible"
         >
           <line x1="0" y1={H - 0.5} x2="100%" y2={H - 0.5} stroke="var(--hairline-divider)" />
@@ -138,12 +142,14 @@ export function RatingChart({
   return (
     <div className="flex flex-col gap-3">
       {change !== null && (
-        <p className={cn("stat-number text-[13px]", change >= 0 ? "text-win" : "text-loss")}>
+        <p className={cn("stat-number text-[13px]", CHANGE_TONE[chartChangeTone(change)])}>
           {chartChangeLabel(change, range, whose)}
         </p>
       )}
       {chart}
-      <Segmented options={options} value={range} ariaLabel="Rating chart range" />
+      {/* scroll={false}: the picker sits below the fold on a phone, and Next
+          would otherwise jump to the page's top on every tap. */}
+      <Segmented options={options} value={range} ariaLabel="Rating chart range" scroll={false} />
     </div>
   );
 }

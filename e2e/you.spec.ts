@@ -97,6 +97,25 @@ test("the You page shows your progress; someone else's page shows you vs them", 
     main.getByText(new RegExp(`^${month} so far: 1 game, 1 win\\. You're on the board at #\\d+\\.$`))
   ).toBeVisible();
 
+  // On a phone the range picker sits below the fold: switching range keeps
+  // the page where it is (Next scrolls to the top of <main> otherwise). Month
+  // is never the default range, so the tap always changes the URL.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const picker = main.getByRole("navigation", { name: "Rating chart range" });
+  await picker.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  const before = await page.evaluate(() => window.scrollY);
+  expect(before).toBeGreaterThan(100);
+  await picker.getByRole("link", { name: "Month", exact: true }).click();
+  await expect(page).toHaveURL(/[?&]range=month\b/);
+  await expect(picker.getByRole("link", { name: "Month", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(main.getByRole("img", { name: /^Rating chart, this month: / })).toBeVisible();
+  // A scroll to the top would land in the same commit as the new range; give
+  // it a beat before measuring.
+  await page.waitForTimeout(500);
+  const after = await page.evaluate(() => window.scrollY);
+  expect(after).toBeGreaterThan(0);
+  expect(Math.abs(after - before)).toBeLessThan(80);
+
   // B's page, seen by A: Play B (by its href), the record between them, and
   // no month sentence (that is only ever yours).
   await page.goto(`/players/${b.id}`);
@@ -115,4 +134,22 @@ test("the You page shows your progress; someone else's page shows you vs them", 
     main.getByRole("region", { name: "Form", exact: true }).getByText("won 0 of their last 1")
   ).toBeVisible();
   await expect(main.getByRole("heading", { name: "Where E2E wins" })).toBeVisible();
+
+  // Spec §9: a deep link (a fresh tab, no in-app history), a range switch (a
+  // replace, not a new entry), then Back: it follows the fallback to the
+  // leaderboard and never leaves the app.
+  const fresh = await page.context().newPage();
+  const freshMain = fresh.getByRole("main");
+  await fresh.goto(`/players/${b.id}`);
+  await onTrail(fresh, `/players/${b.id}`);
+  await freshMain
+    .getByRole("navigation", { name: "Rating chart range" })
+    .getByRole("link", { name: "Month", exact: true })
+    .click();
+  await expect(fresh).toHaveURL(/[?&]range=month\b/);
+  await onTrail(fresh, `/players/${b.id}?range=month`);
+  await freshMain.getByRole("link", { name: "Back", exact: true }).click();
+  await expect(fresh).toHaveURL((u) => u.pathname === "/leaderboard", { timeout: 15_000 });
+  await expect(fresh.getByRole("navigation", { name: "Main" })).toBeVisible();
+  await fresh.close();
 });

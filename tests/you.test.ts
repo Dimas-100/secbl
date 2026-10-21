@@ -7,7 +7,9 @@ import {
   bestWinMarker,
   chartAriaLabel,
   chartChangeLabel,
+  chartChangeTone,
   chartEmptyLabel,
+  chartRange,
   chartSeries,
   formSummary,
   gameSplits,
@@ -393,8 +395,14 @@ describe("chart copy", () => {
     expect(chartEmptyLabel("season")).toBe("No rated games this season");
   });
 
-  it("reads the line's ends for screen readers", () => {
-    const s = chartSeries(
+  it("colours a gain as a win, a loss as a loss and no change muted", () => {
+    expect(chartChangeTone(12)).toBe("win");
+    expect(chartChangeTone(-8)).toBe("loss");
+    expect(chartChangeTone(0)).toBe("muted");
+  });
+
+  it("reads the range, the line's ends and the markers it draws for screen readers", () => {
+    const rising = chartSeries(
       [
         { match_id: "x", rating_before: 470, rating_after: 490, created_at: "2026-10-02T00:00:00Z" },
         { match_id: "y", rating_before: 490, rating_after: 512, created_at: "2026-10-04T00:00:00Z" },
@@ -402,7 +410,48 @@ describe("chart copy", () => {
       "season",
       null
     );
-    expect(chartAriaLabel(s, "season")).toBe("Rating chart, season: 470 to 512");
+    expect(chartAriaLabel(rising, "season", null)).toBe("Rating chart, this season: 470 to 512, peak 512");
+    expect(chartAriaLabel(rising, "all", { first: "Sam" })).toBe(
+      "Rating chart, all time: 470 to 512, peak 512, best win over Sam"
+    );
+    // A losing month draws no peak (ruling S3-R4), so none is read.
+    const falling = chartSeries(
+      [
+        { match_id: "x", rating_before: 500, rating_after: 490, created_at: "2026-10-02T00:00:00Z" },
+        { match_id: "y", rating_before: 490, rating_after: 484, created_at: "2026-10-04T00:00:00Z" },
+      ],
+      "month",
+      null
+    );
+    expect(chartAriaLabel(falling, "month", null)).toBe("Rating chart, this month: 500 to 484");
+  });
+});
+
+describe("chartRange (ruling S3-R8)", () => {
+  const withSeason: ("month" | "season" | "all")[] = ["month", "season", "all"];
+  const noSeason: ("month" | "season" | "all")[] = ["month", "all"];
+
+  it("opens on Season when this member has a line in it", () => {
+    expect(chartRange(undefined, withSeason, 2)).toBe("season");
+    expect(chartRange(undefined, withSeason, 7)).toBe("season");
+  });
+
+  it("opens on All when the open season has fewer than 2 points, or none is open", () => {
+    expect(chartRange(undefined, withSeason, 0)).toBe("all");
+    expect(chartRange(undefined, withSeason, 1)).toBe("all");
+    expect(chartRange(undefined, noSeason, 0)).toBe("all");
+  });
+
+  it("honours an explicit range on offer, even an empty one", () => {
+    expect(chartRange("season", withSeason, 0)).toBe("season");
+    expect(chartRange("month", withSeason, 7)).toBe("month");
+    expect(chartRange("all", withSeason, 7)).toBe("all");
+  });
+
+  it("ignores a range not on offer or not a single value", () => {
+    expect(chartRange("season", noSeason, 0)).toBe("all");
+    expect(chartRange("weekly", withSeason, 3)).toBe("season");
+    expect(chartRange(["month", "all"], withSeason, 3)).toBe("season");
   });
 });
 
@@ -413,7 +462,11 @@ describe("bestWinMarker", () => {
     { at: "t2", rating: 480, matchId: "m2" },
   ];
   it("sits on the point the win produced, labelled with the first name", () => {
-    expect(bestWinMarker(points, { matchId: "m2", opponent: "Alex Morgan" })).toEqual({ index: 2, label: "beat Alex" });
+    expect(bestWinMarker(points, { matchId: "m2", opponent: "Alex Morgan" })).toEqual({
+      index: 2,
+      label: "beat Alex",
+      first: "Alex",
+    });
   });
   it("is null when there is no best win or it is outside the range", () => {
     expect(bestWinMarker(points, null)).toBeNull();

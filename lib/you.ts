@@ -221,6 +221,17 @@ export type ChartRange = "month" | "season" | "all";
 
 export const CHART_RANGE_LABEL: Record<ChartRange, string> = { month: "Month", season: "Season", all: "All" };
 
+// The range the chart opens on. An explicit ?range= that is on offer is
+// honoured, even when it is empty. Otherwise Season while one is open and
+// this member has a line in it (2+ points), else All (ruling S3-R8): an empty
+// chart by default would hide the progress the page exists to show.
+// seasonPoints: the season series' point count (0 with no open season).
+export function chartRange(asked: string | string[] | undefined, ranges: ChartRange[], seasonPoints: number): ChartRange {
+  const wanted = typeof asked === "string" ? ranges.find((r) => r === asked) : undefined;
+  if (wanted) return wanted;
+  return ranges.includes("season") && seasonPoints >= 2 ? "season" : "all";
+}
+
 export interface ChartPoint {
   at: string;
   rating: number;
@@ -266,6 +277,12 @@ const RANGE_SPAN: Record<Exclude<ChartRange, "all">, string> = {
   season: "this season",
 };
 
+// The change line's colour: a gain in the win colour, a loss in the loss
+// colour, no change (the "+0" convention) muted, neither won nor lost.
+export function chartChangeTone(change: number): "win" | "loss" | "muted" {
+  return change > 0 ? "win" : change < 0 ? "loss" : "muted";
+}
+
 // "+12 this month", "−8 this season" (U+2212), "+42 since your first game";
 // "since their first game" on someone else's page.
 export function chartChangeLabel(change: number, range: ChartRange, whose: "your" | "their" = "your"): string {
@@ -279,19 +296,33 @@ export function chartEmptyLabel(range: ChartRange): string {
   return range === "all" ? "No rated games yet" : `No rated games ${RANGE_SPAN[range]}`;
 }
 
-// "Rating chart, season: 470 to 512". Only for a series with points.
-export function chartAriaLabel(series: ChartSeries, range: ChartRange): string {
-  const { points } = series;
-  return `Rating chart, ${range}: ${points[0]?.rating} to ${points[points.length - 1]?.rating}`;
+const ARIA_SPAN: Record<ChartRange, string> = { month: "this month", season: "this season", all: "all time" };
+
+// "Rating chart, this season: 470 to 512, peak 512, best win over Sam". The
+// chart is one role="img", so its visible marker labels are not read on their
+// own: each marker the chart draws (the peak when series.peak is set, the best
+// win when bestWin is passed) is spoken here instead. Only for a series with
+// points.
+export function chartAriaLabel(series: ChartSeries, range: ChartRange, bestWin: { first: string } | null): string {
+  const { points, peak } = series;
+  return [
+    `Rating chart, ${ARIA_SPAN[range]}: ${points[0]?.rating} to ${points[points.length - 1]?.rating}`,
+    peak ? `peak ${peak.rating}` : null,
+    bestWin ? `best win over ${bestWin.first}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
 }
 
-// The best-win marker sits on the point that win produced (its rating_after).
-// null when there is no best win or that game is outside the range.
+// The best-win marker sits on the point that win produced (its rating_after),
+// labelled "beat {first}". null when there is no best win or that game is
+// outside the range.
 export function bestWinMarker(
   points: { matchId: string | null }[],
   best: { matchId: string; opponent: string } | null
-): { index: number; label: string } | null {
+): { index: number; label: string; first: string } | null {
   if (!best) return null;
   const index = points.findIndex((p) => p.matchId === best.matchId);
-  return index === -1 ? null : { index, label: `beat ${firstName(best.opponent)}` };
+  const first = firstName(best.opponent);
+  return index === -1 ? null : { index, label: `beat ${first}`, first };
 }

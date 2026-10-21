@@ -38,6 +38,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import {
   bestWinMarker,
+  chartRange,
   chartSeries,
   formSummary,
   gameSplits,
@@ -292,16 +293,13 @@ export default async function PlayerPage({
 
   // The chart: Month · Season · All, Season only while one is open. An
   // unknown or stale ?range= (Season after it closed) falls back to the
-  // default, so a bounded range always has a start.
+  // default, so a bounded range always has a start. The default is Season
+  // when this member has a line in it, else All (ruling S3-R8).
   const ranges: ChartRange[] = openSeason ? ["month", "season", "all"] : ["month", "all"];
-  const asked = typeof rawRange === "string" ? (rawRange as ChartRange) : null;
-  const range: ChartRange = asked && ranges.includes(asked) ? asked : openSeason ? "season" : "all";
-  const startIso =
-    range === "month"
-      ? monthStart.toISOString()
-      : range === "season" && openSeason
-        ? clubTimeToISO(`${openSeason.starts_on}T00:00`)
-        : null;
+  const seasonStart = openSeason ? clubTimeToISO(`${openSeason.starts_on}T00:00`) : null;
+  const seasonPoints = seasonStart ? chartSeries(history, "season", seasonStart).points.length : 0;
+  const range = chartRange(rawRange, ranges, seasonPoints);
+  const startIso = range === "month" ? monthStart.toISOString() : range === "season" ? seasonStart : null;
   const series = chartSeries(history, range, startIso);
   const hrefFor: Record<ChartRange, string> = {
     month: `/players/${id}?range=month`,
