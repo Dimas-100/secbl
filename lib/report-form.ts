@@ -5,6 +5,15 @@ import { startingScores, suggestedSpot, type Side } from "@/lib/race";
 import { formatClubDate } from "@/lib/season";
 import type { MatchStatus } from "@/lib/types";
 
+// The scoreboard keeps its in-progress game in localStorage under a per-member
+// key, and treats a draft older than 12 hours as abandoned. The Play sheet
+// reads the same key to offer "Resume", so both sides share these.
+export const DRAFT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+export function draftKey(meId: string): string {
+  return `secbl:draft-game:${meId}`;
+}
+
 // The board a newly picked opponent gets — the same numbers the scoreboard's
 // applyFormat picks: the spot their ratings suggest, scores starting from it.
 // Used when "Start game" opens the scoreboard with the called opponent.

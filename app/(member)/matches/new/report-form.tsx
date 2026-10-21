@@ -23,7 +23,14 @@ import {
   type Side,
 } from "@/lib/race";
 import { isFresh } from "@/lib/live";
-import { duplicateNotice, recentOpponents, startBoard, type DuplicateGame } from "@/lib/report-form";
+import {
+  DRAFT_MAX_AGE_MS,
+  draftKey as draftKeyFor,
+  duplicateNotice,
+  recentOpponents,
+  startBoard,
+  type DuplicateGame,
+} from "@/lib/report-form";
 import { talkSummary } from "@/lib/table-talk";
 import { cn } from "@/lib/utils";
 import { confirmTheirs, findDuplicateReport, reportMatch } from "./actions";
@@ -37,7 +44,6 @@ const GAME_TYPES = [
 ] as const;
 
 const DEFAULT_RACE = 5;
-const DRAFT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 export interface OpponentOption {
   id: string;
@@ -99,7 +105,7 @@ export function ReportMatchForm({
   myRating: number;
   initialOpponentId?: string;
 }) {
-  const draftKey = `secbl:draft-game:${meId}`;
+  const draftKey = draftKeyFor(meId);
   // One state object for the board, lazily restored from the draft. This
   // component is loaded client-only (see page.tsx), so reading localStorage
   // in the initialiser is safe and there is no hydration mismatch. Called to
