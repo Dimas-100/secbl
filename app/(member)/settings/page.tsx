@@ -36,7 +36,7 @@ export default async function SettingsPage({
   const school = Array.isArray(profile?.schools) ? profile.schools[0] : profile?.schools;
   const { data: prefs } = await supabase
     .from("notification_prefs")
-    .select("messages, matches, events, league, social")
+    .select("messages, matches, events, league")
     .eq("profile_id", user.id)
     .maybeSingle();
 

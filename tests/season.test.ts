@@ -11,6 +11,7 @@ import {
   seasonCountdownLabel,
   seasonProgress,
   seasonStandings,
+  seasonStrip,
   type SeasonMatch,
 } from "@/lib/season";
 
@@ -134,5 +135,33 @@ describe("dates", () => {
     expect(seasonCountdownLabel(open, "2026-12-20")).toBe("Ended Dec 12");
     expect(seasonCountdownLabel({ ...open, ends_on: null }, "2026-09-01")).toBe("Started Aug 20");
     expect(seasonCountdownLabel({ ...season, status: "closed" }, "2027-01-01")).toBe("Ended Dec 12");
+  });
+});
+
+describe("seasonStrip", () => {
+  const people = [
+    { id: "a", display_name: "Ana Ruiz" },
+    { id: "b", display_name: "Ben" },
+    { id: "c", display_name: "Cy" },
+  ];
+  it("says the season is empty until someone plays", () => {
+    const board = seasonStandings([], people, season);
+    expect(seasonStrip(board, "a")).toEqual({ primary: "No games yet", secondary: "3 pts a win, 1 a loss" });
+  });
+  it("names the leader to a member who hasn't played, so the season never reads empty", () => {
+    const board = seasonStandings([game("a", "b")], people, season);
+    expect(seasonStrip(board, "c")).toEqual({ primary: "Ana leads · 3 pts", secondary: "Your first game puts you on the board" });
+  });
+  it("leads with your place, then the leader", () => {
+    const board = seasonStandings([game("a", "b")], people, season);
+    expect(seasonStrip(board, "b")).toEqual({ primary: "#2 · 1 pts", secondary: "Ana leads · 3 pts" });
+  });
+  it("tells the leader they lead", () => {
+    const board = seasonStandings([game("a", "b")], people, season);
+    expect(seasonStrip(board, "a")).toEqual({ primary: "#1 · 3 pts", secondary: "You lead the season" });
+  });
+  it("treats a viewer missing from the board like one who hasn't played", () => {
+    const board = seasonStandings([game("a", "b")], people, season);
+    expect(seasonStrip(board, "nobody").primary).toBe("Ana leads · 3 pts");
   });
 });

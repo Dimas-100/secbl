@@ -17,7 +17,9 @@ export interface MatchRowPlayer {
 //     [winner][loser]    Winner name            5–3
 //                        def. Loser · game         +16
 // Win/loss by weight, not colour: the result reads primary for a win and muted
-// for a loss. `delta` is the winner's gain; a loss shows it negated.
+// for a loss. `delta` is the winner's gain; a loss shows it negated. `stamp`
+// (the feed's "5h" / "Oct 16") sits under the score, where every other feed
+// row keeps its time.
 export function MatchRow({
   winner,
   loser,
@@ -30,6 +32,7 @@ export function MatchRow({
   gameType,
   format,
   caption,
+  stamp,
 }: {
   winner: MatchRowPlayer | null | undefined;
   loser: MatchRowPlayer | null | undefined;
@@ -43,6 +46,7 @@ export function MatchRow({
   // "race to 5 · 2 spot" from lib/race formatShort; absent for open play.
   format?: string | null;
   caption?: React.ReactNode;
+  stamp?: string;
 }) {
   const sub = [gameType, format, meta].filter(Boolean).join(" · ");
   const won = perspectiveId !== undefined && winner?.id === perspectiveId;
@@ -65,6 +69,7 @@ export function MatchRow({
           <span className={cn("stat-number text-[15px] leading-tight", lost && "text-muted-foreground")}>
             {won ? "Won" : "Lost"} {won ? winnerScore : loserScore}–{won ? loserScore : winnerScore}
           </span>
+          {stamp && <span className="text-muted-foreground text-[12px] leading-tight">{stamp}</span>}
           {signed && (
             <span className="text-muted-foreground stat-number text-[12px] leading-tight">{signed}</span>
           )}
@@ -101,6 +106,7 @@ export function MatchRow({
         <span className="stat-number text-[15px] leading-tight">
           {winnerScore}–{loserScore}
         </span>
+        {stamp && <span className="text-muted-foreground text-[12px] leading-tight">{stamp}</span>}
         {delta !== null && (
           <span className="text-muted-foreground stat-number text-[12px] leading-tight">+{delta}</span>
         )}

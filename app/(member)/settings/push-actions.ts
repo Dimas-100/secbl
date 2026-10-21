@@ -59,7 +59,7 @@ export async function loadNotificationPrefs(): Promise<Prefs> {
   if (!user) return DEFAULT_PREFS;
   const { data } = await supabase
     .from("notification_prefs")
-    .select("messages, matches, events, league, social")
+    .select("messages, matches, events, league")
     .eq("profile_id", user.id)
     .maybeSingle();
   return data ?? DEFAULT_PREFS;
@@ -74,7 +74,6 @@ export async function updateNotificationPrefs(prefs: Prefs): Promise<{ error: st
     matches: !!prefs.matches,
     events: !!prefs.events,
     league: !!prefs.league,
-    social: !!prefs.social,
     updated_at: new Date().toISOString(),
   });
   return { error: error?.message ?? null };

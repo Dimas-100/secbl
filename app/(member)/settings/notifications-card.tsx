@@ -14,11 +14,10 @@ const CATEGORIES: { key: keyof Prefs; label: string; hint: string }[] = [
   { key: "matches", label: "Matches", hint: "Games reported to you, confirmations, disputes" },
   { key: "events", label: "Events", hint: "New events on the calendar" },
   { key: "league", label: "League", hint: "Season news and admin alerts" },
-  { key: "social", label: "Social", hint: "Likes and comments on your posts" },
 ];
 
-// One master switch (the push subscription itself) and three category
-// switches. The subscription lives in the browser; the server only keeps a
+// One master switch (the push subscription itself) and a switch per
+// category. The subscription lives in the browser; the server only keeps a
 // copy to send to, so turning it off here really does stop everything.
 export function NotificationsCard({ initialPrefs }: { initialPrefs: Prefs }) {
   const [status, setStatus] = useState<Status>("checking");

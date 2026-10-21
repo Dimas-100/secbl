@@ -1,7 +1,7 @@
 # SECBL Posts — photos and clips in the league feed, with reactions and moderation
 
 **Date:** 2026-10-07
-**Status:** Approved 2026-10-07; the owner then asked to build **iteration 1** the same day (§9 below narrows the scope). Plan: `docs/superpowers/plans/2026-10-07-posts.md`.
+**Status:** RETIRED 2026-10-20: the owner took photo posts out of the app (nobody had posted); migration `0032_remove_posts.sql` drops the schema. Kept as history. Before that: approved 2026-10-07; the owner then asked to build **iteration 1** the same day (§9 below narrows the scope). Plan: `docs/superpowers/plans/2026-10-07-posts.md`.
 **Builds on:** `2026-10-06-seasons-feed-live-design.md` (the `activity` table and Home feed, Realtime refresh), `2026-10-06-live-club-design.md` (push categories, Storage upload pattern from `0016_personalization.sql`), `2026-10-06-elevated-dark-redesign-design.md` (tokens, `ListRow`, cards).
 
 ## 0. The ask, and the calls made
