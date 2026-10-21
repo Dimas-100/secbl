@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { formSummary, gameSplits, ratingSplits, rivalLine, rivals, type YouMatch } from "@/lib/you";
+import { clubMonthStart } from "@/lib/events";
+import { STARTING_RATING } from "@/lib/rating";
+import {
+  bestWinMarker,
+  chartAriaLabel,
+  chartChangeLabel,
+  chartEmptyLabel,
+  chartSeries,
+  formSummary,
+  gameSplits,
+  monthSentence,
+  rankAsOf,
+  ratingSplits,
+  rivalLine,
+  rivals,
+  type YouMatch,
+} from "@/lib/you";
 
 const ME = "me";
 let seq = 0;
@@ -114,5 +130,232 @@ describe("rivalLine", () => {
     expect(rivalLine({ run: null, lastPlayedAt: "2026-10-13" }, "You", "Sam", today)).toBe("Last played Tue, Oct 13");
     expect(rivalLine({ run: null, lastPlayedAt: today }, "You", "Sam", today)).toBe("Last played today");
     expect(rivalLine({ run: null, lastPlayedAt: "2026-10-20" }, "You", "Sam", today)).toBe("Last played yesterday");
+  });
+});
+
+describe("rankAsOf", () => {
+  const AT = "2026-10-01T04:00:00.000Z";
+  const hist = (profile_id: string, rating_after: number, created_at: string) => ({ profile_id, rating_after, created_at });
+  const game = (winner: string, loser: string, confirmed_at: string | null) => ({
+    reporter_id: winner,
+    opponent_id: loser,
+    winner_id: winner,
+    confirmed_at,
+  });
+
+  it("ranks by each member's latest rating before the instant", () => {
+    // a led after the first game; b's big win in the second flips it.
+    const history = [
+      hist("a", 470, "2026-09-10T00:00:00Z"),
+      hist("b", 430, "2026-09-10T00:00:00Z"),
+      hist("a", 440, "2026-09-20T00:00:00Z"),
+      hist("b", 460, "2026-09-20T00:00:00Z"),
+    ];
+    const matches = [game("a", "b", "2026-09-10T00:00:00Z"), game("b", "a", "2026-09-20T00:00:00Z")];
+    expect(rankAsOf(["a", "b"], history, matches, AT, "b")).toBe(1);
+    expect(rankAsOf(["a", "b"], history, matches, AT, "a")).toBe(2);
+  });
+
+  it("ignores games and history at or after the instant", () => {
+    const history = [
+      hist("a", 466, "2026-09-10T00:00:00Z"),
+      hist("b", 434, "2026-09-10T00:00:00Z"),
+      // b's win lands exactly at the instant, then another later: neither counts.
+      hist("b", 470, AT),
+      hist("a", 430, AT),
+      hist("b", 490, "2026-10-05T00:00:00Z"),
+    ];
+    const matches = [game("a", "b", "2026-09-10T00:00:00Z"), game("b", "a", AT), game("b", "a", "2026-10-05T00:00:00Z")];
+    expect(rankAsOf(["a", "b"], history, matches, AT, "a")).toBe(1);
+    expect(rankAsOf(["a", "b"], history, matches, AT, "b")).toBe(2);
+  });
+
+  it("puts a game at 11:30 PM on the 30th in the old month and 00:30 on the 1st in the new", () => {
+    const monthStart = clubMonthStart(new Date("2026-10-21T15:00:00Z")).toISOString();
+    // Sep 30, 11:30 PM EDT counts at the month start; Oct 1, 00:30 EDT does not.
+    const matches = [game("a", "b", "2026-10-01T03:30:00Z"), game("c", "d", "2026-10-01T04:30:00Z")];
+    const ids = ["a", "b", "c", "d"];
+    expect(rankAsOf(ids, [], matches, monthStart, "a")).toBe(1);
+    expect(rankAsOf(ids, [], matches, monthStart, "c")).toBeNull();
+  });
+
+  it("leaves members with no confirmed game before the instant unranked", () => {
+    const history = [
+      hist("a", 466, "2026-09-10T00:00:00Z"),
+      hist("b", 434, "2026-09-10T00:00:00Z"),
+      hist("c", 600, "2026-10-02T00:00:00Z"),
+    ];
+    // c: one unconfirmed game, one confirmed after the instant.
+    const matches = [game("a", "b", "2026-09-10T00:00:00Z"), game("c", "a", null), game("c", "b", "2026-10-02T00:00:00Z")];
+    expect(rankAsOf(["a", "b", "c"], history, matches, AT, "c")).toBeNull();
+    // The unranked member doesn't push anyone down.
+    expect(rankAsOf(["a", "b", "c"], history, matches, AT, "a")).toBe(1);
+    expect(rankAsOf(["a", "b", "c"], history, matches, AT, "b")).toBe(2);
+  });
+
+  it("gives anyone without history before the instant the starting rating", () => {
+    expect(STARTING_RATING).toBe(450);
+    // b has games but no history row: 450 sits between a's 451 and c's 449.
+    const history = [hist("a", 451, "2026-09-10T00:00:00Z"), hist("c", 449, "2026-09-11T00:00:00Z")];
+    const matches = [game("a", "c", "2026-09-10T00:00:00Z"), game("b", "c", "2026-09-11T00:00:00Z")];
+    expect(rankAsOf(["a", "b", "c"], history, matches, AT, "a")).toBe(1);
+    expect(rankAsOf(["a", "b", "c"], history, matches, AT, "b")).toBe(2);
+    expect(rankAsOf(["a", "b", "c"], history, matches, AT, "c")).toBe(3);
+  });
+
+  it("breaks rating ties by wins, then id", () => {
+    // Everyone at 450: z has 2 wins; x and y one each, x first by id; w none.
+    const matches = [
+      game("z", "w", "2026-09-01T00:00:00Z"),
+      game("z", "w", "2026-09-02T00:00:00Z"),
+      game("y", "w", "2026-09-03T00:00:00Z"),
+      game("x", "w", "2026-09-04T00:00:00Z"),
+    ];
+    const ids = ["w", "x", "y", "z"];
+    expect(ids.map((id) => rankAsOf(ids, [], matches, AT, id))).toEqual([4, 2, 3, 1]);
+  });
+
+  it("is null for someone who isn't a member", () => {
+    expect(rankAsOf(["a"], [], [game("a", "q", "2026-09-01T00:00:00Z")], AT, "q")).toBeNull();
+  });
+});
+
+describe("monthSentence", () => {
+  const base = { month: "October", rankStart: null, rankNow: null, last: null };
+
+  it("counts games and wins, singular and plural", () => {
+    expect(monthSentence({ ...base, games: 1, wins: 1 })).toBe("October so far: 1 game, 1 win.");
+    expect(monthSentence({ ...base, games: 7, wins: 0 })).toBe("October so far: 7 games, 0 wins.");
+    expect(monthSentence({ ...base, games: 3, wins: 2 })).toBe("October so far: 3 games, 2 wins.");
+  });
+
+  it("adds the climb when ranked at the month start and higher now", () => {
+    expect(monthSentence({ ...base, games: 7, wins: 5, rankStart: 6, rankNow: 3 })).toBe(
+      "October so far: 7 games, 5 wins. You climbed from #6 to #3."
+    );
+  });
+
+  it("says you're on the board when you were unranked at the month start", () => {
+    expect(monthSentence({ ...base, games: 1, wins: 0, rankStart: null, rankNow: 9 })).toBe(
+      "October so far: 1 game, 0 wins. You're on the board at #9."
+    );
+  });
+
+  it("adds no clause when the rank fell, held or can't be computed", () => {
+    expect(monthSentence({ ...base, games: 4, wins: 1, rankStart: 3, rankNow: 5 })).toBe("October so far: 4 games, 1 win.");
+    expect(monthSentence({ ...base, games: 4, wins: 2, rankStart: 3, rankNow: 3 })).toBe("October so far: 4 games, 2 wins.");
+    expect(monthSentence({ ...base, games: 2, wins: 1, rankStart: 3, rankNow: null })).toBe("October so far: 2 games, 1 win.");
+    expect(monthSentence({ ...base, games: 2, wins: 1, rankStart: null, rankNow: null })).toBe("October so far: 2 games, 1 win.");
+  });
+
+  it("says when your last game was when there are none this month", () => {
+    expect(
+      monthSentence({
+        ...base,
+        games: 0,
+        wins: 0,
+        rankStart: 4,
+        rankNow: 4,
+        last: { playedAt: "2026-09-28", opponent: "Jordan Avery" },
+      })
+    ).toBe("No games yet in October. Your last was Sep 28 vs Jordan.");
+  });
+
+  it("is null with no games ever", () => {
+    expect(monthSentence({ ...base, games: 0, wins: 0 })).toBeNull();
+  });
+});
+
+describe("chartSeries", () => {
+  let n = 0;
+  const row = (rating_before: number, rating_after: number, created_at: string) => {
+    n += 1;
+    return { match_id: `h${n}`, rating_before, rating_after, created_at };
+  };
+  const rows = [
+    row(450, 466, "2026-09-10T00:00:00Z"),
+    row(466, 480, "2026-09-20T00:00:00Z"),
+    row(480, 470, "2026-10-03T00:00:00Z"),
+    row(470, 492, "2026-10-09T00:00:00Z"),
+    row(492, 485, "2026-10-15T00:00:00Z"),
+  ];
+  const OCT = "2026-10-01T04:00:00.000Z";
+
+  it("starts the all range at the first rating_before and ends at the last rating_after", () => {
+    const s = chartSeries(rows, "all", null);
+    expect(s.points.map((p) => p.rating)).toEqual([450, 466, 480, 470, 492, 485]);
+    expect(s.points[0]).toEqual({ at: "2026-09-10T00:00:00Z", rating: 450, matchId: null });
+    expect(s.points[1].matchId).toBe(rows[0].match_id);
+    expect(s.change).toBe(35);
+  });
+
+  it("starts a bounded range at the rating before its first game", () => {
+    const s = chartSeries(rows, "month", OCT);
+    expect(s.points.map((p) => p.rating)).toEqual([480, 470, 492, 485]);
+    expect(s.change).toBe(5);
+    expect(chartSeries(rows, "season", "2026-09-15T00:00:00Z").points.map((p) => p.rating)).toEqual([
+      466, 480, 470, 492, 485,
+    ]);
+  });
+
+  it("puts the peak at the max, the first time it was reached", () => {
+    expect(chartSeries(rows, "all", null).peak).toEqual({ index: 4, rating: 492 });
+    const tied = [
+      row(450, 470, "2026-09-01T00:00:00Z"),
+      row(470, 460, "2026-09-02T00:00:00Z"),
+      row(460, 470, "2026-09-03T00:00:00Z"),
+    ];
+    expect(chartSeries(tied, "all", null).peak).toEqual({ index: 1, rating: 470 });
+  });
+
+  it("has no change or peak with fewer than 2 points in range", () => {
+    expect(chartSeries(rows, "month", "2026-11-01T04:00:00.000Z")).toEqual({ points: [], change: null, peak: null });
+    expect(chartSeries([], "all", null)).toEqual({ points: [], change: null, peak: null });
+  });
+
+  it("draws one game as two points", () => {
+    const s = chartSeries([row(450, 466, "2026-10-02T00:00:00Z")], "month", OCT);
+    expect(s.points.map((p) => p.rating)).toEqual([450, 466]);
+    expect(s.change).toBe(16);
+  });
+});
+
+describe("chart copy", () => {
+  it("signs the change with a real minus and names the range", () => {
+    expect(chartChangeLabel(12, "month")).toBe("+12 this month");
+    expect(chartChangeLabel(-8, "season")).toBe("−8 this season");
+    expect(chartChangeLabel(42, "all")).toBe("+42 since your first game");
+  });
+
+  it("says when a range has no rated games", () => {
+    expect(chartEmptyLabel("month")).toBe("No rated games this month");
+    expect(chartEmptyLabel("season")).toBe("No rated games this season");
+  });
+
+  it("reads the line's ends for screen readers", () => {
+    const s = chartSeries(
+      [
+        { match_id: "x", rating_before: 470, rating_after: 490, created_at: "2026-10-02T00:00:00Z" },
+        { match_id: "y", rating_before: 490, rating_after: 512, created_at: "2026-10-04T00:00:00Z" },
+      ],
+      "season",
+      null
+    );
+    expect(chartAriaLabel(s, "season")).toBe("Rating chart, season: 470 to 512");
+  });
+});
+
+describe("bestWinMarker", () => {
+  const points = [
+    { at: "t0", rating: 450, matchId: null },
+    { at: "t1", rating: 466, matchId: "m1" },
+    { at: "t2", rating: 480, matchId: "m2" },
+  ];
+  it("sits on the point the win produced, labelled with the first name", () => {
+    expect(bestWinMarker(points, { matchId: "m2", opponent: "Alex Morgan" })).toEqual({ index: 2, label: "beat Alex" });
+  });
+  it("is null when there is no best win or it is outside the range", () => {
+    expect(bestWinMarker(points, null)).toBeNull();
+    expect(bestWinMarker(points, { matchId: "m9", opponent: "Alex" })).toBeNull();
   });
 });

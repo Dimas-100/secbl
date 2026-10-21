@@ -116,6 +116,21 @@ export function clubMonthStart(now: Date): Date {
   return new Date(clubTimeToISO(`${month}-01T00:00`));
 }
 
+// Club dates are calendar dates, so they format in UTC at noon: no zone or
+// DST can move the day.
+const monthNameFormatter = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "long" });
+const shortDateFormatter = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+
+// "October": the club month an instant falls in (the You page's month card).
+export function clubMonthName(iso: string): string {
+  return monthNameFormatter.format(new Date(`${clubDateOf(iso).slice(0, 7)}-01T12:00:00Z`));
+}
+
+// "Oct 13" for a club date "YYYY-MM-DD" (a match's played_at).
+export function shortClubDate(clubDate: string): string {
+  return shortDateFormatter.format(new Date(`${clubDate}T12:00:00Z`));
+}
+
 // The Monday that starts the club week (Mon 00:00 – Sun 23:59 club time)
 // containing an instant, as a club calendar date. Calendar math runs in UTC
 // on the club date so neither the server zone nor DST can shift the day.

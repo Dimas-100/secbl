@@ -1,9 +1,14 @@
 // The You page's story from match results only (spec 2026-10-21-play-and-progress
 // stage 3): the form note, where you win per game, how you do against higher-
-// and lower-rated opponents, and your rivals. Pure, so vitest covers every
-// branch. Match lists are newest first.
+// and lower-rated opponents, your rivals, the month in one sentence, your rank
+// at an instant and the rating chart's series and copy. Pure, so vitest covers
+// every branch. Match lists are newest first.
 
+import { shortClubDate } from "@/lib/events";
+import { firstName } from "@/lib/home";
 import { GAME_LABEL } from "@/lib/identity";
+import { rankOf, type RankRow } from "@/lib/ranking";
+import { STARTING_RATING } from "@/lib/rating";
 import { labelPlayedDate } from "@/lib/stats";
 
 export interface YouMatch {
@@ -133,4 +138,152 @@ export function rivalLine(
   // "Today"/"Yesterday" lowercase after "Last played "; dates read as they are.
   const natural = label === "Today" || label === "Yesterday" ? label.toLowerCase() : label;
   return `Last played ${natural}`;
+}
+
+// A member's rank at an instant (e.g. clubMonthStart), replayed through
+// lib/ranking's one order. Only rows strictly before the instant count: each
+// member's rating is their latest rating_after before it (STARTING_RATING with
+// none), and their record is their games confirmed before it, so a member with
+// no such game is unranked, exactly as on the leaderboard. rating_history rows
+// are written in the same transaction that stamps confirmed_at, so the two
+// agree on which side of the instant a game falls.
+export function rankAsOf(
+  memberIds: string[],
+  history: { profile_id: string; rating_after: number; created_at: string }[],
+  matches: { reporter_id: string; opponent_id: string; winner_id: string; confirmed_at: string | null }[],
+  atIso: string,
+  id: string
+): number | null {
+  const at = Date.parse(atIso);
+  const before = (iso: string | null) => iso !== null && Date.parse(iso) < at;
+
+  const latest = new Map<string, { rating: number; t: number }>();
+  for (const h of history) {
+    if (!before(h.created_at)) continue;
+    const t = Date.parse(h.created_at);
+    const seen = latest.get(h.profile_id);
+    if (!seen || t >= seen.t) latest.set(h.profile_id, { rating: h.rating_after, t });
+  }
+
+  const record = new Map<string, { wins: number; losses: number }>();
+  for (const m of matches) {
+    if (!before(m.confirmed_at)) continue;
+    for (const p of [m.reporter_id, m.opponent_id]) {
+      const r = record.get(p) ?? { wins: 0, losses: 0 };
+      if (m.winner_id === p) r.wins += 1;
+      else r.losses += 1;
+      record.set(p, r);
+    }
+  }
+
+  const rows: RankRow[] = [...new Set(memberIds)].map((pid) => ({
+    id: pid,
+    rating: latest.get(pid)?.rating ?? STARTING_RATING,
+    wins: record.get(pid)?.wins ?? 0,
+    losses: record.get(pid)?.losses ?? 0,
+  }));
+  return rankOf(rows, id);
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// The month card on your own page. month is the club month's name
+// (clubMonthName); games and wins count this month's confirmed games; ranks
+// are rankAsOf at the month start and rankOf now; last is the newest game
+// (played_at club date and the opponent's name) for the no-games line. Only a
+// true clause appears: a climb needs a rank at both ends. null: no games ever.
+export function monthSentence(input: {
+  month: string;
+  games: number;
+  wins: number;
+  rankStart: number | null;
+  rankNow: number | null;
+  last: { playedAt: string; opponent: string } | null;
+}): string | null {
+  const { month, games, wins, rankStart, rankNow, last } = input;
+  if (games > 0) {
+    const head = `${month} so far: ${plural(games, "game")}, ${plural(wins, "win")}.`;
+    if (rankNow !== null && rankStart !== null && rankNow < rankStart) {
+      return `${head} You climbed from #${rankStart} to #${rankNow}.`;
+    }
+    if (rankNow !== null && rankStart === null) return `${head} You're on the board at #${rankNow}.`;
+    return head;
+  }
+  if (!last) return null;
+  return `No games yet in ${month}. Your last was ${shortClubDate(last.playedAt)} vs ${firstName(last.opponent)}.`;
+}
+
+export type ChartRange = "month" | "season" | "all";
+
+export const CHART_RANGE_LABEL: Record<ChartRange, string> = { month: "Month", season: "Season", all: "All" };
+
+export interface ChartPoint {
+  at: string;
+  rating: number;
+  matchId: string | null;
+}
+
+export interface ChartSeries {
+  points: ChartPoint[];
+  change: number | null;
+  peak: { index: number; rating: number } | null;
+}
+
+// The rating line for a range: rows created at or after startIso (every row
+// for "all", or when startIso is null). The first point is the rating going
+// into the range's first game (its rating_before, matchId null), then one
+// point per game. change = last − first and peak (the max, first reached) are
+// null with fewer than 2 points, so an empty range never reads "+0".
+export function chartSeries(
+  historyOldestFirst: { match_id: string | null; rating_before: number; rating_after: number; created_at: string }[],
+  range: ChartRange,
+  startIso: string | null
+): ChartSeries {
+  const since = range === "all" || startIso === null ? null : Date.parse(startIso);
+  const rows = since === null ? historyOldestFirst : historyOldestFirst.filter((h) => Date.parse(h.created_at) >= since);
+  if (rows.length === 0) return { points: [], change: null, peak: null };
+
+  const points: ChartPoint[] = [
+    { at: rows[0].created_at, rating: rows[0].rating_before, matchId: null },
+    ...rows.map((h) => ({ at: h.created_at, rating: h.rating_after, matchId: h.match_id })),
+  ];
+  let peak = { index: 0, rating: points[0].rating };
+  points.forEach((p, index) => {
+    if (p.rating > peak.rating) peak = { index, rating: p.rating };
+  });
+  return { points, change: points[points.length - 1].rating - points[0].rating, peak };
+}
+
+const RANGE_SPAN: Record<ChartRange, string> = {
+  month: "this month",
+  season: "this season",
+  all: "since your first game",
+};
+
+// "+12 this month", "−8 this season" (U+2212), "+42 since your first game".
+export function chartChangeLabel(change: number, range: ChartRange): string {
+  return `${change >= 0 ? "+" : "−"}${Math.abs(change)} ${RANGE_SPAN[range]}`;
+}
+
+// In place of the chart when a range has fewer than 2 points. The page hides
+// the chart at 0 games, so "all" only needs a fallback.
+export function chartEmptyLabel(range: ChartRange): string {
+  return range === "all" ? "No rated games yet" : `No rated games ${RANGE_SPAN[range]}`;
+}
+
+// "Rating chart, season: 470 to 512". Only for a series with points.
+export function chartAriaLabel(series: ChartSeries, range: ChartRange): string {
+  const { points } = series;
+  return `Rating chart, ${range}: ${points[0]?.rating} to ${points[points.length - 1]?.rating}`;
+}
+
+// The best-win marker sits on the point that win produced (its rating_after).
+// null when there is no best win or that game is outside the range.
+export function bestWinMarker(
+  points: { matchId: string | null }[],
+  best: { matchId: string; opponent: string } | null
+): { index: number; label: string } | null {
+  if (!best) return null;
+  const index = points.findIndex((p) => p.matchId === best.matchId);
+  return index === -1 ? null : { index, label: `beat ${firstName(best.opponent)}` };
 }

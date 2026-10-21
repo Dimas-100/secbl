@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  clubMonthName,
   clubMonthStart,
   clubWeekOf,
+  shortClubDate,
   eventMentionsSchool,
   addClubWeek,
   clubDateOf,
@@ -251,5 +253,29 @@ describe("clubMonthStart", () => {
   });
   it("handles standard time in winter", () => {
     expect(clubMonthStart(new Date("2026-01-15T12:00:00Z")).toISOString()).toBe("2026-01-01T05:00:00.000Z");
+  });
+});
+
+describe("clubMonthName", () => {
+  it("names the club month an instant falls in", () => {
+    expect(clubMonthName("2026-10-21T15:00:00Z")).toBe("October");
+    expect(clubMonthName("2026-01-15T12:00:00Z")).toBe("January");
+  });
+  it("is still last month in New York when UTC has rolled over", () => {
+    // Oct 31, 10:30 PM EDT.
+    expect(clubMonthName("2026-11-01T02:30:00Z")).toBe("October");
+    // Nov 1, 00:30 EDT.
+    expect(clubMonthName("2026-11-01T04:30:00Z")).toBe("November");
+  });
+});
+
+describe("shortClubDate", () => {
+  it("reads a club date as Mon D", () => {
+    expect(shortClubDate("2026-10-13")).toBe("Oct 13");
+    expect(shortClubDate("2026-09-05")).toBe("Sep 5");
+  });
+  it("never shifts the day, whatever the zone", () => {
+    expect(shortClubDate("2026-11-01")).toBe("Nov 1");
+    expect(shortClubDate("2026-12-31")).toBe("Dec 31");
   });
 });
