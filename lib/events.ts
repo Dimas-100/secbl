@@ -107,6 +107,15 @@ export function clubDateOf(iso: string): string {
   return isoToClubTime(iso).slice(0, 10);
 }
 
+// The instant the club month containing `now` began: 00:00 club time on the
+// 1st. "This month" means this, everywhere (Home's rating change, the You
+// page's month sentence). The offset is the one in force on the 1st, so a
+// month that began in EDT stays right after the clocks fall back.
+export function clubMonthStart(now: Date): Date {
+  const month = clubDateOf(now.toISOString()).slice(0, 7);
+  return new Date(clubTimeToISO(`${month}-01T00:00`));
+}
+
 // The Monday that starts the club week (Mon 00:00 – Sun 23:59 club time)
 // containing an instant, as a club calendar date. Calendar math runs in UTC
 // on the club date so neither the server zone nor DST can shift the day.

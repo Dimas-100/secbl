@@ -23,7 +23,7 @@ import { formatShort } from "@/lib/race";
 import { rankOf, toRankRow } from "@/lib/ranking";
 import { createClient } from "@/lib/supabase/server";
 import { startDm } from "@/app/(member)/chat/actions";
-import { clubDateOf } from "@/lib/events";
+import { clubDateOf, clubMonthStart } from "@/lib/events";
 import { winnerDelta } from "@/lib/form";
 import {
   bestWin,
@@ -88,7 +88,8 @@ export default async function PlayerPage({
   const school = Array.isArray(profile.schools) ? profile.schools[0] : profile.schools;
 
   const now = new Date();
-  const monthAgo = new Date(now.getTime() - 30 * 86_400_000);
+  // "This month" is the club calendar month, as on Home (ruling S2-R4).
+  const monthStart = clubMonthStart(now);
 
   const [{ data: history }, { data: matches }, { data: boardRow }, { data: board }, { count: titles }, { xp, level }] =
     await Promise.all([
@@ -126,7 +127,7 @@ export default async function PlayerPage({
   const rank = rankOf((board ?? []).map(toRankRow), id);
   const bestStreak = longestWinStreak(all, id);
   const peak = peakRating(history ?? [], profile.rating);
-  const change = ratingChangeSince(history ?? [], monthAgo, profile.rating);
+  const change = ratingChangeSince(history ?? [], monthStart, profile.rating);
   const chronological = [...(history ?? [])].reverse().slice(-30);
   const ratings =
     chronological.length > 0

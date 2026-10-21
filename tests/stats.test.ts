@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { clubMonthStart } from "@/lib/events";
 import {
   bestWin,
   currentStreak,
@@ -87,6 +88,14 @@ describe("ratingChangeSince", () => {
   });
   it("is null when nothing happened in the window", () => {
     expect(ratingChangeSince(history, new Date("2026-10-04T00:00:00Z"), 490)).toBeNull();
+  });
+  it("counts this club month only: a game late on Sep 30 in New York is September's", () => {
+    // 2026-10-01T02:00Z is Sep 30, 10:00 PM EDT.
+    const late = [{ rating_before: 450, rating_after: 470, created_at: "2026-10-01T02:00:00Z" }];
+    const october = clubMonthStart(new Date("2026-10-21T15:00:00Z"));
+    expect(ratingChangeSince(late, october, 470)).toBeNull();
+    const early = [...late, { rating_before: 470, rating_after: 482, created_at: "2026-10-01T05:00:00Z" }];
+    expect(ratingChangeSince(early, october, 482)).toBe(12);
   });
 });
 
