@@ -1,5 +1,10 @@
 @AGENTS.md
 
+## Rules
+
+- The repo is public. Tests, fixtures, specs and commit messages use invented names only ("Player A"); never copy a
+  real member's name into the repo, from the database or anywhere else. The ship guard refuses a push carrying a
+  current member's name.
 
 ## Current work (2026-10-06)
 
