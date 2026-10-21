@@ -9,6 +9,8 @@ import { ListRow } from "@/components/list-row";
 import { LiveGameCard } from "@/components/live-game-card";
 import { LiveHome } from "@/components/live-home";
 import { MessagesButton } from "@/components/messages-button";
+import { NightCard } from "@/components/night-card";
+import { loadNight } from "@/lib/night-data";
 import { NotifyPrompt } from "@/components/notify-prompt";
 import { PostComposer } from "@/components/post-composer";
 import { SectionHeading } from "@/components/section-heading";
@@ -72,6 +74,7 @@ export default async function HomePage({
     { data: liveRows },
     { data: myMatches },
     { data: agreedForMe },
+    nightData,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -146,6 +149,8 @@ export default async function HomePage({
       .not("agreed_at", "is", null)
       .gte("confirmed_at", new Date(now.getTime() - AGREED_WINDOW_MS).toISOString())
       .order("confirmed_at", { ascending: false }),
+    // Tonight's club night at your school, if one is on.
+    loadNight(supabase, user.id, now),
   ]);
   const flaggable = (agreedForMe ?? []).filter((m) => canFlag(m, user.id, now));
   const mine30 = (myMatches ?? []) as (StatMatch & { reporter: unknown; opponent: unknown })[];
@@ -293,6 +298,19 @@ export default async function HomePage({
       {celebration && <CelebrationCard {...celebration} />}
       <NotifyPrompt />
       <LiveHome />
+
+      {nightData.night && (
+        <section className="flex flex-col gap-3">
+          <Link href="/night" className="eyebrow press flex items-center gap-2">
+            <span aria-hidden="true" className="bg-win size-2 rounded-full motion-safe:animate-pulse" />
+            Club night
+            <ChevronRight className="ml-auto size-4" strokeWidth={1.7} aria-hidden="true" />
+          </Link>
+          <div className="bg-card rounded-[20px] p-4 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
+            <NightCard data={nightData} meId={user.id} back="/" now={now} />
+          </div>
+        </section>
+      )}
 
       {live.length > 0 && (
         <section className="flex flex-col gap-3">

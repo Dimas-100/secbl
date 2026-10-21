@@ -1,8 +1,22 @@
 // Pure logic for the one-screen report form, kept out of the component so
 // vitest covers it without DOM tooling.
 
+import { startingScores, suggestedSpot, type Side } from "@/lib/race";
 import { formatClubDate } from "@/lib/season";
 import type { MatchStatus } from "@/lib/types";
+
+// The board a newly picked opponent gets — the same numbers the scoreboard's
+// applyFormat picks: the spot their ratings suggest, scores starting from it.
+// Used when "Start game" opens the scoreboard with the called opponent.
+export function startBoard(
+  opponentRating: number,
+  myRating: number,
+  raceTo: number
+): { raceTo: number; spot: number; spotTo: Side | null; you: number; them: number } {
+  const { spot, to } = suggestedSpot(raceTo, myRating, opponentRating);
+  const start = startingScores(raceTo, spot, to);
+  return { raceTo, spot, spotTo: spot > 0 ? to : null, ...start };
+}
 
 export function recentOpponents<T extends { id: string; display_name: string }>(
   matchOpponentIds: string[],
@@ -84,17 +98,21 @@ export interface DuplicateGame {
 }
 
 // The opponent's report waiting on you comes first (confirming it is the
-// fix); otherwise the newest game.
+// fix); otherwise the newest game. `since` is when the pair was called to a
+// club-night table: a game logged before that call cannot be this one, so a
+// rematch the same evening is not flagged (spec 2026-10-20-club-night §0 #14).
 export function findDuplicate(
   rows: PairMatchRow[],
   meId: string,
   opponentId: string,
-  playedAt: string
+  playedAt: string,
+  since: string | null = null
 ): DuplicateGame | null {
   const same = rows
     .filter(
       (r) =>
         r.played_at === playedAt &&
+        (since === null || Date.parse(r.created_at) >= Date.parse(since)) &&
         (r.status === "pending" || r.status === "confirmed") &&
         ((r.reporter_id === meId && r.opponent_id === opponentId) ||
           (r.reporter_id === opponentId && r.opponent_id === meId))
