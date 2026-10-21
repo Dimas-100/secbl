@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NavHistory } from "@/components/nav-history";
 import { PresenceProvider } from "@/components/presence-provider";
 import { TabBar } from "@/components/tab-bar";
 import { createClient } from "@/lib/supabase/server";
@@ -23,6 +24,7 @@ export default async function MemberLayout({ children }: { children: React.React
     // shrink-wraps its content instead of stretching.
     <PresenceProvider meId={profile.id}>
       <div className="mx-auto w-full max-w-3xl px-6 pb-32">
+        <NavHistory />
         {children}
         <TabBar profileHref={`/players/${profile.id}`} meId={profile.id} />
       </div>

@@ -32,7 +32,7 @@ export default async function LadderPage({ params }: { params: Promise<{ id: str
 
   return (
     <main className="flex flex-col gap-8">
-      <PageHeader title="Ladder" back={`/players/${id}`} trailing={null} />
+      <PageHeader title="Ladder" back={`/players/${id}`} history trailing={null} />
 
       <section className="flex flex-col gap-1.5">
         <span className="eyebrow">

@@ -96,4 +96,31 @@ test("the Play sheet resumes a game, offers faces and opens club night", async (
   await expect(page).toHaveURL(/\/night$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
+
+  // Spec §6/§9: another player's page offers "Play {first name}" (checked by
+  // its href, not clicked: it would publish a live table) and Back returns to
+  // where the member came from.
+  await page.goto("/leaderboard?tab=players");
+  await expect(async () => {
+    await page.locator(`a[href="/players/${b.id}"]`).first().click();
+    await expect(page.getByRole("link", { name: "Play E2E", exact: true })).toBeVisible({ timeout: 3_000 });
+  }).toPass();
+  await expect(page.getByRole("link", { name: "Play E2E", exact: true })).toHaveAttribute(
+    "href",
+    new RegExp(`opponent=${b.id}`)
+  );
+  await expect(async () => {
+    await page.getByRole("link", { name: "Back", exact: true }).click();
+    await expect(page).toHaveURL(/tab=players/, { timeout: 3_000 });
+  }).toPass();
+
+  // A fresh tab has no in-app history: Back falls back to the leaderboard and
+  // never leaves the app.
+  const fresh = await page.context().newPage();
+  await fresh.goto(`/players/${b.id}`);
+  await expect(async () => {
+    await fresh.getByRole("link", { name: "Back", exact: true }).click();
+    await expect(fresh).toHaveURL((u) => u.pathname === "/leaderboard", { timeout: 3_000 });
+  }).toPass();
+  await expect(fresh.getByRole("navigation", { name: "Main" })).toBeVisible();
 });

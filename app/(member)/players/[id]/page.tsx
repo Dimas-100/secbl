@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Camera, ChevronLeft, SlidersHorizontal } from "lucide-react";
+import { Camera, SlidersHorizontal } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { BackButton } from "@/components/nav-history";
 import { Button } from "@/components/ui/button";
 import { LevelBar } from "@/components/level-bar";
 import { ListRow } from "@/components/list-row";
@@ -174,9 +175,7 @@ export default async function PlayerPage({
             <SlidersHorizontal className="size-5" strokeWidth={1.6} />
           </Link>
         ) : (
-          <Link href="/leaderboard" aria-label="Back" className={iconButton}>
-            <ChevronLeft className="size-5" strokeWidth={1.7} />
-          </Link>
+          <BackButton fallback="/leaderboard" />
         )}
         <MessagesButton />
       </header>
@@ -222,9 +221,14 @@ export default async function PlayerPage({
             </>
           ) : user ? (
             <>
+              <Button asChild>
+                <Link href={`/matches/new?opponent=${profile.id}`}>Play {firstName}</Link>
+              </Button>
               <form action={startDm}>
                 <input type="hidden" name="profile_id" value={profile.id} />
-                <SubmitButton pendingChildren="Opening…">Message</SubmitButton>
+                <SubmitButton variant="ghost" pendingChildren="Opening…">
+                  Message
+                </SubmitButton>
               </form>
               <ShareButton title={`${profile.display_name} · SECBL`} />
             </>
