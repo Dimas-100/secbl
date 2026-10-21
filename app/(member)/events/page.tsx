@@ -9,9 +9,8 @@ import { PageHeader } from "@/components/page-header";
 import { SectionHeading } from "@/components/section-heading";
 import { SubmitButton } from "@/components/submit-button";
 import { UnderlineTabs } from "@/components/underline-tabs";
-import { loadNight } from "@/lib/night-data";
 import { createClient } from "@/lib/supabase/server";
-import { CLUB_TIMEZONE, eventMentionsSchool, formatEventWhen, partitionEvents } from "@/lib/events";
+import { CLUB_TIMEZONE, formatEventWhen, partitionEvents } from "@/lib/events";
 import { cn } from "@/lib/utils";
 import { setRsvp } from "@/app/(member)/events/actions";
 
@@ -32,13 +31,11 @@ interface TournamentRow {
   status: "setup" | "live" | "complete";
 }
 
-const TABS = ["upcoming", "going", "school", "past", "cups"] as const;
+const TABS = ["upcoming", "past", "cups"] as const;
 type Tab = (typeof TABS)[number];
 
 const EMPTY: Record<Tab, string> = {
-  upcoming: "Nothing on the calendar yet.",
-  going: "You haven't said you're going to anything yet.",
-  school: "Nothing from your school coming up.",
+  upcoming: "Nothing on the calendar. Start a club night from Play.",
   past: "No past events.",
   cups: "No cups yet.",
 };
@@ -211,7 +208,7 @@ export default async function EventsPage({
   if (!user) redirect("/login");
 
   const [{ data: me }, { data: events }, { data: tournaments }] = await Promise.all([
-    supabase.from("profiles").select("role, schools(name, short_name)").eq("id", user.id).single(),
+    supabase.from("profiles").select("role").eq("id", user.id).single(),
     supabase
       .from("events")
       // Counts only; the featured card's attendee faces come from one small
@@ -220,21 +217,11 @@ export default async function EventsPage({
       .order("starts_at"),
     supabase.from("tournaments").select("id, name, status").order("created_at", { ascending: false }),
   ]);
-  const school = Array.isArray(me?.schools) ? me.schools[0] : me?.schools;
   const admin = me?.role === "admin";
 
   const now = new Date();
-  // The club night row at the top: on now, or the way to start one.
-  const nightData = await loadNight(supabase, user.id, now);
   const { upcoming, past } = partitionEvents((events ?? []) as EventRow[], now);
-  const list =
-    tab === "past"
-      ? past
-      : tab === "going"
-        ? upcoming.filter((e) => isGoing(e, user.id))
-        : tab === "school" && school
-          ? upcoming.filter((e) => eventMentionsSchool(e, school))
-          : upcoming;
+  const list = tab === "past" ? past : upcoming;
   const featured = tab === "upcoming" ? (upcoming[0] ?? null) : null;
   const rest = featured ? list.slice(1) : list;
   let going: AvatarIdentity[] = [];
@@ -265,30 +252,11 @@ export default async function EventsPage({
           </div>
         )}
       </PageHeader>
-      <ListRow
-        href="/night"
-        leading={
-          <span className="flex size-10 items-center justify-center">
-            <span
-              aria-hidden="true"
-              className={cn("size-2.5 rounded-full", nightData.night ? "bg-win motion-safe:animate-pulse" : "bg-hairline-strong")}
-            />
-          </span>
-        }
-        title="Club night"
-        meta={
-          nightData.night
-            ? `On now · ${nightData.line.length === 0 ? "nobody" : nightData.line.length} in line`
-            : "Start the line for the tables"
-        }
-      />
       <UnderlineTabs
         ariaLabel="Event filter"
         value={tab}
         options={[
           { value: "upcoming", label: "Upcoming", href: "/events" },
-          { value: "going", label: "Going", href: "/events?tab=going" },
-          { value: "school", label: "My school", href: "/events?tab=school" },
           { value: "past", label: "Past", href: "/events?tab=past" },
           { value: "cups", label: "Cups", href: "/events?tab=cups" },
         ]}

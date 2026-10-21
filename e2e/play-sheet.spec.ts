@@ -123,4 +123,19 @@ test("the Play sheet resumes a game, offers faces and opens club night", async (
     await expect(fresh).toHaveURL((u) => u.pathname === "/leaderboard", { timeout: 3_000 });
   }).toPass();
   await expect(fresh.getByRole("navigation", { name: "Main" })).toBeVisible();
+
+  // Spec §7: Events keeps three tabs and no club night row; an empty calendar
+  // points to Play.
+  await page.goto("/events");
+  // The filter is a nav of links (UnderlineTabs), not an ARIA tablist.
+  const tabs = page.getByRole("navigation", { name: "Event filter" }).getByRole("link");
+  await expect(tabs).toHaveText(["Upcoming", "Past", "Cups"]);
+  await expect(page.getByRole("link", { name: "Club night" })).toHaveCount(0);
+  // The page lists every event (cancelled too) until it ends, so the empty
+  // copy only shows when no event, of any status, is still ahead.
+  const { data: all } = await service.from("events").select("starts_at, ends_at");
+  const anyUpcoming = (all ?? []).some((e) => new Date(e.ends_at ?? e.starts_at).getTime() >= Date.now());
+  if (!anyUpcoming) {
+    await expect(page.getByText("Start a club night from Play")).toBeVisible();
+  }
 });
