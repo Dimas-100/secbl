@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import type { FeedPerson } from "@/lib/feed";
 import { GAME_LABEL } from "@/lib/identity";
@@ -20,9 +21,20 @@ export interface LiveGameRow {
 }
 
 // A table being played right now: both faces, the format, the score as two
-// hero numbers and a rail each toward the finish. The reporter's own card
-// takes them back to their scoreboard.
-export function LiveGameCard({ row, viewerId }: { row: LiveGameRow; viewerId: string }) {
+// hero numbers and a rail each toward the finish, and the newest table talk.
+// The reporter's own card takes them back to their scoreboard; everyone
+// else's opens the table (spec 2026-10-20-table-talk §5).
+export function LiveGameCard({
+  row,
+  viewerId,
+  talk,
+  link = true,
+}: {
+  row: LiveGameRow;
+  viewerId: string;
+  talk?: { count: number; latest: { name: string; body: string } | null };
+  link?: boolean;
+}) {
   const name = (p: FeedPerson | null, id: string) =>
     id === viewerId ? "You" : (p?.display_name ?? "Member").split(" ")[0];
   const r = name(row.reporter, row.reporter_id);
@@ -84,14 +96,21 @@ export function LiveGameCard({ row, viewerId }: { row: LiveGameRow; viewerId: st
           {mine && <span className="text-brass">{line.need ? " · " : ""}Your game</span>}
         </span>
       )}
+      {talk && talk.count > 0 && talk.latest && (
+        <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-[12px]">
+          <MessageCircle className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+          <span className="truncate">
+            {talk.count} · {talk.latest.name}: {talk.latest.body}
+          </span>
+        </span>
+      )}
     </>
   );
   const cls = "bg-card flex flex-col gap-3 rounded-[20px] p-4 shadow-[inset_0_0_0_1px_var(--hairline-row)]";
-  return mine ? (
-    <Link href="/matches/new" className={cn("press", cls)}>
+  if (!link) return <div className={cls}>{body}</div>;
+  return (
+    <Link href={mine ? "/matches/new" : `/live/${row.reporter_id}`} className={cn("press", cls)}>
       {body}
     </Link>
-  ) : (
-    <div className={cls}>{body}</div>
   );
 }

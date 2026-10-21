@@ -127,6 +127,18 @@ export function matchReportedPayload(input: {
   };
 }
 
+// Table talk (spec 2026-10-20-table-talk §4): someone said something on a
+// game you're playing. One tag per game, and the sender throttles it.
+export function liveCommentPayload(input: { gameId: string; authorName: string; body: string; url: string }): PushPayload {
+  return {
+    title: `${first(input.authorName)} on your game`,
+    body: flatten(input.body),
+    url: input.url,
+    tag: `live:${input.gameId}`,
+    category: "messages",
+  };
+}
+
 // A game the scorekeeper counted on the spot (spec 2026-10-20-agreed-results §4):
 // nothing to confirm, but the opponent has a day to say it's wrong.
 export function matchAgreedPayload(input: {
