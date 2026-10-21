@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   duplicateNotice,
   findDuplicate,
+  openingBoard,
   recentOpponents,
   resultLine,
   startBoard,
@@ -115,6 +116,27 @@ describe("findDuplicate since a club-night table call", () => {
     expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", "2026-10-15T21:00:00Z")).toBeNull();
     expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", "2026-10-15T19:00:00Z")).toMatchObject({ id: "m1" });
     expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", null)).toMatchObject({ id: "m1" });
+  });
+});
+
+describe("openingBoard", () => {
+  const scored = { opponentId: "a", you: 2, them: 1 };
+  it("keeps the draft when nobody was called", () => {
+    expect(openingBoard(scored, undefined)).toBe("keep");
+  });
+  it("keeps the draft when it is already against the called opponent", () => {
+    expect(openingBoard(scored, "a")).toBe("keep");
+  });
+  it("asks before replacing a scored game against someone else", () => {
+    expect(openingBoard(scored, "b")).toBe("ask");
+    expect(openingBoard({ opponentId: "a", you: 0, them: 3 }, "b")).toBe("ask");
+  });
+  it("switches silently from an unscored board", () => {
+    expect(openingBoard({ opponentId: "a", you: 0, them: 0 }, "b")).toBe("switch");
+  });
+  it("switches when the draft has no opponent yet", () => {
+    expect(openingBoard({ opponentId: null, you: 0, them: 0 }, "b")).toBe("switch");
+    expect(openingBoard({ opponentId: null, you: 1, them: 0 }, "b")).toBe("switch");
   });
 });
 

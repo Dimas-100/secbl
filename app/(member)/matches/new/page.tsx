@@ -8,9 +8,9 @@ import { ReportMatchFormLoader } from "./report-form-loader";
 export default async function NewMatchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; opponent?: string }>;
+  searchParams: Promise<{ error?: string; opponent?: string; find?: string }>;
 }) {
-  const { error, opponent } = await searchParams;
+  const { error, opponent, find } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -64,6 +64,8 @@ export default async function NewMatchPage({
         myRating={me?.rating ?? 450}
         // Club night's "Start game": the board opens with the called opponent.
         initialOpponentId={options.some((o) => o.id === opponent) ? opponent : undefined}
+        // The Play sheet's "Find a player": the picker opens on arrival.
+        initialPickerOpen={find === "1"}
       />
     </main>
   );

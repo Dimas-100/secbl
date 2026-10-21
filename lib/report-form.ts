@@ -14,6 +14,18 @@ export function draftKey(meId: string): string {
   return `secbl:draft-game:${meId}`;
 }
 
+// What the scoreboard does when it opens with a called opponent (Play sheet,
+// player page, club night) and may already hold a draft. A scored game
+// against someone else is never replaced silently: the form asks first.
+export function openingBoard(
+  draft: { opponentId: string | null; you: number; them: number },
+  calledId: string | undefined
+): "keep" | "switch" | "ask" {
+  if (!calledId || draft.opponentId === calledId) return "keep";
+  if (draft.opponentId !== null && draft.you + draft.them > 0) return "ask";
+  return "switch";
+}
+
 // The board a newly picked opponent gets — the same numbers the scoreboard's
 // applyFormat picks: the spot their ratings suggest, scores starting from it.
 // Used when "Start game" opens the scoreboard with the called opponent.

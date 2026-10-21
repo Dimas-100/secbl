@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
 import { ChevronRight, MessageCircle, Search } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { TableTalk, useLiveComments } from "@/components/table-talk";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScoreStepper } from "@/components/score-stepper";
 import { SubmitButton } from "@/components/submit-button";
@@ -27,6 +29,7 @@ import {
   DRAFT_MAX_AGE_MS,
   draftKey as draftKeyFor,
   duplicateNotice,
+  openingBoard,
   recentOpponents,
   startBoard,
   type DuplicateGame,
@@ -97,6 +100,7 @@ export function ReportMatchForm({
   meId,
   myRating,
   initialOpponentId,
+  initialPickerOpen = false,
 }: {
   opponents: OpponentOption[];
   recentIds: string[];
@@ -104,20 +108,29 @@ export function ReportMatchForm({
   meId: string;
   myRating: number;
   initialOpponentId?: string;
+  initialPickerOpen?: boolean;
 }) {
   const draftKey = draftKeyFor(meId);
   // One state object for the board, lazily restored from the draft. This
   // component is loaded client-only (see page.tsx), so reading localStorage
   // in the initialiser is safe and there is no hydration mismatch. Called to
-  // a club-night table, the board opens on that opponent — unless the draft
-  // is already a game against them.
-  const [d, setD] = useState<Draft>(() => {
+  // a table or a player (?opponent=), the board opens on that opponent: a
+  // draft already against them is kept, an unscored one is replaced, and a
+  // scored game against someone else is kept while the footer asks
+  // (lib/report-form openingBoard) — it is never dropped silently.
+  const [opening] = useState(() => {
     const draft = loadDraft(draftKey, opponents, today);
     const called = initialOpponentId ? opponents.find((o) => o.id === initialOpponentId) : undefined;
-    if (!called || draft.opponentId === called.id) return draft;
+    const choice = openingBoard(draft, called?.id);
+    if (!called || choice === "keep") return { draft, askId: null as string | null };
+    if (choice === "ask") return { draft, askId: called.id };
     const board = startBoard(called.rating, myRating, DEFAULT_RACE);
-    return { ...freshDraft(today), opponentId: called.id, ...board };
+    return { draft: { ...freshDraft(today), opponentId: called.id, ...board }, askId: null };
   });
+  const [d, setD] = useState<Draft>(opening.draft);
+  // The called opponent while the switch-guard notice is up.
+  const [askId, setAskId] = useState<string | null>(opening.askId);
+  const router = useRouter();
   const { opponentId, game, raceTo, spot, spotTo, you, them, date } = d;
   const patch = (next: Partial<Draft>) => setD((cur) => ({ ...cur, ...next, at: Date.now() }));
   const setYou = (v: number) => patch({ you: v });
@@ -125,7 +138,7 @@ export function ReportMatchForm({
   const setDate = (v: string) => patch({ date: v });
   const setGame = (v: string) => patch({ game: v });
   const [editingDate, setEditingDate] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(initialPickerOpen);
   const [query, setQuery] = useState("");
   const buzzed = useRef<Side | null>(null);
   // The pending live publish, so Send can cancel it: a publish landing after
@@ -192,8 +205,12 @@ export function ReportMatchForm({
   const dupKey = `${opponentId}|${date}`;
   const shownDup = dup?.key === dupKey ? dup : null;
   const notice = shownDup ? duplicateNotice(shownDup, first, today) : null;
-  // The duplicate notice owns the footer while it is up.
-  const talkShown = talkLine.count > 0 && !notice;
+  // The switch-guard notice: the scoreboard opened for someone else while a
+  // scored game was in progress.
+  const called = askId ? (opponents.find((o) => o.id === askId) ?? null) : null;
+  const asking = called !== null;
+  // The switch-guard and duplicate notices own the footer while they are up.
+  const talkShown = talkLine.count > 0 && !notice && !asking;
 
   const race: RaceState = { you, them, raceTo, spot, spotTo };
   const done = finished(race);
@@ -231,10 +248,28 @@ export function ReportMatchForm({
   }
 
   function pickOpponent(o: OpponentOption) {
+    setAskId(null);
     applyFormat({ opponent: o });
   }
 
+  // "Start new": the called opponent gets a fresh board, as the lazy
+  // initialiser would have given had the old game been unscored.
+  function startCalled(o: OpponentOption) {
+    setAskId(null);
+    setD({ ...freshDraft(today), opponentId: o.id, ...startBoard(o.rating, myRating, DEFAULT_RACE) });
+    buzzed.current = null;
+    setGameId(null);
+    setTalkOpen(false);
+  }
+
+  // "Keep that game": drop the ?opponent= so a reload does not ask again.
+  function keepDraft() {
+    setAskId(null);
+    router.replace("/matches/new");
+  }
+
   function clearBoard() {
+    setAskId(null);
     setEditingDate(false);
     setD(freshDraft(today));
     buzzed.current = null;
@@ -314,7 +349,7 @@ export function ReportMatchForm({
       }}
       className={cn(
         "flex flex-col gap-8",
-        notice ? "pb-72" : s.disabled ? (talkShown ? "pb-56" : "pb-36") : talkShown ? "pb-80" : "pb-56"
+        notice || asking ? "pb-72" : s.disabled ? (talkShown ? "pb-56" : "pb-36") : talkShown ? "pb-80" : "pb-56"
       )}
     >
       <section className="flex flex-col gap-3.5">
@@ -535,7 +570,21 @@ export function ReportMatchForm({
               <ChevronRight className="text-muted-foreground size-4 shrink-0" strokeWidth={1.7} />
             </button>
           )}
-          {notice && shownDup ? (
+          {called ? (
+            <>
+              <div role="alert" className="flex flex-col gap-1 pb-1">
+                <p className="text-[15px] font-medium">
+                  {`You have a game in progress vs ${first} (${you}–${them})`}
+                </p>
+              </div>
+              <Button type="button" size="xl" className="w-full" onClick={keepDraft}>
+                Keep that game
+              </Button>
+              <Button type="button" size="xl" variant="ghost" className="w-full" onClick={() => startCalled(called)}>
+                Start new
+              </Button>
+            </>
+          ) : notice && shownDup ? (
             <>
               <div role="alert" className="flex flex-col gap-1 pb-1">
                 <p className="text-[15px] font-medium">{notice.title}</p>
