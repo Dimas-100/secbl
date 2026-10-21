@@ -80,7 +80,9 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
   await pageB.reload();
   await expect(pageB.getByRole("region", { name: "Latest result" })).toHaveCount(0);
   await pageB.goto(`/players/${weak.id}`);
-  await expect(pageB.getByText(/race to 3 · 1 spot/)).toBeVisible();
+  // Inside the visible main landmark: a production build can leave a hidden
+  // copy of the page body.
+  await expect(pageB.getByRole("main").getByText(/race to 3 · 1 spot/)).toBeVisible();
 
   const { data: m } = await service
     .from("matches")
