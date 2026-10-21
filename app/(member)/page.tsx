@@ -5,6 +5,7 @@ import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { AvatarStack } from "@/components/avatar-stack";
 import { CelebrationCard } from "@/components/celebration-card";
 import { ActivityRow } from "@/components/activity-row";
+import { FirstGameCard, type FirstGameFace } from "@/components/first-game-card";
 import { ListRow } from "@/components/list-row";
 import { LiveGameCard } from "@/components/live-game-card";
 import { LiveHome } from "@/components/live-home";
@@ -12,10 +13,9 @@ import { MessagesButton } from "@/components/messages-button";
 import { NightCard } from "@/components/night-card";
 import { loadNight } from "@/lib/night-data";
 import { NotifyPrompt } from "@/components/notify-prompt";
+import { ProgressCard } from "@/components/progress-card";
 import { SectionHeading } from "@/components/section-heading";
 import { ShowMore } from "@/components/show-more";
-import { Sparkline } from "@/components/sparkline";
-import { StatGrid, StatTile } from "@/components/stat-tile";
 import { StreakFlame } from "@/components/streak-flame";
 import { SubmitButton } from "@/components/submit-button";
 import { TitleBadge } from "@/components/title-badge";
@@ -26,14 +26,16 @@ import { talkSummary, type LiveComment } from "@/lib/table-talk";
 import { freshMatch, headline } from "@/lib/celebration";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { FEED_SELECT, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
+import { formDots, nextLine, xpNote } from "@/lib/home";
 import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
-import type { TitleName } from "@/lib/levels";
+import { nextBadge, type TitleName } from "@/lib/levels";
+import { playFaces } from "@/lib/play";
 import { formatLabel } from "@/lib/race";
-import { rankOf, toRankRow, type RankRow } from "@/lib/ranking";
+import { aboveOf, leadOf, toRankRow, type RankRow } from "@/lib/ranking";
 import { seasonCountdownLabel, seasonStrip } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
-import { currentStreak, ratingChangeSince, seasonLabel, winRate, type StatMatch } from "@/lib/stats";
+import { currentStreak, ratingChangeSince, type StatMatch } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { loadXp } from "@/lib/xp-data";
 import type { RsvpResponse } from "@/lib/types";
@@ -78,7 +80,7 @@ export default async function HomePage({
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, display_name, rating, matches_played, avatar_url, ball, schools(short_name)")
+      .select("id, display_name, rating, avatar_url, ball, school_id, schools(short_name)")
       .eq("id", user.id)
       .single(),
     // Rank, wins and losses come from the same view the leaderboard renders,
@@ -232,26 +234,47 @@ export default async function HomePage({
     }
     for (const [gameId, comments] of perGame) talkByGame.set(gameId, talkSummary(comments, talkNames));
   }
-  // Your place in the running season and who leads it, for the strip under the stats.
-  const strip = openSeason ? seasonStrip(await loadSeasonStandings(supabase, openSeason), user.id) : null;
-
-  const rating = me?.rating ?? 450;
-  const played = me?.matches_played ?? 0;
-  const provisional = played < 10;
-
+  // Games played come from the same view as rank, so placement and the Next
+  // line can never disagree with the Ranks tab.
   const rankRows: RankRow[] = (board ?? []).map(toRankRow);
   const myRow = rankRows.find((r) => r.id === user.id);
-  const wins = myRow?.wins ?? 0;
-  const losses = myRow?.losses ?? 0;
-  const rate = winRate(wins, losses);
-  const rank = rankOf(rankRows, user.id);
+  const played = (myRow?.wins ?? 0) + (myRow?.losses ?? 0);
+  const boardNames = new Map((board ?? []).map((r) => [String(r.id), String(r.display_name ?? "Member")]));
 
-  const chronological = [...(history ?? [])].reverse();
-  const ratings =
-    chronological.length > 0
-      ? [chronological[0].rating_before, ...chronological.map((h) => h.rating_after)]
-      : [rating];
+  // Your place in the running season and who leads it, for the strip under
+  // the progress card; and for a member with no game yet, the people to play
+  // (approved members in the Play sheet's order, with no recent opponents).
+  const [strip, members] = await Promise.all([
+    openSeason ? loadSeasonStandings(supabase, openSeason).then((s) => seasonStrip(s, user.id)) : null,
+    played === 0
+      ? supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url, ball, school_id")
+          .eq("status", "approved")
+          .neq("id", user.id)
+          .then(({ data }) => (data ?? []) as (FirstGameFace & { school_id: string | null })[])
+      : null,
+  ]);
+  let firstGameFaces: FirstGameFace[] = [];
+  if (members) {
+    const byId = new Map(members.map((m) => [m.id, m]));
+    firstGameFaces = playFaces([], members, me?.school_id ?? null).flatMap((id) => {
+      const m = byId.get(id);
+      return m ? [{ id: m.id, display_name: m.display_name, avatar_url: m.avatar_url, ball: m.ball }] : [];
+    });
+  }
+
+  const rating = me?.rating ?? 450;
   const change = ratingChangeSince(history ?? [], monthAgo, rating);
+  const above = aboveOf(rankRows, user.id);
+  const lead = leadOf(rankRows, user.id);
+  const badge = nextBadge(level, xp.total);
+  const next = nextLine({
+    played,
+    above: above ? { name: boardNames.get(above.id) ?? "Member", rank: above.rank, gap: above.gap } : null,
+    lead: lead ? { name: boardNames.get(lead.id) ?? "Member", gap: lead.gap } : null,
+    badge: badge ? { title: badge.title, xpToGo: badge.xpToGo } : null,
+  });
 
   const today = clubDateOf(nowIso);
   const greeting = greetingFor(now, me?.display_name ?? "").split(",")[0];
@@ -328,31 +351,21 @@ export default async function HomePage({
         </section>
       )}
 
-      <section className="flex flex-col gap-[18px]">
-        <span className="eyebrow">Rating · {openSeason?.name ?? seasonLabel(today)}</span>
-        <div className="flex items-end justify-between gap-4">
-          <span className="hero-number">{rating}</span>
-          {change !== null && (
-            <span className={cn("stat-number pb-1.5 text-[13px]", change >= 0 ? "text-win" : "text-loss")}>
-              {change >= 0 ? "+" : "−"}
-              {Math.abs(change)} this month
-            </span>
-          )}
-        </div>
-        <Sparkline ratings={ratings} />
-        <StatGrid cols={3}>
-          <StatTile label="Overall rank" value={rank ? `#${rank}` : "–"} />
-          <StatTile
-            label="Win rate"
-            value={rate === null ? "–" : `${rate}%`}
-            note={`${wins}–${losses}${provisional ? " · provisional" : ""}`}
+      <section className="flex flex-col gap-3">
+        {played === 0 ? (
+          <FirstGameCard school={mySchool} faces={firstGameFaces} />
+        ) : (
+          <ProgressCard
+            meId={user.id}
+            rating={rating}
+            change={change}
+            form={formDots(mine30, user.id)}
+            played={played}
+            level={level}
+            xpNote={xpNote(level, xp.total)}
+            next={next}
           />
-          <StatTile
-            label={`Level · ${level.title}`}
-            value={`Lvl ${level.level}`}
-            note={`${Math.round((level.intoLevel / level.needed) * 100)}% to ${level.level + 1}`}
-          />
-        </StatGrid>
+        )}
         {openSeason && strip && (
           <Link
             href="/leaderboard?tab=season"

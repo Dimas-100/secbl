@@ -1,0 +1,57 @@
+// Home's copy decisions (spec 2026-10-21-play-and-progress §2), kept pure so
+// vitest covers every branch: placement, the last-five dots, the XP note and
+// the one Next line on the progress card.
+
+import { nextBadge, type LevelInfo } from "@/lib/levels";
+
+// Confirmed games before a rating counts as set ("placement").
+export const PLACEMENT_GAMES = 10;
+
+export function placementLeft(played: number): number {
+  return Math.max(0, PLACEMENT_GAMES - played);
+}
+
+const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
+
+// XP to go reads like the profile's ("3,450"); rating gaps stay plain.
+const xpCount = (n: number) => n.toLocaleString("en-US");
+
+// The newest `n` results as W/L, oldest first, so the newest sits on the right.
+export function formDots(newestFirst: { winner_id: string }[], meId: string, n = 5): ("W" | "L")[] {
+  return newestFirst
+    .slice(0, n)
+    .map((m): "W" | "L" => (m.winner_id === meId ? "W" : "L"))
+    .reverse();
+}
+
+// The progress card's one goal, first that applies: finish placement, pass
+// the member directly above, hold #1 over #2, then the next badge.
+export function nextLine(input: {
+  played: number;
+  above: { name: string; rank: number; gap: number } | null;
+  lead: { name: string; gap: number } | null;
+  badge: { title: string; xpToGo: number } | null;
+}): string | null {
+  const left = placementLeft(input.played);
+  if (left > 0) return `${left} more ${left === 1 ? "game" : "games"} to finish placement`;
+  if (input.above) {
+    const { name, rank, gap } = input.above;
+    return `Next: pass ${firstName(name)} for #${rank} · ${gap === 0 ? "level on rating" : `${gap} pts`}`;
+  }
+  if (input.lead) {
+    const { name, gap } = input.lead;
+    return gap === 0
+      ? `You're #1 · level on rating with ${firstName(name)}`
+      : `You're #1 · ${gap} pts ahead of ${firstName(name)}`;
+  }
+  if (input.badge) return `Next: ${input.badge.title} badge · ${xpCount(input.badge.xpToGo)} XP`;
+  return null;
+}
+
+// Beside the level bar: the XP to the next title, or for a Legend (no title
+// left) the XP into the current level, as the profile shows it.
+export function xpNote(level: LevelInfo, xpTotal: number): string {
+  const badge = nextBadge(level, xpTotal);
+  if (!badge) return `${level.intoLevel} / ${level.needed} XP`;
+  return `${xpCount(badge.xpToGo)} XP to ${badge.title}`;
+}
