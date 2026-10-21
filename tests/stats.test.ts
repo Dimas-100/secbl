@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { clubMonthStart } from "@/lib/events";
 import {
   bestWin,
+  byPlayOrder,
   currentStreak,
   groupByPlayedDate,
   headToHead,
@@ -187,5 +188,56 @@ describe("longestWinStreak", () => {
   it("is 0 with no matches or no wins", () => {
     expect(longestWinStreak([], "me")).toBe(0);
     expect(longestWinStreak([m("1", "x", "me", "x")], "me")).toBe(0);
+  });
+});
+
+describe("byPlayOrder (ruling S3-R7)", () => {
+  const g = (id: string, played_at: string, created_at: string) => ({ id, played_at, created_at });
+
+  it("puts the newest played first, then the newest logged, then the higher id", () => {
+    const ms = [
+      g("a", "2026-10-01", "2026-10-01T20:00:00Z"),
+      g("b", "2026-10-03", "2026-10-03T19:00:00Z"),
+      g("c", "2026-10-03", "2026-10-03T21:00:00Z"),
+      g("e", "2026-10-02", "2026-10-02T20:00:00Z"),
+      g("d", "2026-10-02", "2026-10-02T20:00:00Z"),
+    ];
+    expect([...ms].sort(byPlayOrder).map((m) => m.id)).toEqual(["c", "b", "e", "d", "a"]);
+  });
+
+  it("orders by the day played, not by when it was logged or confirmed", () => {
+    // Logged a week later for a game played on the 1st: it is still older.
+    const late = g("late", "2026-10-01", "2026-10-08T12:00:00Z");
+    const recent = g("recent", "2026-10-05", "2026-10-05T12:00:00Z");
+    expect([late, recent].sort(byPlayOrder).map((m) => m.id)).toEqual(["recent", "late"]);
+  });
+
+  it("keeps PostgREST microseconds in order within one millisecond", () => {
+    const a = g("a", "2026-10-03", "2026-10-03T21:00:00.123456+00:00");
+    const b = g("b", "2026-10-03", "2026-10-03T21:00:00.123401+00:00");
+    expect([b, a].sort(byPlayOrder).map((m) => m.id)).toEqual(["a", "b"]);
+  });
+
+  it("is 0 only for the same game", () => {
+    const a = g("a", "2026-10-03", "2026-10-03T21:00:00Z");
+    expect(byPlayOrder(a, { ...a })).toBe(0);
+  });
+
+  it("reads a batch confirmed in reverse play order as played", () => {
+    // Played W, W, L (oldest to newest) and confirmed L first: newest
+    // confirmed first the list is W, W, L, which reads "won the last 2".
+    const played = (id: string, winner: string, day: string) => ({
+      ...m(id, winner, "me", "x", { confirmed_at: null }),
+      played_at: day,
+      created_at: `${day}T20:00:00Z`,
+    });
+    const w1 = played("w1", "me", "2026-10-01");
+    const w2 = played("w2", "me", "2026-10-02");
+    const l3 = played("l3", "x", "2026-10-03");
+    const newestConfirmedFirst = [w1, w2, l3];
+    const byPlay = [...newestConfirmedFirst].sort(byPlayOrder);
+    expect(byPlay.map((x) => x.id)).toEqual(["l3", "w2", "w1"]);
+    expect(currentStreak(byPlay, "me")).toEqual({ kind: "L", length: 1 });
+    expect(currentStreak(newestConfirmedFirst, "me")).toEqual({ kind: "W", length: 2 }); // the old, untrue read
   });
 });

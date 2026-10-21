@@ -36,7 +36,7 @@ import { playFaces } from "@/lib/play";
 import { aboveOf, leadOf, toRankRow, type RankRow } from "@/lib/ranking";
 import { seasonCountdownLabel, seasonStrip } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
-import { currentStreak, ratingChangeSince, type StatMatch } from "@/lib/stats";
+import { byPlayOrder, currentStreak, ratingChangeSince, type PlayOrdered, type StatMatch } from "@/lib/stats";
 import { cn, GOLD_EDGE } from "@/lib/utils";
 import { loadXp } from "@/lib/xp-data";
 import type { RsvpResponse } from "@/lib/types";
@@ -140,11 +140,12 @@ export default async function HomePage({
       )
       .gte("updated_at", new Date(now.getTime() - LIVE_STALE_MS).toISOString())
       .order("updated_at", { ascending: false }),
-    // Your newest confirmed games: the streak flame and the result card.
+    // Your newest confirmed games: the streak flame, the form dots and the
+    // result card.
     supabase
       .from("matches")
       .select(
-        "id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, confirmed_at, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
+        "id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, confirmed_at, played_at, created_at, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
       )
       .eq("status", "confirmed")
       .or(`reporter_id.eq.${user.id},opponent_id.eq.${user.id}`)
@@ -169,8 +170,12 @@ export default async function HomePage({
   // Called to a table tonight: that card joins what needs you at the top; out
   // of the line or waiting in it, the night stays further down.
   const atTable = myNightStatus(nightData.night, nightData.line, nightData.tables, user.id, now).kind === "playing";
-  const mine30 = (myMatches ?? []) as (StatMatch & { reporter: unknown; opponent: unknown })[];
-  const streak = currentStreak(mine30, user.id);
+  // Newest confirmed first: the result card is the game that just counted.
+  const mine30 = (myMatches ?? []) as (StatMatch & PlayOrdered & { reporter: unknown; opponent: unknown })[];
+  // The same games as they were played (ruling S3-R7): the flame and the dots
+  // read "the last N", so a batch confirmed out of order can't misstate them.
+  const mineByPlay = [...mine30].sort(byPlayOrder);
+  const streak = currentStreak(mineByPlay, user.id);
   const streakLength = streak?.kind === "W" ? streak.length : 0;
 
   // The result card: the newest confirmed game in the last day, with what it
@@ -464,7 +469,7 @@ export default async function HomePage({
             meId={user.id}
             rating={rating}
             change={change}
-            form={formDots(mine30, user.id)}
+            form={formDots(mineByPlay, user.id)}
             played={played}
             level={level}
             xpNote={xpNote(level, xp.total)}

@@ -21,7 +21,29 @@ export function opponentOf(m: StatMatch, viewerId: string): string {
   return m.reporter_id === viewerId ? m.opponent_id : m.reporter_id;
 }
 
-// Matches must be newest-first (the order every page already queries in).
+export interface PlayOrdered {
+  id: string;
+  played_at: string;
+  created_at: string;
+}
+
+// The one play order (ruling S3-R7): newest first by played_at (the club
+// date), then created_at (when it was logged), then id, all descending. Every
+// "last N" and streak follows it, so a batch confirmed in a different order
+// than it was played still reads as the games were played. Sort a copy:
+// [...matches].sort(byPlayOrder). created_at compares as an instant, then as
+// text, which keeps PostgREST's microseconds in order.
+export function byPlayOrder(a: PlayOrdered, b: PlayOrdered): number {
+  if (a.played_at !== b.played_at) return a.played_at < b.played_at ? 1 : -1;
+  const ta = Date.parse(a.created_at);
+  const tb = Date.parse(b.created_at);
+  if (ta !== tb && !Number.isNaN(ta) && !Number.isNaN(tb)) return tb - ta;
+  if (a.created_at !== b.created_at) return a.created_at < b.created_at ? 1 : -1;
+  if (a.id !== b.id) return a.id < b.id ? 1 : -1;
+  return 0;
+}
+
+// Matches newest first in play order (byPlayOrder).
 export function currentStreak(
   newestFirst: StatMatch[],
   viewerId: string
@@ -176,7 +198,8 @@ export function seasonLabel(clubDate: string): string {
 }
 
 // The longest run of wins anywhere in the history (the live streak is
-// currentStreak; this is the record). Matches newest-first, confirmed only.
+// currentStreak; this is the record). Matches newest first in play order
+// (byPlayOrder), confirmed only.
 export function longestWinStreak(newestFirst: StatMatch[], viewerId: string): number {
   let best = 0;
   let run = 0;

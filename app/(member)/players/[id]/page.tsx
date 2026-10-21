@@ -25,7 +25,15 @@ import { fetchAllPages } from "@/lib/paging";
 import { formatShort } from "@/lib/race";
 import { rankOf, toRankRow } from "@/lib/ranking";
 import { loadOpenSeason } from "@/lib/season-data";
-import { bestWin, labelPlayedDate, longestWinStreak, peakRating, type StatMatch } from "@/lib/stats";
+import {
+  bestWin,
+  byPlayOrder,
+  labelPlayedDate,
+  longestWinStreak,
+  peakRating,
+  type PlayOrdered,
+  type StatMatch,
+} from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import {
@@ -53,7 +61,8 @@ interface PlayerRef {
 }
 
 type PlayerMatch = StatMatch &
-  YouMatch & {
+  YouMatch &
+  PlayOrdered & {
     race_to: number | null;
     spot: number;
     spot_to: string | null;
@@ -73,7 +82,7 @@ interface HistoryRow {
 }
 
 const MATCH_COLS =
-  "id, reporter_id, opponent_id, reporter_score, opponent_score, game_type, played_at, confirmed_at, winner_id, race_to, spot, spot_to, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, rating, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, rating, avatar_url, ball), rating_history(profile_id, rating_before)";
+  "id, reporter_id, opponent_id, reporter_score, opponent_score, game_type, played_at, created_at, confirmed_at, winner_id, race_to, spot, spot_to, rating_delta_reporter, rating_delta_opponent, reporter:profiles!matches_reporter_id_fkey(id, display_name, rating, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, rating, avatar_url, ball), rating_history(profile_id, rating_before)";
 
 const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
 
@@ -264,6 +273,10 @@ export default async function PlayerPage({
   const losses = games - wins;
   const rank = rankOf((board ?? []).map(toRankRow), id);
   const placing = games > 0 && games < PLACEMENT_GAMES;
+  // The derivations below read the games as they were played (ruling S3-R7),
+  // so "the last k", the form and the streaks hold when a batch is confirmed
+  // out of order; the match history list keeps its confirmed order.
+  const played = [...all].sort(byPlayOrder);
 
   // Everyone this member has played: names, faces and current ratings.
   const people = new Map<string, PlayerRef>();
@@ -275,7 +288,7 @@ export default async function PlayerPage({
   const nameOf = (pid: string) => people.get(pid)?.display_name ?? "Member";
   const ratingsById: Record<string, number> = Object.fromEntries([...people].map(([pid, p]) => [pid, p.rating]));
   const peak = peakRating(history, profile.rating);
-  const best = bestWin(all, id, ratingsById);
+  const best = bestWin(played, id, ratingsById);
 
   // The chart: Month · Season · All, Season only while one is open. An
   // unknown or stale ?range= (Season after it closed) falls back to the
@@ -301,13 +314,13 @@ export default async function PlayerPage({
   );
 
   // Form, where they win, rivals.
-  const dots = formDots(all, id, 10);
-  const streak = longestWinStreak(all, id);
+  const dots = formDots(played, id, 10);
+  const streak = longestWinStreak(played, id);
   const formNote = [formSummary(dots, isMe ? "your" : "their"), streak >= 2 ? `best streak ${streak}` : null]
     .filter(Boolean)
     .join(" · ");
-  const splits = gameSplits(all, id);
-  const vsRated = ratingSplits(all, id, ratingBefore);
+  const splits = gameSplits(played, id);
+  const vsRated = ratingSplits(played, id, ratingBefore);
   const whereRows = [
     ...splits.map((s) => ({ key: s.game, label: s.label, wins: s.wins, losses: s.losses, pct: s.pct as number | null })),
     ...(vsRated.higher.wins + vsRated.higher.losses > 0
@@ -317,11 +330,11 @@ export default async function PlayerPage({
       ? [{ key: "lower", label: "vs lower-rated", ...vsRated.lower, pct: null }]
       : []),
   ];
-  const rivalRows = rivals(all, id, 3);
+  const rivalRows = rivals(played, id, 3);
 
   // Someone else's page: your record against them, from your side.
   const together =
-    viewerId && !isMe ? all.filter((m) => m.reporter_id === viewerId || m.opponent_id === viewerId) : [];
+    viewerId && !isMe ? played.filter((m) => m.reporter_id === viewerId || m.opponent_id === viewerId) : [];
   const versus = viewerId && together.length > 0 ? rivals(together, viewerId, 1)[0] : null;
   const versusLine = versus ? rivalLine(versus, "You", first, today) : "You haven't played each other yet.";
 
@@ -333,7 +346,7 @@ export default async function PlayerPage({
   if (isMe) {
     const month = clubMonthName(nowIso);
     const thisMonth = all.filter((m) => m.played_at.slice(0, 7) === today.slice(0, 7));
-    const last = all.reduce<PlayerMatch | null>((a, m) => (!a || m.played_at > a.played_at ? m : a), null);
+    const last = played[0] ?? null;
     // Without the club's rows (a failed read) neither end is known, so the
     // sentence keeps its counts and drops the rank clause.
     const sentence = monthSentence({
@@ -361,7 +374,7 @@ export default async function PlayerPage({
     viewerId: id,
     rating: profile.rating,
     peak: peak.rating,
-    matches: all,
+    matches: played,
     opponentRatings: ratingsById,
     tournamentsWon: titles ?? 0,
     seasonsWon: seasonsWon ?? 0,

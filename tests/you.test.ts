@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { clubMonthStart } from "@/lib/events";
+import { formDots } from "@/lib/home";
 import { STARTING_RATING } from "@/lib/rating";
+import { byPlayOrder, longestWinStreak } from "@/lib/stats";
 import {
   bestWinMarker,
   chartAriaLabel,
@@ -122,6 +124,38 @@ describe("rivals", () => {
     expect(wlw.run).toBeNull();
     const single = rivals([match("a", true)], ME)[0];
     expect(single.run).toBeNull();
+  });
+});
+
+describe("a batch confirmed out of play order (ruling S3-R7)", () => {
+  // Played W, W, L against Sam (oldest to newest), then confirmed L first, so
+  // newest confirmed first the list is W, W, L.
+  const logged = (iWon: boolean, day: string) => ({
+    ...match("sam", iWon, "8ball", day),
+    created_at: `${day}T20:00:00Z`,
+    reporter_score: iWon ? 5 : 3,
+    opponent_score: iWon ? 3 : 5,
+  });
+  const w1 = logged(true, "2026-10-01");
+  const w2 = logged(true, "2026-10-02");
+  const l3 = logged(false, "2026-10-03");
+  const newestConfirmedFirst = [w1, w2, l3];
+  const played = [...newestConfirmedFirst].sort(byPlayOrder);
+
+  it("has no won-the-last-2 run: the newest game was a loss", () => {
+    expect(rivals(played, ME)[0].run).toBeNull();
+    expect(rivalLine(rivals(played, ME)[0], "You", "Sam", "2026-10-21")).toBe("Last played Sat, Oct 3");
+    // Confirmation order would have said "You've won the last 2".
+    expect(rivals(newestConfirmedFirst, ME)[0].run).toEqual({ k: 2, ownerWon: true });
+  });
+
+  it("ends the form dots W, W, L, the newest on the right", () => {
+    expect(formDots(played, ME, 10)).toEqual(["W", "W", "L"]);
+    expect(formSummary(formDots(played, ME, 10))).toBe("won 2 of your last 3");
+  });
+
+  it("still counts the best streak as played", () => {
+    expect(longestWinStreak(played, ME)).toBe(2);
   });
 });
 

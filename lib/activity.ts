@@ -22,9 +22,18 @@ export function badgeMoment(before: LevelInfo, after: LevelInfo): { title: Title
   return { title: after.title, level: after.level };
 }
 
-export function streakMoment(newestFirst: StatMatch[], winnerId: string): { length: number } | null {
-  const s = currentStreak(newestFirst, winnerId);
+// The winner's current run at a mark, from their games newest first in play
+// order (byPlayOrder, ruling S3-R7). With matchId (the game just confirmed),
+// only when that game is part of the run: a game confirmed late that was
+// played before the run is not what made it, and must not carry its moment.
+export function streakMoment(
+  playOrder: StatMatch[],
+  winnerId: string,
+  matchId?: string
+): { length: number } | null {
+  const s = currentStreak(playOrder, winnerId);
   if (!s || s.kind !== "W" || !isStreakMark(s.length)) return null;
+  if (matchId !== undefined && !playOrder.slice(0, s.length).some((m) => m.id === matchId)) return null;
   return { length: s.length };
 }
 

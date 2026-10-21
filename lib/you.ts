@@ -2,7 +2,8 @@
 // stage 3): the form note, where you win per game, how you do against higher-
 // and lower-rated opponents, your rivals, the month in one sentence, your rank
 // at an instant and the rating chart's series and copy. Pure, so vitest covers
-// every branch. Match lists are newest first.
+// every branch. Match lists are newest first in play order (lib/stats
+// byPlayOrder, ruling S3-R7), so "the last k" means the games as played.
 
 import { shortClubDate } from "@/lib/events";
 import { firstName } from "@/lib/home";

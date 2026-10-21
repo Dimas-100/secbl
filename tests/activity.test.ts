@@ -38,6 +38,14 @@ describe("streakMoment", () => {
     expect(streakMoment([m("b", "a", 4), ...three], "a")).toBeNull(); // just lost
     expect(streakMoment([], "a")).toBeNull();
   });
+  it("only credits the game just confirmed when it is part of the run", () => {
+    // Play order, newest first: three wins after a loss. A win from before
+    // that loss, confirmed late, did not make the run (ruling S3-R7).
+    const run = [m("a", "b", 6), m("a", "c", 5), m("a", "d", 4), m("e", "a", 3)];
+    expect(streakMoment(run, "a", "m5")).toEqual({ length: 3 });
+    expect(streakMoment([...run, m("a", "f", 2)], "a", "m2")).toBeNull();
+    expect(streakMoment(run, "a", "m6")).toEqual({ length: 3 });
+  });
 });
 
 describe("passMoment", () => {

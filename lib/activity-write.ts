@@ -8,7 +8,7 @@ import { clubWeekOf } from "@/lib/events";
 import { levelFromXp, xpFromMatches } from "@/lib/levels";
 import { fetchAllPages } from "@/lib/paging";
 import { boardBefore, toRankRow, type RankRow } from "@/lib/ranking";
-import type { StatMatch } from "@/lib/stats";
+import { byPlayOrder, type PlayOrdered, type StatMatch } from "@/lib/stats";
 import { loadXpMatches } from "@/lib/xp-data";
 
 export async function recordMatchMoments(service: SupabaseClient, matchId: string): Promise<void> {
@@ -37,16 +37,20 @@ export async function recordMatchMoments(service: SupabaseClient, matchId: strin
       if (badge) rows.push({ kind: "badge", actor_id: pid, match_id: matchId, data: badge });
     }
 
-    // Streak: the winner's run, newest first.
+    // Streak: the winner's run as the games were played (ruling S3-R7). The
+    // query's order picks the newest 60 by play; byPlayOrder is the one
+    // definition of that order, so the run is read through it.
     const { data: hist } = await service
       .from("matches")
-      .select("id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, confirmed_at")
+      .select("id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, confirmed_at, played_at, created_at")
       .eq("status", "confirmed")
       .or(`reporter_id.eq.${winner},opponent_id.eq.${winner}`)
-      .order("confirmed_at", { ascending: false })
+      .order("played_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(60);
-    const streak = streakMoment((hist ?? []) as StatMatch[], winner);
+    const played = ((hist ?? []) as (StatMatch & PlayOrdered)[]).sort(byPlayOrder);
+    const streak = streakMoment(played, winner, matchId);
     if (streak) rows.push({ kind: "streak", actor_id: winner, match_id: matchId, data: streak });
 
     // Pass: the ladder with this match taken back out (boardBefore) vs the
