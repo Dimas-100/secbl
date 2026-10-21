@@ -41,7 +41,8 @@ describe("streakMoment", () => {
 });
 
 describe("passMoment", () => {
-  const board = (ratings: Record<string, number>) => Object.entries(ratings).map(([id, rating]) => ({ id, rating }));
+  const board = (ratings: Record<string, number>) =>
+    Object.entries(ratings).map(([id, rating]) => ({ id, rating, wins: 1, losses: 0 }));
   it("names the highest player jumped and the new rank", () => {
     const before = board({ a: 600, b: 550, c: 540, d: 500 });
     const after = board({ a: 600, b: 550, c: 540, d: 560 });
@@ -56,5 +57,22 @@ describe("passMoment", () => {
     const after = { ...big, [last]: big[`p${PASS_TOP}`] + 1 }; // climbs to #11
     expect(passMoment(board(big), board(after), last)).toBeNull();
     expect(passMoment(board({ a: 600 }), board({ a: 600 }), "zz")).toBeNull();
+  });
+  it("is null when the winner only jumps members who have not played", () => {
+    const row = (id: string, rating: number, wins: number, losses = 0) => ({ id, rating, wins, losses });
+    const before = [row("a", 600, 3), row("w", 440, 0, 1), row("u", 450, 0, 0)];
+    const after = [row("a", 600, 3), row("w", 470, 1, 1), row("u", 450, 0, 0)];
+    expect(passMoment(before, after, "w")).toBeNull();
+  });
+  it("orders members at the same rating by wins", () => {
+    const row = (id: string, rating: number, wins: number, losses = 0) => ({ id, rating, wins, losses });
+    // Before: a (5 wins) and w (1 win) share 500, so a is #1 and w #2. w wins and
+    // ends on 520, the new #1.
+    const before = [row("a", 500, 5), row("w", 500, 0, 1)];
+    const after = [row("a", 500, 5), row("w", 520, 1, 1)];
+    expect(passMoment(before, after, "w")).toEqual({ rank: 1, otherId: "a" });
+    // Same rating after the match: wins decide, so w (2 wins) stays below a (5 wins).
+    const tied = [row("a", 500, 5), row("w", 500, 2, 1)];
+    expect(passMoment(before, tied, "w")).toBeNull();
   });
 });

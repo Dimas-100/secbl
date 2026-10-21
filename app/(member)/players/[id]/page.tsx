@@ -20,6 +20,7 @@ import { ACHIEVEMENTS, earnedAchievements } from "@/lib/achievements";
 import { GAME_LABEL } from "@/lib/identity";
 import { nextBadge, xpCaption } from "@/lib/levels";
 import { formatShort } from "@/lib/race";
+import { rankOf } from "@/lib/ranking";
 import { createClient } from "@/lib/supabase/server";
 import { startDm } from "@/app/(member)/chat/actions";
 import { clubDateOf } from "@/lib/events";
@@ -29,7 +30,6 @@ import {
   headToHead,
   labelPlayedDate,
   longestWinStreak,
-  overallRank,
   peakRating,
   ratingChangeSince,
   winRate,
@@ -108,7 +108,7 @@ export default async function PlayerPage({
         .order("confirmed_at", { ascending: false })
         .limit(50),
       supabase.from("leaderboard").select("wins, losses").eq("id", id).maybeSingle(),
-      supabase.from("leaderboard").select("id"),
+      supabase.from("leaderboard").select("id, rating, wins, losses"),
       // Tournament titles: finals are the matches whose winner advances nowhere.
       supabase
         .from("tournament_matches")
@@ -123,7 +123,15 @@ export default async function PlayerPage({
   const wins = Number(boardRow?.wins ?? 0);
   const losses = Number(boardRow?.losses ?? 0);
   const rate = winRate(wins, losses);
-  const rank = overallRank(board ?? [], id);
+  const rank = rankOf(
+    (board ?? []).map((r) => ({
+      id: r.id as string,
+      rating: Number(r.rating),
+      wins: Number(r.wins),
+      losses: Number(r.losses),
+    })),
+    id
+  );
   const bestStreak = longestWinStreak(all, id);
   const peak = peakRating(history ?? [], profile.rating);
   const change = ratingChangeSince(history ?? [], monthAgo, profile.rating);

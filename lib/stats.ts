@@ -175,12 +175,6 @@ export function seasonLabel(clubDate: string): string {
   return `${name} ${year}`;
 }
 
-// 1-based position in a rating-ordered board; null when the member has no row.
-export function overallRank(board: { id: string }[], id: string): number | null {
-  const i = board.findIndex((r) => r.id === id);
-  return i === -1 ? null : i + 1;
-}
-
 // The longest run of wins anywhere in the history (the live streak is
 // currentStreak; this is the record). Matches newest-first, confirmed only.
 export function longestWinStreak(newestFirst: StatMatch[], viewerId: string): number {

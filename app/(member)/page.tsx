@@ -30,9 +30,10 @@ import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
 import type { TitleName } from "@/lib/levels";
 import { formatLabel } from "@/lib/race";
+import { rankOf, type RankRow } from "@/lib/ranking";
 import { seasonCountdownLabel, seasonStrip } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
-import { currentStreak, overallRank, ratingChangeSince, seasonLabel, winRate, type StatMatch } from "@/lib/stats";
+import { currentStreak, ratingChangeSince, seasonLabel, winRate, type StatMatch } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { loadXp } from "@/lib/xp-data";
 import type { RsvpResponse } from "@/lib/types";
@@ -82,7 +83,7 @@ export default async function HomePage({
       .single(),
     // Rank, wins and losses come from the same view the leaderboard renders,
     // so the home block can never disagree with the Ranks tab.
-    supabase.from("leaderboard").select("id, wins, losses"),
+    supabase.from("leaderboard").select("id, rating, wins, losses, display_name"),
     supabase
       .from("rating_history")
       .select("rating_before, rating_after, created_at")
@@ -238,11 +239,17 @@ export default async function HomePage({
   const played = me?.matches_played ?? 0;
   const provisional = played < 10;
 
-  const myRow = (board ?? []).find((r) => r.id === user.id);
-  const wins = Number(myRow?.wins ?? 0);
-  const losses = Number(myRow?.losses ?? 0);
+  const rankRows: RankRow[] = (board ?? []).map((r) => ({
+    id: r.id as string,
+    rating: Number(r.rating),
+    wins: Number(r.wins),
+    losses: Number(r.losses),
+  }));
+  const myRow = rankRows.find((r) => r.id === user.id);
+  const wins = myRow?.wins ?? 0;
+  const losses = myRow?.losses ?? 0;
   const rate = winRate(wins, losses);
-  const rank = overallRank(board ?? [], user.id);
+  const rank = rankOf(rankRows, user.id);
 
   const chronological = [...(history ?? [])].reverse();
   const ratings =

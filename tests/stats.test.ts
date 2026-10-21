@@ -7,7 +7,6 @@ import {
   labelPlayedDate,
   longestWinStreak,
   movementSince,
-  overallRank,
   peakRating,
   ratingChangeSince,
   seasonLabel,
@@ -161,17 +160,6 @@ describe("seasonLabel", () => {
     expect(seasonLabel("2027-01-15")).toBe("Spring 2027");
     expect(seasonLabel("2027-05-31")).toBe("Spring 2027");
     expect(seasonLabel("2027-06-10")).toBe("Summer 2027");
-  });
-});
-
-describe("overallRank", () => {
-  const board = [{ id: "a" }, { id: "b" }, { id: "c" }];
-  it("is the 1-based position in the ordered board", () => {
-    expect(overallRank(board, "b")).toBe(2);
-  });
-  it("is null for a member with no row (no confirmed matches yet)", () => {
-    expect(overallRank(board, "zed")).toBeNull();
-    expect(overallRank([], "a")).toBeNull();
   });
 });
 

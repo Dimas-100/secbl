@@ -3,10 +3,11 @@
 // Runs after the confirmation is saved and never throws — a missing moment
 // must not fail a result, exactly like push.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { badgeMoment, passMoment, streakMoment, type BoardRow } from "@/lib/activity";
+import { badgeMoment, passMoment, streakMoment } from "@/lib/activity";
 import { clubWeekOf } from "@/lib/events";
 import { levelFromXp, xpFromMatches } from "@/lib/levels";
 import { fetchAllPages } from "@/lib/paging";
+import type { RankRow } from "@/lib/ranking";
 import type { StatMatch } from "@/lib/stats";
 import { loadXpMatches } from "@/lib/xp-data";
 
@@ -48,22 +49,39 @@ export async function recordMatchMoments(service: SupabaseClient, matchId: strin
     const streak = streakMoment((hist ?? []) as StatMatch[], winner);
     if (streak) rows.push({ kind: "streak", actor_id: winner, match_id: matchId, data: streak });
 
-    // Pass: the ladder with both players' pre-match ratings vs the ladder now.
-    const board = await fetchAllPages<BoardRow>((from, to) =>
+    // Pass: the ladder with this match taken back out vs the ladder now. The
+    // leaderboard view already counts the confirmed match, so the "before" board
+    // uses both players' pre-match ratings, the winner's wins - 1 and the
+    // loser's losses - 1 (lib/ranking.ts decides who holds a rank).
+    const board = await fetchAllPages<RankRow>((from, to) =>
       service
-        .from("profiles")
-        .select("id, rating")
-        .eq("status", "approved")
+        .from("leaderboard")
+        .select("id, rating, wins, losses")
         .order("id")
         .range(from, to)
-        .then(({ data }) => (data ?? []) as BoardRow[])
+        .then(({ data }) =>
+          (data ?? []).map((r) => ({
+            id: r.id as string,
+            rating: Number(r.rating),
+            wins: Number(r.wins),
+            losses: Number(r.losses),
+          }))
+        )
     );
     const { data: hrows } = await service
       .from("rating_history")
       .select("profile_id, rating_before")
       .eq("match_id", matchId);
     const beforeRating = new Map((hrows ?? []).map((h) => [h.profile_id as string, h.rating_before as number]));
-    const before = board.map((p) => (beforeRating.has(p.id) ? { id: p.id, rating: beforeRating.get(p.id)! } : p));
+    const before = board.map((p) => {
+      if (!beforeRating.has(p.id)) return p;
+      return {
+        id: p.id,
+        rating: beforeRating.get(p.id)!,
+        wins: p.id === winner ? p.wins - 1 : p.wins,
+        losses: p.id === winner ? p.losses : p.losses - 1,
+      };
+    });
     const pass = passMoment(before, board, winner);
     if (pass) {
       rows.push({ kind: "pass", actor_id: winner, other_id: pass.otherId, match_id: matchId, data: { rank: pass.rank } });
