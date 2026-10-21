@@ -1,6 +1,6 @@
 // A per-tab trail of the pages a member has visited, kept in sessionStorage
 // by NavHistory (entries are pathname + search) so a sub-page's Back control can return to where they came
-// from (spec 2026-10-21-play-and-progress §6). Pure helpers; no storage here.
+// from (spec 2026-10-21-play-and-progress §9). Pure helpers; no storage here.
 
 export const NAV_KEY = "secbl:nav";
 export const NAV_MAX = 50;
