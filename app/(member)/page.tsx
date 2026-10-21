@@ -14,6 +14,7 @@ import { NightCard } from "@/components/night-card";
 import { loadNight } from "@/lib/night-data";
 import { NotifyPrompt } from "@/components/notify-prompt";
 import { ProgressCard } from "@/components/progress-card";
+import { ResumeGameCard } from "@/components/resume-game-card";
 import { SectionHeading } from "@/components/section-heading";
 import { ShowMore } from "@/components/show-more";
 import { StreakFlame } from "@/components/streak-flame";
@@ -26,17 +27,17 @@ import { talkSummary, type LiveComment } from "@/lib/table-talk";
 import { freshMatch, headline } from "@/lib/celebration";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { FEED_SELECT, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
-import { facesEyebrow, formDots, nextLine, xpNote } from "@/lib/home";
+import { confirmMeta, facesEyebrow, formDots, nextLine, xpNote } from "@/lib/home";
 import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
-import { GAME_LABEL, greetingFor } from "@/lib/identity";
+import { greetingFor } from "@/lib/identity";
 import { nextBadge, type TitleName } from "@/lib/levels";
+import { myNightStatus } from "@/lib/night";
 import { playFaces } from "@/lib/play";
-import { formatLabel } from "@/lib/race";
 import { aboveOf, leadOf, toRankRow, type RankRow } from "@/lib/ranking";
 import { seasonCountdownLabel, seasonStrip } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
 import { currentStreak, ratingChangeSince, type StatMatch } from "@/lib/stats";
-import { cn } from "@/lib/utils";
+import { cn, GOLD_EDGE } from "@/lib/utils";
 import { loadXp } from "@/lib/xp-data";
 import type { RsvpResponse } from "@/lib/types";
 
@@ -164,6 +165,9 @@ export default async function HomePage({
     loadNight(supabase, user.id, now),
   ]);
   const flaggable = (agreedForMe ?? []).filter((m) => canFlag(m, user.id, now));
+  // Called to a table tonight: that card joins what needs you at the top; out
+  // of the line or waiting in it, the night stays further down.
+  const atTable = myNightStatus(nightData.night, nightData.line, nightData.tables, user.id, now).kind === "playing";
   const mine30 = (myMatches ?? []) as (StatMatch & { reporter: unknown; opponent: unknown })[];
   const streak = currentStreak(mine30, user.id);
   const streakLength = streak?.kind === "W" ? streak.length : 0;
@@ -331,37 +335,113 @@ export default async function HomePage({
       {message && <p className="bg-card rounded-2xl p-3 text-sm">{message}</p>}
       {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
       {celebration && <CelebrationCard {...celebration} />}
+
+      {/* What needs you (spec §2), gold-edged, before anything else. The
+          resume card renders on the client, so an empty stack hides itself. */}
+      <div className="flex flex-col gap-6 empty:hidden">
+        {(toConfirm ?? []).length > 0 && (
+          <section className="flex flex-col gap-2.5">
+            <h2 className="eyebrow">Confirm results</h2>
+            {(toConfirm ?? []).map((m) => {
+              const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
+              const name = reporter?.display_name ?? "Member";
+              return (
+                <div key={m.id} className={cn(GOLD_EDGE, "flex flex-col gap-3.5")}>
+                  <div className="flex items-center gap-3">
+                    <Avatar person={reporter ?? { id: "unknown", display_name: null }} size="md" />
+                    <div className="flex min-w-0 flex-col gap-[3px]">
+                      <p className="truncate text-[15px] leading-tight">
+                        <span className="font-medium">{name}</span> logged a game
+                      </p>
+                      <p className="text-muted-foreground truncate text-[12px] leading-tight">
+                        {confirmMeta({
+                          reporterName: name,
+                          reporterWon: m.winner_id === reporter?.id,
+                          reporterScore: m.reporter_score,
+                          opponentScore: m.opponent_score,
+                          gameType: m.game_type,
+                          raceTo: m.race_to,
+                          spot: m.spot,
+                          spotToMe: m.spot_to === user.id,
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {/* Disabled while in flight: a double tap must not send it twice. */}
+                    <form action={rejectMatch} className="flex-1">
+                      <input type="hidden" name="match_id" value={m.id} />
+                      <SubmitButton variant="ghost" className="w-full" pendingChildren="Sending…">
+                        Not right
+                      </SubmitButton>
+                    </form>
+                    <form action={confirmMatch} className="flex-1">
+                      <input type="hidden" name="match_id" value={m.id} />
+                      <SubmitButton className="w-full" pendingChildren="Confirming…">
+                        Confirm
+                      </SubmitButton>
+                    </form>
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        )}
+
+        {atTable && (
+          <section className="flex flex-col gap-2.5">
+            <h2 className="eyebrow">Your table</h2>
+            <div className={GOLD_EDGE}>
+              <NightCard data={nightData} meId={user.id} back="/" now={now} />
+            </div>
+          </section>
+        )}
+
+        {flaggable.length > 0 && (
+          <section className="flex flex-col gap-2.5">
+            <h2 className="eyebrow">Logged for you</h2>
+            {flaggable.map((m) => {
+              const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
+              const theyWon = m.winner_id === reporter?.id;
+              return (
+                <ListRow
+                  key={m.id}
+                  className={cn(GOLD_EDGE, "border-b-0")}
+                  leading={<Avatar person={reporter ?? { id: "unknown", display_name: null }} size="md" />}
+                  title={
+                    <>
+                      {reporter?.display_name ?? "Member"} · {theyWon ? "beat you" : "lost to you"}{" "}
+                      <span className="stat-number">
+                        {m.reporter_score}–{m.opponent_score}
+                      </span>
+                    </>
+                  }
+                  meta={`Counted · flag until ${flagDeadlineLabel(m.confirmed_at!, now)}`}
+                  trailing={
+                    <form action={disputeAgreedMatch}>
+                      <input type="hidden" name="match_id" value={m.id} />
+                      {/* Disabled while in flight: a double tap must not send two flags. */}
+                      <SubmitButton
+                        variant="link"
+                        size="xs"
+                        className="text-muted-foreground px-0 text-[13px] font-normal no-underline"
+                        pendingChildren="Flagging…"
+                      >
+                        Not right?
+                      </SubmitButton>
+                    </form>
+                  }
+                />
+              );
+            })}
+          </section>
+        )}
+
+        <ResumeGameCard meId={user.id} />
+      </div>
+
       <NotifyPrompt />
       <LiveHome />
-
-      {nightData.night && (
-        <section className="flex flex-col gap-3">
-          <Link href="/night" className="eyebrow press flex items-center gap-2">
-            <span aria-hidden="true" className="bg-win size-2 rounded-full motion-safe:animate-pulse" />
-            Club night
-            <ChevronRight className="ml-auto size-4" strokeWidth={1.7} aria-hidden="true" />
-          </Link>
-          <div className="bg-card rounded-[20px] p-4 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
-            <NightCard data={nightData} meId={user.id} back="/" now={now} />
-          </div>
-        </section>
-      )}
-
-      {live.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <span className="eyebrow flex items-center gap-2">
-            <span aria-hidden="true" className="bg-win motion-safe:animate-pulse size-2 rounded-full" />
-            Live now
-          </span>
-          <ShowMore
-            initial={LIVE_SHOWN}
-            label="Show {hidden} more tables"
-            items={live.map((g) => (
-              <LiveGameCard key={g.reporter_id} row={g} viewerId={user.id} talk={talkByGame.get(g.id as string)} />
-            ))}
-          />
-        </section>
-      )}
 
       <section className="flex flex-col gap-3">
         {played === 0 ? (
@@ -395,95 +475,6 @@ export default async function HomePage({
         )}
       </section>
 
-      {(toConfirm ?? []).length > 0 && (
-        <section className="flex flex-col gap-1.5">
-          <SectionHeading>Confirm results</SectionHeading>
-          {(toConfirm ?? []).map((m) => {
-            const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
-            const theyWon = m.winner_id === reporter?.id;
-            return (
-              <ListRow
-                key={m.id}
-                leading={<Avatar person={reporter ?? { id: "unknown", display_name: null }} size="md" />}
-                title={
-                  <>
-                    {reporter?.display_name ?? "Member"} · {theyWon ? "beat you" : "lost to you"}{" "}
-                    <span className="stat-number">
-                      {m.reporter_score}–{m.opponent_score}
-                    </span>
-                  </>
-                }
-                meta={[
-                  GAME_LABEL[m.game_type] ?? m.game_type,
-                  formatLabel(
-                    m.race_to,
-                    m.spot,
-                    m.spot_to === user.id ? "you" : (reporter?.display_name ?? "them").split(" ")[0]
-                  ),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-                trailing={
-                  <span className="flex items-center gap-4 text-[13px]">
-                    <form action={rejectMatch}>
-                      <input type="hidden" name="match_id" value={m.id} />
-                      <button type="submit" className="text-muted-foreground press">
-                        Reject
-                      </button>
-                    </form>
-                    <form action={confirmMatch}>
-                      <input type="hidden" name="match_id" value={m.id} />
-                      <button type="submit" className="text-brass press font-medium">
-                        Confirm
-                      </button>
-                    </form>
-                  </span>
-                }
-              />
-            );
-          })}
-        </section>
-      )}
-
-      {flaggable.length > 0 && (
-        <section className="flex flex-col gap-1.5">
-          <SectionHeading>Logged for you</SectionHeading>
-          {flaggable.map((m) => {
-            const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
-            const theyWon = m.winner_id === reporter?.id;
-            return (
-              <ListRow
-                key={m.id}
-                leading={<Avatar person={reporter ?? { id: "unknown", display_name: null }} size="md" />}
-                title={
-                  <>
-                    {reporter?.display_name ?? "Member"} · {theyWon ? "beat you" : "lost to you"}{" "}
-                    <span className="stat-number">
-                      {m.reporter_score}–{m.opponent_score}
-                    </span>
-                  </>
-                }
-                meta={`Counted · flag until ${flagDeadlineLabel(m.confirmed_at!, now)}`}
-                trailing={
-                  <form action={disputeAgreedMatch}>
-                    <input type="hidden" name="match_id" value={m.id} />
-                    {/* Disabled while in flight: a double tap must not send two flags. */}
-                    <SubmitButton
-                      variant="link"
-                      size="xs"
-                      className="text-muted-foreground px-0 text-[13px] font-normal no-underline"
-                      pendingChildren="Flagging…"
-                    >
-                      Not right?
-                    </SubmitButton>
-                  </form>
-                }
-              />
-            );
-          })}
-        </section>
-      )}
-
       {(awaiting ?? []).length > 0 && (
         <section className="flex flex-col gap-1.5">
           <SectionHeading>Waiting on</SectionHeading>
@@ -498,6 +489,35 @@ export default async function HomePage({
               />
             );
           })}
+        </section>
+      )}
+
+      {nightData.night && !atTable && (
+        <section className="flex flex-col gap-3">
+          <Link href="/night" className="eyebrow press flex items-center gap-2">
+            <span aria-hidden="true" className="bg-win size-2 rounded-full motion-safe:animate-pulse" />
+            Club night
+            <ChevronRight className="ml-auto size-4" strokeWidth={1.7} aria-hidden="true" />
+          </Link>
+          <div className="bg-card rounded-[20px] p-4 shadow-[inset_0_0_0_1px_var(--hairline-row)]">
+            <NightCard data={nightData} meId={user.id} back="/" now={now} />
+          </div>
+        </section>
+      )}
+
+      {live.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <span className="eyebrow flex items-center gap-2">
+            <span aria-hidden="true" className="bg-win motion-safe:animate-pulse size-2 rounded-full" />
+            Live now
+          </span>
+          <ShowMore
+            initial={LIVE_SHOWN}
+            label="Show {hidden} more tables"
+            items={live.map((g) => (
+              <LiveGameCard key={g.reporter_id} row={g} viewerId={user.id} talk={talkByGame.get(g.id as string)} />
+            ))}
+          />
         </section>
       )}
 

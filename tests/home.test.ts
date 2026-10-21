@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PLACEMENT_GAMES, facesEyebrow, formDots, nextLine, placementLeft, xpNote } from "@/lib/home";
+import { PLACEMENT_GAMES, confirmMeta, facesEyebrow, formDots, nextLine, placementLeft, xpNote } from "@/lib/home";
 import { levelFromXp, xpToNext, xpToReach } from "@/lib/levels";
 
 const placed = { played: 15, above: null, lead: null, badge: null };
@@ -123,5 +123,41 @@ describe("xpNote", () => {
     const level = levelFromXp(total);
     expect(level.title).toBe("Legend");
     expect(xpNote(level, total)).toBe(`300 / ${xpToNext(40)} XP`);
+  });
+});
+
+describe("confirmMeta", () => {
+  const game = {
+    reporterName: "Jordan Lee",
+    reporterWon: true,
+    reporterScore: 5,
+    opponentScore: 3,
+    gameType: "8ball",
+    raceTo: 5,
+    spot: 0,
+    spotToMe: false,
+  };
+
+  it("names the reporter by first name when they won", () => {
+    expect(confirmMeta(game)).toBe("Jordan won 5–3 · 8-ball · Race to 5");
+  });
+
+  it("reads You when the confirmer won, high score first", () => {
+    expect(confirmMeta({ ...game, reporterWon: false, reporterScore: 2, opponentScore: 5 })).toBe(
+      "You won 5–2 · 8-ball · Race to 5"
+    );
+  });
+
+  it("says who got the spot", () => {
+    expect(confirmMeta({ ...game, raceTo: 3, spot: 1, spotToMe: true, reporterScore: 3, opponentScore: 1 })).toBe(
+      "Jordan won 3–1 · 8-ball · Race to 3 · 1 on the wire to you"
+    );
+    expect(confirmMeta({ ...game, spot: 2, spotToMe: false })).toBe(
+      "Jordan won 5–3 · 8-ball · Race to 5 · 2 on the wire to Jordan"
+    );
+  });
+
+  it("leaves the format out for open play and keeps an unknown game as is", () => {
+    expect(confirmMeta({ ...game, raceTo: null, gameType: "straight" })).toBe("Jordan won 5–3 · straight");
   });
 });

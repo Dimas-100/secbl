@@ -3,10 +3,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { PlacementRow } from "@/components/progress-card";
-
-// The gold edge: a brass hairline over a faint brass wash, for what needs you.
-export const GOLD_EDGE =
-  "rounded-[20px] p-4 bg-[color-mix(in_srgb,var(--brass)_8%,var(--card))] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brass)_55%,transparent)]";
+import { GOLD_EDGE } from "@/lib/utils";
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 

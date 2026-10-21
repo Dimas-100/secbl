@@ -108,3 +108,25 @@ export async function loadPlaySheet(resumeOpponentId: string | null): Promise<Pl
 
   return { night, faces, resume };
 }
+
+// The opponent of the scoreboard draft Home's resume card found in
+// localStorage (spec §2). The id comes from the client, so only an approved
+// member's profile comes back; anything else, or no session, is null and the
+// card stays hidden.
+export async function draftOpponent(id: string): Promise<PlayPerson | null> {
+  if (typeof id !== "string" || !UUID_RE.test(id)) return null;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, display_name, avatar_url, ball")
+    .eq("id", id)
+    .eq("status", "approved")
+    .maybeSingle();
+  return data
+    ? { id: data.id, display_name: data.display_name, avatar_url: data.avatar_url, ball: data.ball }
+    : null;
+}

@@ -1,8 +1,11 @@
 // Home's copy decisions (spec 2026-10-21-play-and-progress §2), kept pure so
 // vitest covers every branch: placement, the last-five dots, the XP note and
-// the one Next line on the progress card.
+// the one Next line on the progress card, and the line under a result to
+// confirm.
 
+import { GAME_LABEL } from "@/lib/identity";
 import { nextBadge, type LevelInfo } from "@/lib/levels";
+import { formatLabel } from "@/lib/race";
 
 // Confirmed games before a rating counts as set ("placement").
 export const PLACEMENT_GAMES = 10;
@@ -71,4 +74,30 @@ export function xpNote(level: LevelInfo, xpTotal: number): string {
   const badge = nextBadge(level, xpTotal);
   if (!badge) return `${level.intoLevel} / ${level.needed} XP`;
   return `${xpCount(badge.xpToGo)} XP to ${badge.title}`;
+}
+
+// Under "{name} logged a game" in Home's needs-you stack: who won and how,
+// from the confirmer's side. The winner is the reporter's first name or You,
+// the score high–low, then the game and the race as the confirm row always
+// showed them; open play has no race.
+export function confirmMeta(m: {
+  reporterName: string;
+  reporterWon: boolean;
+  reporterScore: number;
+  opponentScore: number;
+  gameType: string;
+  raceTo: number | null;
+  spot: number;
+  spotToMe: boolean;
+}): string {
+  const reporter = firstName(m.reporterName);
+  const hi = Math.max(m.reporterScore, m.opponentScore);
+  const lo = Math.min(m.reporterScore, m.opponentScore);
+  return [
+    `${m.reporterWon ? reporter : "You"} won ${hi}–${lo}`,
+    GAME_LABEL[m.gameType] ?? m.gameType,
+    formatLabel(m.raceTo, m.spot, m.spotToMe ? "you" : reporter),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
