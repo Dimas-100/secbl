@@ -7,9 +7,11 @@ test.afterEach(cleanupTracked);
 // Spec 2026-10-21-play-and-progress §5–§6: your own page tells the story of
 // your pool from match results, and someone else's page adds your record
 // against them. The test users live in a school with no approved real
-// members, so the club never sees them. The one game is confirmed on Home
-// (the real confirmMatch path: ratings and history written, no live table);
-// Play links are checked by their href, never clicked.
+// members, so no real member's school lists them. The one game is confirmed
+// on Home (the real confirmMatch path: ratings and history written, no live
+// table), so while the test runs that game is visible league-wide (Ranks, the
+// feed), as in report-race; cleanupTracked removes it with the users. Play
+// links are checked by their href, never clicked.
 test("the You page shows your progress; someone else's page shows you vs them", async ({ page }) => {
   test.setTimeout(180_000);
   const stamp = Date.now();
