@@ -86,6 +86,64 @@ const card = "bg-card rounded-[20px] shadow-[inset_0_0_0_1px_var(--hairline-row)
 // game the database stamped a moment ahead of this server's clock still counts.
 const ALL_SO_FAR = "9999-12-31T23:59:59.999Z";
 
+// One page of rows, or a thrown error (ruling S3-R6): a failed read must never
+// pass for "no games", or the page would say something untrue with confidence.
+function rowsOrThrow<T>(
+  { data, error }: { data: unknown; error: { message: string } | null },
+  what: string
+): T[] {
+  if (error) throw new Error(`player page: couldn't read ${what}: ${error.message}`);
+  return (data ?? []) as T[];
+}
+
+interface ClubRows {
+  matches: { reporter_id: string; opponent_id: string; winner_id: string; confirmed_at: string | null }[];
+  history: { profile_id: string; rating_after: number; created_at: string }[];
+  memberIds: string[];
+}
+
+// Your own page only: the club's confirmed games, rating history and members,
+// to replay your rank at the month start and now (ruling S3-R3: both ends from
+// the same rows, so "You climbed" compares like with like). null when any read
+// fails: the month sentence then drops its rank clause instead of inventing
+// one, and the rest of the page still renders.
+async function loadClubRows(supabase: Awaited<ReturnType<typeof createClient>>): Promise<ClubRows | null> {
+  try {
+    const [matches, history, members] = await Promise.all([
+      fetchAllPages<ClubRows["matches"][number]>((from, to) =>
+        supabase
+          .from("matches")
+          .select("reporter_id, opponent_id, winner_id, confirmed_at")
+          .eq("status", "confirmed")
+          .order("id")
+          .range(from, to)
+          .then((res) => rowsOrThrow<ClubRows["matches"][number]>(res, "the club's matches"))
+      ),
+      fetchAllPages<ClubRows["history"][number]>((from, to) =>
+        supabase
+          .from("rating_history")
+          .select("profile_id, rating_after, created_at")
+          .order("id")
+          .range(from, to)
+          .then((res) => rowsOrThrow<ClubRows["history"][number]>(res, "the club's rating history"))
+      ),
+      fetchAllPages<{ id: string }>((from, to) =>
+        supabase
+          .from("profiles")
+          .select("id")
+          .eq("status", "approved")
+          .order("id")
+          .range(from, to)
+          .then((res) => rowsOrThrow<{ id: string }>(res, "the club's members"))
+      ),
+    ]);
+    return { matches, history, memberIds: members.map((m) => m.id) };
+  } catch (err) {
+    console.error("player page: couldn't replay the club's ranks", err);
+    return null;
+  }
+}
+
 // "#3" in the month sentence reads in brass, as in the approved mockup.
 function brassRanks(text: string) {
   return text.split(/(#\d+)/).map((part, i) =>
@@ -144,9 +202,7 @@ export default async function PlayerPage({
     { count: seasonsWon },
     { xp, level },
     openSeason,
-    clubMatches,
-    clubHistory,
-    memberIds,
+    club,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -157,6 +213,7 @@ export default async function PlayerPage({
       .maybeSingle(),
     // Every confirmed game, newest first, each with both players' ratings
     // going in (paged: PostgREST caps a response at the project's max rows).
+    // A failed page throws to the error boundary (ruling S3-R6).
     fetchAllPages<PlayerMatch>((from, to) =>
       supabase
         .from("matches")
@@ -166,7 +223,7 @@ export default async function PlayerPage({
         .order("confirmed_at", { ascending: false })
         .order("id", { ascending: false })
         .range(from, to)
-        .then(({ data }) => (data ?? []) as unknown as PlayerMatch[])
+        .then((res) => rowsOrThrow<PlayerMatch>(res, "the member's matches"))
     ),
     // The member's whole rating line, oldest first, for the chart and peak.
     fetchAllPages<HistoryRow>((from, to) =>
@@ -177,7 +234,7 @@ export default async function PlayerPage({
         .order("created_at", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to)
-        .then(({ data }) => (data ?? []) as HistoryRow[])
+        .then((res) => rowsOrThrow<HistoryRow>(res, "the member's rating history"))
     ),
     supabase.from("leaderboard").select("id, rating, wins, losses"),
     // Tournament titles: finals are the matches whose winner advances nowhere.
@@ -194,42 +251,7 @@ export default async function PlayerPage({
       .eq("champion_id", id),
     loadXp(supabase, id),
     loadOpenSeason(supabase),
-    // Your own page only: the club's confirmed games, rating history and
-    // members, to replay your rank at the month start and now (ruling S3-R3:
-    // both ends from the same rows, so "You climbed" compares like with like).
-    isMe
-      ? fetchAllPages<{ reporter_id: string; opponent_id: string; winner_id: string; confirmed_at: string | null }>(
-          (from, to) =>
-            supabase
-              .from("matches")
-              .select("reporter_id, opponent_id, winner_id, confirmed_at")
-              .eq("status", "confirmed")
-              .order("id")
-              .range(from, to)
-              .then(({ data }) => data ?? [])
-        )
-      : [],
-    isMe
-      ? fetchAllPages<{ profile_id: string; rating_after: number; created_at: string }>((from, to) =>
-          supabase
-            .from("rating_history")
-            .select("profile_id, rating_after, created_at")
-            .order("id")
-            .range(from, to)
-            .then(({ data }) => data ?? [])
-        )
-      : [],
-    isMe
-      ? fetchAllPages<{ id: string }>((from, to) =>
-          supabase
-            .from("profiles")
-            .select("id")
-            .eq("status", "approved")
-            .order("id")
-            .range(from, to)
-            .then(({ data }) => data ?? [])
-        )
-      : [],
+    isMe ? loadClubRows(supabase) : null,
   ]);
   if (!profile) notFound();
   const school = Array.isArray(profile.schools) ? profile.schools[0] : profile.schools;
@@ -312,13 +334,14 @@ export default async function PlayerPage({
     const month = clubMonthName(nowIso);
     const thisMonth = all.filter((m) => m.played_at.slice(0, 7) === today.slice(0, 7));
     const last = all.reduce<PlayerMatch | null>((a, m) => (!a || m.played_at > a.played_at ? m : a), null);
-    const ids = memberIds.map((m) => m.id);
+    // Without the club's rows (a failed read) neither end is known, so the
+    // sentence keeps its counts and drops the rank clause.
     const sentence = monthSentence({
       month,
       games: thisMonth.length,
       wins: thisMonth.filter((m) => m.winner_id === id).length,
-      rankStart: rankAsOf(ids, clubHistory, clubMatches, monthStart.toISOString(), id),
-      rankNow: rankAsOf(ids, clubHistory, clubMatches, ALL_SO_FAR, id),
+      rankStart: club ? rankAsOf(club.memberIds, club.history, club.matches, monthStart.toISOString(), id) : null,
+      rankNow: club ? rankAsOf(club.memberIds, club.history, club.matches, ALL_SO_FAR, id) : null,
       last: last
         ? { playedAt: last.played_at, opponent: nameOf(last.reporter_id === id ? last.opponent_id : last.reporter_id) }
         : null,

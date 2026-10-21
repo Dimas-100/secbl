@@ -101,6 +101,13 @@ describe("rivals", () => {
     expect(rivals(ms, ME, 2)).toHaveLength(2);
   });
 
+  it("dates Last played by the newest played_at, not the confirmation order (ruling S3-R6)", () => {
+    // Newest first by confirmed_at: the Oct 5 game was confirmed late, after
+    // the Oct 12 game, so it comes first, but Oct 12 is the last time they played.
+    const ms = [match("a", true, "8ball", "2026-10-05"), match("a", false, "8ball", "2026-10-12")];
+    expect(rivals(ms, ME)[0].lastPlayedAt).toBe("2026-10-12");
+  });
+
   it("finds the opponent when they reported", () => {
     const out = rivals([match("a", false, "8ball", "2026-10-01", false)], ME);
     expect(out[0]).toMatchObject({ opponentId: "a", games: 1, wins: 0, losses: 1 });

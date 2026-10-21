@@ -16,11 +16,20 @@ export function parseNavStack(raw: string | null): string[] {
   }
 }
 
-// Same path as the top: no-op. Same path as the entry below the top: the
-// browser went back, so pop. Anything else is a step forward.
+const pathnameOf = (entry: string) => entry.split("?")[0];
+
+// Same entry as the top: no-op. Same entry as the one below the top: the
+// browser went back, so pop. Same pathname as the top with another query: a
+// view switch (Segmented, UnderlineTabs and the scoreboard all navigate with
+// replace), so it replaces the top (ruling S3-R5). A same-path push (a
+// ?message= redirect) then leaves the trail shorter than the history, which
+// only ever makes Back fall back to its in-app href, never leave the app.
+// Anything else is a step forward.
 export function nextNavStack(stack: string[], path: string): string[] {
-  if (stack[stack.length - 1] === path) return stack;
+  const top = stack[stack.length - 1];
+  if (top === path) return stack;
   if (stack.length >= 2 && stack[stack.length - 2] === path) return stack.slice(0, -1);
+  if (top !== undefined && pathnameOf(top) === pathnameOf(path)) return [...stack.slice(0, -1), path];
   return [...stack, path].slice(-NAV_MAX);
 }
 

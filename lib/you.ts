@@ -107,7 +107,9 @@ export function rivals(
         wins,
         losses: ms.length - wins,
         run: k >= 2 ? { k, ownerWon: first === ownerId } : null,
-        lastPlayedAt: ms[0].played_at,
+        // The newest played_at, not the first in confirmation order: a game
+        // confirmed late must not name an older date (ruling S3-R6).
+        lastPlayedAt: ms.reduce((last, m) => (m.played_at > last ? m.played_at : last), ms[0].played_at),
         newest: newestFirst.indexOf(ms[0]),
       };
     })

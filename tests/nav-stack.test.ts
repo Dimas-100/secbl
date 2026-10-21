@@ -43,13 +43,31 @@ describe("canGoBack", () => {
 });
 
 describe("entries with a query string", () => {
-  it("push and pop like paths", () => {
-    const a = nextNavStack(["/"], "/leaderboard?tab=players");
-    expect(a).toEqual(["/", "/leaderboard?tab=players"]);
-    const b = nextNavStack(a, "/leaderboard?tab=schools");
-    expect(b).toEqual(["/", "/leaderboard?tab=players", "/leaderboard?tab=schools"]);
-    expect(nextNavStack(b, "/leaderboard?tab=players")).toEqual(["/", "/leaderboard?tab=players"]);
-    expect(nextNavStack(b, "/leaderboard?tab=schools")).toBe(b);
+  it("push onto a different path", () => {
+    expect(nextNavStack(["/"], "/leaderboard?tab=players")).toEqual(["/", "/leaderboard?tab=players"]);
+  });
+
+  // Ruling S3-R5: tabs and range pickers navigate with replace, so a query
+  // change on the same path replaces the top, as the browser history does.
+  it("replace the top on the same path", () => {
+    const a = nextNavStack(["/", "/leaderboard?tab=players"], "/leaderboard?tab=schools");
+    expect(a).toEqual(["/", "/leaderboard?tab=schools"]);
+    expect(nextNavStack(a, "/leaderboard?tab=players")).toEqual(["/", "/leaderboard?tab=players"]);
+    expect(nextNavStack(a, "/leaderboard?tab=schools")).toBe(a);
+    expect(nextNavStack(["/", "/leaderboard"], "/leaderboard?tab=players")).toEqual(["/", "/leaderboard?tab=players"]);
+  });
+
+  it("keep a deep link with nothing behind it unable to go back after a range switch", () => {
+    const next = nextNavStack(["/players/x"], "/players/x?range=month");
+    expect(next).toEqual(["/players/x?range=month"]);
+    expect(canGoBack(next)).toBe(false);
+    expect(nextNavStack(["/", "/players/x"], "/players/x?range=all")).toEqual(["/", "/players/x?range=all"]);
+  });
+
+  it("still pop when returning to the entry below", () => {
+    expect(nextNavStack(["/leaderboard?tab=players", "/players/b"], "/leaderboard?tab=players")).toEqual([
+      "/leaderboard?tab=players",
+    ]);
   });
 });
 
