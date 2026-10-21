@@ -63,11 +63,34 @@ test("a club night calls the line to the table and frees it on the result", asyn
     await expect(page.getByRole("heading", { name: /^recent$/i })).toBeVisible();
   }
 
+  // NavHistory adds a page to the per-tab trail (sessionStorage "secbl:nav")
+  // from an effect, so the entry being there means the page has hydrated.
+  // A check or click before that can be undone when React takes over (the
+  // controlled table-count radio snaps back to its default).
+  async function onTrail(page: Page, entry: string) {
+    await page.waitForFunction(
+      (want) => {
+        try {
+          const trail: unknown = JSON.parse(sessionStorage.getItem("secbl:nav") ?? "[]");
+          return Array.isArray(trail) && trail.includes(want);
+        } catch {
+          return false;
+        }
+      },
+      entry,
+      { timeout: 30_000 }
+    );
+  }
+
   // A starts a one-table night and gets in line.
   const pageA = await (await browser.newContext()).newPage();
   await logIn(pageA, a.email);
   await pageA.goto("/night");
+  await onTrail(pageA, "/night");
+  // The page body streams in after the layout hydrates; wait for it to show.
+  await expect(pageA.getByRole("button", { name: "Start club night" })).toBeVisible();
   await pageA.getByLabel("1 table").check({ force: true });
+  await expect(pageA.getByLabel("1 table")).toBeChecked();
   await pageA.getByRole("button", { name: "Start club night" }).click();
   await pageA.getByRole("button", { name: "Get in line" }).click();
   await expect(pageA.getByText("You're next in line")).toBeVisible();
@@ -80,6 +103,7 @@ test("a club night calls the line to the table and frees it on the result", asyn
   await expect(pageB.getByRole("link", { name: "Watch the table" })).toBeVisible();
 
   await pageA.goto("/night");
+  await onTrail(pageA, "/night");
   await expect(pageA.getByText(/You're up on table 1/).first()).toBeVisible();
   await pageA.getByRole("link", { name: "Start game" }).first().click();
   await expect(pageA).toHaveURL(new RegExp(`/matches/new\\?opponent=${b.id}`));
@@ -95,8 +119,12 @@ test("a club night calls the line to the table and frees it on the result", asyn
   await expect(pageA.getByText(/Counted — ratings updated/)).toBeVisible({ timeout: 20_000 });
 
   await pageA.goto("/night");
-  await expect(pageA.getByText("Free", { exact: true })).toBeVisible();
-  await expect(pageA.getByText("Nobody in line.")).toBeVisible();
+  await onTrail(pageA, "/night");
+  // Scoped to the page's main landmark: a bare text match also counts the
+  // hidden streamed copy of the body, so it can briefly match twice.
+  const nightMain = pageA.getByRole("main").filter({ hasText: "Club night" });
+  await expect(nightMain.getByText("Free", { exact: true })).toBeVisible();
+  await expect(nightMain.getByText("Nobody in line.")).toBeVisible();
 
   // A started it, so A ends it.
   pageA.once("dialog", (d) => void d.accept());
