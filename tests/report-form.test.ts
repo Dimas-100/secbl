@@ -120,7 +120,8 @@ describe("findDuplicate since a club-night table call", () => {
 });
 
 describe("openingBoard", () => {
-  const scored = { opponentId: "a", you: 2, them: 1 };
+  const even = { raceTo: 5, spot: 0, spotTo: null } as const;
+  const scored = { opponentId: "a", ...even, you: 2, them: 1 };
   it("keeps the draft when nobody was called", () => {
     expect(openingBoard(scored, undefined)).toBe("keep");
   });
@@ -129,14 +130,29 @@ describe("openingBoard", () => {
   });
   it("asks before replacing a scored game against someone else", () => {
     expect(openingBoard(scored, "b")).toBe("ask");
-    expect(openingBoard({ opponentId: "a", you: 0, them: 3 }, "b")).toBe("ask");
+    expect(openingBoard({ opponentId: "a", ...even, you: 0, them: 3 }, "b")).toBe("ask");
   });
   it("switches silently from an unscored board", () => {
-    expect(openingBoard({ opponentId: "a", you: 0, them: 0 }, "b")).toBe("switch");
+    expect(openingBoard({ opponentId: "a", ...even, you: 0, them: 0 }, "b")).toBe("switch");
   });
   it("switches when the draft has no opponent yet", () => {
-    expect(openingBoard({ opponentId: null, you: 0, them: 0 }, "b")).toBe("switch");
-    expect(openingBoard({ opponentId: null, you: 1, them: 0 }, "b")).toBe("switch");
+    expect(openingBoard({ opponentId: null, ...even, you: 0, them: 0 }, "b")).toBe("switch");
+    expect(openingBoard({ opponentId: null, ...even, you: 1, them: 0 }, "b")).toBe("switch");
+  });
+  it("treats an untouched spotted board as unscored", () => {
+    const spotted = { opponentId: "a", raceTo: 5, spot: 2, spotTo: "you" } as const;
+    expect(openingBoard({ ...spotted, you: 2, them: 0 }, "b")).toBe("switch");
+    expect(openingBoard({ ...spotted, spotTo: "them", you: 0, them: 2 }, "b")).toBe("switch");
+  });
+  it("asks once a point is played beyond the spot's start", () => {
+    const spotted = { opponentId: "a", raceTo: 5, spot: 2, spotTo: "you" } as const;
+    expect(openingBoard({ ...spotted, you: 3, them: 0 }, "b")).toBe("ask");
+    expect(openingBoard({ ...spotted, you: 2, them: 1 }, "b")).toBe("ask");
+  });
+  it("on open play, any score counts", () => {
+    const open = { opponentId: "a", raceTo: null, spot: 0, spotTo: null } as const;
+    expect(openingBoard({ ...open, you: 0, them: 0 }, "b")).toBe("switch");
+    expect(openingBoard({ ...open, you: 1, them: 0 }, "b")).toBe("ask");
   });
 });
 

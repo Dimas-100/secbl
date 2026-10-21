@@ -17,12 +17,23 @@ export function draftKey(meId: string): string {
 // What the scoreboard does when it opens with a called opponent (Play sheet,
 // player page, club night) and may already hold a draft. A scored game
 // against someone else is never replaced silently: the form asks first.
+// "Scored" means the scores moved off the board's starting scores — a spotted
+// board starts nonzero (startBoard), so 2–0 on a 2-game spot is untouched.
 export function openingBoard(
-  draft: { opponentId: string | null; you: number; them: number },
+  draft: {
+    opponentId: string | null;
+    raceTo: number | null;
+    spot: number;
+    spotTo: Side | null;
+    you: number;
+    them: number;
+  },
   calledId: string | undefined
 ): "keep" | "switch" | "ask" {
   if (!calledId || draft.opponentId === calledId) return "keep";
-  if (draft.opponentId !== null && draft.you + draft.them > 0) return "ask";
+  const start = startingScores(draft.raceTo, draft.spot, draft.spotTo);
+  const scored = draft.you !== start.you || draft.them !== start.them;
+  if (draft.opponentId !== null && scored) return "ask";
   return "switch";
 }
 
