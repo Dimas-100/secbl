@@ -25,9 +25,9 @@ import { confirmMatch, disputeAgreedMatch, rejectMatch } from "@/app/(member)/ma
 import { AGREED_WINDOW_MS, canFlag, flagDeadlineLabel } from "@/lib/agreed";
 import { talkSummary, type LiveComment } from "@/lib/table-talk";
 import { freshMatch, headline } from "@/lib/celebration";
-import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
+import { clubDateOf, clubMonthStart, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { FEED_SELECT, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
-import { confirmMeta, facesEyebrow, formDots, nextLine, xpNote } from "@/lib/home";
+import { confirmMeta, facesEyebrow, firstName, formDots, nextLine, playedFrom, xpNote } from "@/lib/home";
 import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
 import { greetingFor } from "@/lib/identity";
 import { nextBadge, type TitleName } from "@/lib/levels";
@@ -62,11 +62,12 @@ export default async function HomePage({
 
   const now = new Date();
   const nowIso = now.toISOString();
-  const monthAgo = new Date(now.getTime() - 30 * 86_400_000);
+  // "This month" is the club calendar month (ruling S2-R4), as on the You page.
+  const monthStart = clubMonthStart(now);
 
   const [
     { data: me },
-    { data: board },
+    { data: board, error: boardError },
     { data: history },
     { data: toConfirm },
     { data: awaiting },
@@ -81,19 +82,19 @@ export default async function HomePage({
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, display_name, rating, avatar_url, ball, school_id, schools(short_name)")
+      .select("id, display_name, rating, matches_played, avatar_url, ball, school_id, schools(short_name)")
       .eq("id", user.id)
       .single(),
     // Rank, wins and losses come from the same view the leaderboard renders,
     // so the home block can never disagree with the Ranks tab.
     supabase.from("leaderboard").select("id, rating, wins, losses, display_name"),
-    // "This month" on the progress card: every rated game in the window, not
+    // "This month" on the progress card: every rated game since the 1st, not
     // a fixed count, so a busy month still finds its first rating.
     supabase
       .from("rating_history")
       .select("rating_before, rating_after, created_at")
       .eq("profile_id", user.id)
-      .gte("created_at", monthAgo.toISOString())
+      .gte("created_at", monthStart.toISOString())
       .order("created_at", { ascending: false }),
     supabase
       .from("matches")
@@ -241,10 +242,15 @@ export default async function HomePage({
     for (const [gameId, comments] of perGame) talkByGame.set(gameId, talkSummary(comments, talkNames));
   }
   // Games played come from the same view as rank, so placement and the Next
-  // line can never disagree with the Ranks tab.
+  // line can never disagree with the Ranks tab. If that read fails, the
+  // profile's count keeps a veteran off the Step 1 card and the Next line,
+  // which needs rank, is left out.
+  if (boardError) console.error("home: couldn't read the leaderboard", boardError);
   const rankRows: RankRow[] = (board ?? []).map(toRankRow);
-  const myRow = rankRows.find((r) => r.id === user.id);
-  const played = (myRow?.wins ?? 0) + (myRow?.losses ?? 0);
+  const { played, rankKnown } = playedFrom(
+    rankRows.find((r) => r.id === user.id),
+    me?.matches_played
+  );
   const boardNames = new Map((board ?? []).map((r) => [String(r.id), String(r.display_name ?? "Member")]));
 
   // Your place in the running season and who leads it, for the strip under
@@ -281,16 +287,18 @@ export default async function HomePage({
   }
 
   const rating = me?.rating ?? 450;
-  const change = ratingChangeSince(history ?? [], monthAgo, rating);
+  const change = ratingChangeSince(history ?? [], monthStart, rating);
   const above = aboveOf(rankRows, user.id);
   const lead = leadOf(rankRows, user.id);
   const badge = nextBadge(level, xp.total);
-  const next = nextLine({
-    played,
-    above: above ? { name: boardNames.get(above.id) ?? "Member", rank: above.rank, gap: above.gap } : null,
-    lead: lead ? { name: boardNames.get(lead.id) ?? "Member", gap: lead.gap } : null,
-    badge: badge ? { title: badge.title, xpToGo: badge.xpToGo } : null,
-  });
+  const next = rankKnown
+    ? nextLine({
+        played,
+        above: above ? { name: boardNames.get(above.id) ?? "Member", rank: above.rank, gap: above.gap } : null,
+        lead: lead ? { name: boardNames.get(lead.id) ?? "Member", gap: lead.gap } : null,
+        badge: badge ? { title: badge.title, xpToGo: badge.xpToGo } : null,
+      })
+    : null;
 
   const today = clubDateOf(nowIso);
   const greeting = greetingFor(now, me?.display_name ?? "").split(",")[0];
@@ -351,9 +359,11 @@ export default async function HomePage({
                     <Avatar person={reporter ?? { id: "unknown", display_name: null }} size="md" />
                     <div className="flex min-w-0 flex-col gap-[3px]">
                       <p className="truncate text-[15px] leading-tight">
-                        <span className="font-medium">{name}</span> logged a game
+                        <span className="font-medium">{firstName(name)}</span> logged a game
                       </p>
-                      <p className="text-muted-foreground truncate text-[12px] leading-tight">
+                      {/* Wraps rather than truncates: the spot, at the end,
+                          is part of what the confirmer is agreeing to. */}
+                      <p className="text-muted-foreground line-clamp-2 text-[12px] leading-tight">
                         {confirmMeta({
                           reporterName: name,
                           // You are always the opponent here; the reporter join

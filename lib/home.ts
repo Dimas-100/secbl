@@ -14,13 +14,26 @@ export function placementLeft(played: number): number {
   return Math.max(0, PLACEMENT_GAMES - played);
 }
 
-const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
+export const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 
 // XP to go reads like the profile's ("3,450"); rating gaps stay plain.
 const xpCount = (n: number) => n.toLocaleString("en-US");
 const pts = (gap: number) => `${gap} ${gap === 1 ? "pt" : "pts"}`;
 
 // The newest `n` results as W/L, oldest first, so the newest sits on the right.
+// Games played, for Home's progress card. The leaderboard view is the source,
+// so placement agrees with the Ranks tab. When that read failed or the
+// member's row is missing, the profile's own count stands in (a veteran must
+// never be shown "Play your first game") and rank is unknown, so the card
+// leaves its Next line out rather than guess it.
+export function playedFrom(
+  myRow: { wins: number; losses: number } | undefined,
+  profileCount: number | null | undefined
+): { played: number; rankKnown: boolean } {
+  if (myRow) return { played: myRow.wins + myRow.losses, rankKnown: true };
+  return { played: Number(profileCount ?? 0), rankKnown: false };
+}
+
 export function formDots(newestFirst: { winner_id: string }[], meId: string, n = 5): ("W" | "L")[] {
   return newestFirst
     .slice(0, n)
@@ -72,7 +85,7 @@ export function facesEyebrow(
 // left) the XP into the current level, as the profile shows it.
 export function xpNote(level: LevelInfo, xpTotal: number): string {
   const badge = nextBadge(level, xpTotal);
-  if (!badge) return `${level.intoLevel} / ${level.needed} XP`;
+  if (!badge) return `${xpCount(level.intoLevel)} / ${xpCount(level.needed)} XP`;
   return `${xpCount(badge.xpToGo)} XP to ${badge.title}`;
 }
 

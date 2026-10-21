@@ -59,9 +59,12 @@ export function ProgressCard({
   const [head, ...rest] = next ? next.split(" · ") : [];
   const tail = rest.join(" · ");
 
+  // A short name for the link: without it, the whole card's text is read out
+  // as one link name. The content stays visible.
   return (
     <Link
       href={`/players/${meId}`}
+      aria-label="Your progress"
       className="press bg-card flex flex-col gap-4 rounded-[20px] p-4 shadow-[inset_0_0_0_1px_var(--hairline-row)]"
     >
       <div className="flex items-end justify-between gap-4">

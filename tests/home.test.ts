@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { PLACEMENT_GAMES, confirmMeta, facesEyebrow, formDots, nextLine, placementLeft, xpNote } from "@/lib/home";
-import { levelFromXp, xpToNext, xpToReach } from "@/lib/levels";
+import {
+  PLACEMENT_GAMES,
+  confirmMeta,
+  facesEyebrow,
+  firstName,
+  formDots,
+  nextLine,
+  placementLeft,
+  playedFrom,
+  xpNote,
+} from "@/lib/home";
+import { levelFromXp, xpToReach } from "@/lib/levels";
 
 const placed = { played: 15, above: null, lead: null, badge: null };
 
@@ -118,11 +128,13 @@ describe("xpNote", () => {
     expect(xpNote(level, 4500)).toBe("1,450 XP to Hustler");
   });
 
-  it("shows a Legend the XP into the level", () => {
-    const total = xpToReach(40) + 300;
+  it("shows a Legend the XP into the level, with thousands separators", () => {
+    // Level 40 needs 2,050 XP to level 41.
+    const total = xpToReach(40) + 1200;
     const level = levelFromXp(total);
     expect(level.title).toBe("Legend");
-    expect(xpNote(level, total)).toBe(`300 / ${xpToNext(40)} XP`);
+    expect(xpNote(level, total)).toBe("1,200 / 2,050 XP");
+    expect(xpNote(levelFromXp(xpToReach(40) + 300), xpToReach(40) + 300)).toBe("300 / 2,050 XP");
   });
 });
 
@@ -159,5 +171,28 @@ describe("confirmMeta", () => {
 
   it("leaves the format out for open play and keeps an unknown game as is", () => {
     expect(confirmMeta({ ...game, raceTo: null, gameType: "straight" })).toBe("Jordan won 5–3 · straight");
+  });
+});
+
+describe("playedFrom", () => {
+  it("counts games from the member's leaderboard row, and rank is known", () => {
+    expect(playedFrom({ wins: 7, losses: 5 }, 3)).toEqual({ played: 12, rankKnown: true });
+    expect(playedFrom({ wins: 0, losses: 0 }, 0)).toEqual({ played: 0, rankKnown: true });
+  });
+
+  it("falls back to the profile's count when the row is missing, so a veteran never reads as new", () => {
+    expect(playedFrom(undefined, 24)).toEqual({ played: 24, rankKnown: false });
+  });
+
+  it("is zero with neither", () => {
+    expect(playedFrom(undefined, null)).toEqual({ played: 0, rankKnown: false });
+    expect(playedFrom(undefined, undefined)).toEqual({ played: 0, rankKnown: false });
+  });
+});
+
+describe("firstName", () => {
+  it("is the first word of the display name", () => {
+    expect(firstName("Jordan Lee")).toBe("Jordan");
+    expect(firstName("  Sam  ")).toBe("Sam");
   });
 });
