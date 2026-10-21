@@ -130,11 +130,11 @@ test("a season runs from open to champion with the feed and live now along the w
   await expect(pageB.getByText(/ratings updated/i)).toBeVisible({ timeout: 20_000 });
   await expect(pageB.getByText("Lost 0–3", { exact: true })).toBeVisible();
 
-  // Standings: 3 for the win, 1 for the loss.
+  // Standings: 3 for the win, 1 for the loss ("1 pt", never "1 pts").
   await pageB.goto("/leaderboard?tab=season");
   const standings = pageB.getByRole("list", { name: "Season standings" });
   await expect(standings.getByRole("link", { name: new RegExp(`1.*${a.name}.*1–0.*3 pts`) })).toBeVisible();
-  await expect(standings.getByRole("link", { name: new RegExp(`${b.name}.*0–1.*1 pts`) })).toBeVisible();
+  await expect(standings.getByRole("link", { name: new RegExp(`${b.name}.*0–1.*1 pt(?!s)`) })).toBeVisible();
 
   // The admin sees the season on Admin, with Alpha leading.
   const ctxAdmin = await browser.newContext();

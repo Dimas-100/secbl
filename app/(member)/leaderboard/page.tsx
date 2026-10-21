@@ -11,7 +11,14 @@ import { UnderlineTabs } from "@/components/underline-tabs";
 import { createClient } from "@/lib/supabase/server";
 import { clubDateOf } from "@/lib/events";
 import { compareRank, isPlaced, toRankRow } from "@/lib/ranking";
-import { formatClubDate, seasonCountdownLabel, seasonProgress, type Standing } from "@/lib/season";
+import {
+  formatClubDate,
+  pointsUnit,
+  seasonCountdownLabel,
+  seasonProgress,
+  unrankedLabel,
+  type Standing,
+} from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings, loadSeasons } from "@/lib/season-data";
 import { movementSince, seasonLabel } from "@/lib/stats";
 import { cn } from "@/lib/utils";
@@ -181,7 +188,7 @@ export default async function LeaderboardPage({
           trailing={
             <>
               <span className="stat-number text-[15px]">{s.points}</span>
-              <span className="text-muted-foreground text-[12px]">pts</span>
+              <span className="text-muted-foreground text-[12px]">{pointsUnit(s.points)}</span>
             </>
           }
         />
@@ -287,17 +294,22 @@ export default async function LeaderboardPage({
                       />
                     }
                     title={`${champion.display_name} · champion`}
-                    meta={`${champion.points} pts · ${champion.wins}–${champion.losses}`}
+                    meta={`${champion.points} ${pointsUnit(champion.points)} · ${champion.wins}–${champion.losses}`}
                   />
                 )}
               </div>
-              <ol aria-label="Season standings" className="flex flex-col">
-                {rankedStandings.map(seasonRow)}
-              </ol>
+              {rankedStandings.length > 0 && (
+                <ol aria-label="Season standings" className="flex flex-col">
+                  {rankedStandings.map(seasonRow)}
+                </ol>
+              )}
               {unrankedStandings.length > 0 && (
                 <section className="flex flex-col gap-1.5">
-                  <span className="eyebrow">Not placed yet</span>
-                  <ol aria-label="Not placed yet" className="flex flex-col">
+                  {/* The list is named by this label, so it is read once. */}
+                  <span id="season-unranked-label" className="eyebrow">
+                    {unrankedLabel(viewed.status)}
+                  </span>
+                  <ol aria-labelledby="season-unranked-label" className="flex flex-col">
                     {unrankedStandings.map(seasonRow)}
                   </ol>
                 </section>
@@ -393,8 +405,10 @@ export default async function LeaderboardPage({
 
           {unplacedRows.length > 0 && (
             <section className="flex flex-col gap-1.5">
-              <span className="eyebrow">Not placed yet</span>
-              <ol aria-label="Not placed yet" className="flex flex-col">
+              <span id="players-unplaced-label" className="eyebrow">
+                Not placed yet
+              </span>
+              <ol aria-labelledby="players-unplaced-label" className="flex flex-col">
                 {unplacedRows.map((r) => playerRow(r, null))}
               </ol>
             </section>

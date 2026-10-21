@@ -7,11 +7,13 @@ import {
   formatClubDate,
   inSeason,
   nextSeasonStart,
+  pointsUnit,
   seasonChampion,
   seasonCountdownLabel,
   seasonProgress,
   seasonStandings,
   seasonStrip,
+  unrankedLabel,
   type SeasonMatch,
 } from "@/lib/season";
 
@@ -164,7 +166,7 @@ describe("seasonStrip", () => {
   });
   it("leads with your place, then the leader", () => {
     const board = seasonStandings([game("a", "b")], people, season);
-    expect(seasonStrip(board, "b")).toEqual({ primary: "#2 · 1 pts", secondary: "Ana leads · 3 pts" });
+    expect(seasonStrip(board, "b")).toEqual({ primary: "#2 · 1 pt", secondary: "Ana leads · 3 pts" });
   });
   it("tells the leader they lead", () => {
     const board = seasonStandings([game("a", "b")], people, season);
@@ -175,8 +177,28 @@ describe("seasonStrip", () => {
     expect(board.find((r) => r.id === "c")?.rank).toBeNull();
     expect(seasonStrip(board, "c").primary).toBe("Ana leads · 3 pts");
   });
+  it("says 1 pt for a leader with a single point", () => {
+    // The winner is no longer listed (suspended), so Ben's loss leads.
+    const board = seasonStandings([game("gone", "b")], people, season);
+    expect(seasonStrip(board, "b")).toEqual({ primary: "#1 · 1 pt", secondary: "You lead the season" });
+    expect(seasonStrip(board, "c").primary).toBe("Ben leads · 1 pt");
+  });
   it("treats a viewer missing from the board like one who hasn't played", () => {
     const board = seasonStandings([game("a", "b")], people, season);
     expect(seasonStrip(board, "nobody").primary).toBe("Ana leads · 3 pts");
+  });
+});
+
+describe("pointsUnit", () => {
+  it("is pt for exactly one point, pts otherwise", () => {
+    expect(pointsUnit(1)).toBe("pt");
+    expect([0, 2, 3, 11].map(pointsUnit)).toEqual(["pts", "pts", "pts", "pts"]);
+  });
+});
+
+describe("unrankedLabel", () => {
+  it("says Not placed yet while the season runs and Didn't play once it is closed", () => {
+    expect(unrankedLabel("open")).toBe("Not placed yet");
+    expect(unrankedLabel("closed")).toBe("Didn't play");
   });
 });
