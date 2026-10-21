@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PLACEMENT_GAMES, formDots, nextLine, placementLeft, xpNote } from "@/lib/home";
+import { PLACEMENT_GAMES, facesEyebrow, formDots, nextLine, placementLeft, xpNote } from "@/lib/home";
 import { levelFromXp, xpToNext, xpToReach } from "@/lib/levels";
 
 const placed = { played: 15, above: null, lead: null, badge: null };
@@ -50,6 +50,11 @@ describe("nextLine", () => {
     expect(nextLine({ ...placed, above, badge })).toBe("Next: pass Jordan for #2 · 18 pts");
   });
 
+  it("says one point in the singular", () => {
+    expect(nextLine({ ...placed, above: { ...above, gap: 1 } })).toBe("Next: pass Jordan for #2 · 1 pt");
+    expect(nextLine({ ...placed, lead: { ...lead, gap: 1 } })).toBe("You're #1 · 1 pt ahead of Riley");
+  });
+
   it("says level on rating when nothing separates you", () => {
     expect(nextLine({ ...placed, above: { ...above, gap: 0 } })).toBe("Next: pass Jordan for #2 · level on rating");
   });
@@ -72,6 +77,29 @@ describe("nextLine", () => {
 
   it("is null when nothing applies", () => {
     expect(nextLine(placed)).toBeNull();
+  });
+});
+
+describe("facesEyebrow", () => {
+  const mine = "school-a";
+  const other = "school-b";
+
+  it("names the school only when every face is a schoolmate", () => {
+    expect(facesEyebrow([mine, mine, mine, mine], mine, "GSU")).toBe("Play someone from GSU");
+  });
+
+  it("does not name the school when some faces come from elsewhere", () => {
+    expect(facesEyebrow([mine, mine, other, other], mine, "GSU")).toBe("Play someone now");
+  });
+
+  it("does not name the school when no face is a schoolmate", () => {
+    expect(facesEyebrow([other, other, null], mine, "GSU")).toBe("Play someone now");
+  });
+
+  it("does not name a school it doesn't know, or one with nobody to show", () => {
+    expect(facesEyebrow([mine, mine], mine, null)).toBe("Play someone now");
+    expect(facesEyebrow([null, null], null, "GSU")).toBe("Play someone now");
+    expect(facesEyebrow([], mine, "GSU")).toBe("Play someone now");
   });
 });
 

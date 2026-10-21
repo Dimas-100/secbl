@@ -15,6 +15,7 @@ const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 
 // XP to go reads like the profile's ("3,450"); rating gaps stay plain.
 const xpCount = (n: number) => n.toLocaleString("en-US");
+const pts = (gap: number) => `${gap} ${gap === 1 ? "pt" : "pts"}`;
 
 // The newest `n` results as W/L, oldest first, so the newest sits on the right.
 export function formDots(newestFirst: { winner_id: string }[], meId: string, n = 5): ("W" | "L")[] {
@@ -36,16 +37,32 @@ export function nextLine(input: {
   if (left > 0) return `${left} more ${left === 1 ? "game" : "games"} to finish placement`;
   if (input.above) {
     const { name, rank, gap } = input.above;
-    return `Next: pass ${firstName(name)} for #${rank} · ${gap === 0 ? "level on rating" : `${gap} pts`}`;
+    return `Next: pass ${firstName(name)} for #${rank} · ${gap === 0 ? "level on rating" : pts(gap)}`;
   }
   if (input.lead) {
     const { name, gap } = input.lead;
     return gap === 0
       ? `You're #1 · level on rating with ${firstName(name)}`
-      : `You're #1 · ${gap} pts ahead of ${firstName(name)}`;
+      : `You're #1 · ${pts(gap)} ahead of ${firstName(name)}`;
   }
   if (input.badge) return `Next: ${input.badge.title} badge · ${xpCount(input.badge.xpToGo)} XP`;
   return null;
+}
+
+// Over the first-game card's faces. playFaces fills from other schools when
+// yours has fewer than four other members, so the school is named only when
+// every face shown is a schoolmate.
+export function facesEyebrow(
+  faceSchoolIds: (string | null)[],
+  mySchoolId: string | null,
+  school: string | null
+): string {
+  const allSchoolmates =
+    school !== null &&
+    mySchoolId !== null &&
+    faceSchoolIds.length > 0 &&
+    faceSchoolIds.every((id) => id === mySchoolId);
+  return allSchoolmates ? `Play someone from ${school}` : "Play someone now";
 }
 
 // Beside the level bar: the XP to the next title, or for a Legend (no title

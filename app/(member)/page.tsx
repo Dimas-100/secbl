@@ -26,7 +26,7 @@ import { talkSummary, type LiveComment } from "@/lib/table-talk";
 import { freshMatch, headline } from "@/lib/celebration";
 import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { FEED_SELECT, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
-import { formDots, nextLine, xpNote } from "@/lib/home";
+import { facesEyebrow, formDots, nextLine, xpNote } from "@/lib/home";
 import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
 import { nextBadge, type TitleName } from "@/lib/levels";
@@ -86,12 +86,14 @@ export default async function HomePage({
     // Rank, wins and losses come from the same view the leaderboard renders,
     // so the home block can never disagree with the Ranks tab.
     supabase.from("leaderboard").select("id, rating, wins, losses, display_name"),
+    // "This month" on the progress card: every rated game in the window, not
+    // a fixed count, so a busy month still finds its first rating.
     supabase
       .from("rating_history")
       .select("rating_before, rating_after, created_at")
       .eq("profile_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(30),
+      .gte("created_at", monthAgo.toISOString())
+      .order("created_at", { ascending: false }),
     supabase
       .from("matches")
       .select(
@@ -256,12 +258,22 @@ export default async function HomePage({
       : null,
   ]);
   let firstGameFaces: FirstGameFace[] = [];
+  let firstGameEyebrow = "";
   if (members) {
+    const mySchoolId: string | null = me?.school_id ?? null;
     const byId = new Map(members.map((m) => [m.id, m]));
-    firstGameFaces = playFaces([], members, me?.school_id ?? null).flatMap((id) => {
-      const m = byId.get(id);
-      return m ? [{ id: m.id, display_name: m.display_name, avatar_url: m.avatar_url, ball: m.ball }] : [];
-    });
+    const picked = playFaces([], members, mySchoolId).flatMap((id) => byId.get(id) ?? []);
+    firstGameFaces = picked.map((m) => ({
+      id: m.id,
+      display_name: m.display_name,
+      avatar_url: m.avatar_url,
+      ball: m.ball,
+    }));
+    firstGameEyebrow = facesEyebrow(
+      picked.map((m) => m.school_id),
+      mySchoolId,
+      mySchool
+    );
   }
 
   const rating = me?.rating ?? 450;
@@ -353,7 +365,7 @@ export default async function HomePage({
 
       <section className="flex flex-col gap-3">
         {played === 0 ? (
-          <FirstGameCard school={mySchool} faces={firstGameFaces} />
+          <FirstGameCard eyebrow={firstGameEyebrow} faces={firstGameFaces} />
         ) : (
           <ProgressCard
             meId={user.id}

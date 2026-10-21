@@ -20,7 +20,9 @@ export interface FirstGameFace {
 // In place of the progress card for a member with no confirmed game (spec
 // 2026-10-21-play-and-progress §2): one thing to do, no rating, rank or level
 // yet. Faces open the scoreboard with that person in, as the Play sheet does.
-export function FirstGameCard({ school, faces }: { school: string | null; faces: FirstGameFace[] }) {
+// `eyebrow` is lib/home.ts facesEyebrow: the school only when every face is
+// a schoolmate.
+export function FirstGameCard({ eyebrow, faces }: { eyebrow: string; faces: FirstGameFace[] }) {
   const titleId = useId();
   const facesId = useId();
   return (
@@ -36,7 +38,7 @@ export function FirstGameCard({ school, faces }: { school: string | null; faces:
       </p>
       <PlacementRow played={0} />
       <h3 id={facesId} className="eyebrow mt-2">
-        {school ? `Play someone from ${school}` : "Play someone now"}
+        {eyebrow}
       </h3>
       <ul aria-labelledby={facesId} className="grid grid-cols-5 gap-2">
         {faces.map((p) => (
