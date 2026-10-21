@@ -52,8 +52,18 @@ describe("seasonStandings", () => {
       ["c", 2 * POINTS_LOSS, 0, 2],
       ["d", 0, 0, 0],
     ]);
-    expect(rows.map((r) => r.rank)).toEqual([1, 2, 3, 4]);
+    expect(rows.map((r) => r.rank)).toEqual([1, 2, 3, null]);
     expect(rows[0].played).toBe(2);
+  });
+
+  it("leaves a member with no games in range unranked, and numbers the rest 1..n with no gaps", () => {
+    const rows = seasonStandings([game("c", "a"), game("c", "a", "2026-08-01")], members, season);
+    expect(rows.map((r) => [r.id, r.rank])).toEqual([
+      ["c", 1],
+      ["a", 2],
+      ["b", null],
+      ["d", null],
+    ]);
   });
 
   it("ranks more wins above on equal points", () => {
@@ -159,6 +169,11 @@ describe("seasonStrip", () => {
   it("tells the leader they lead", () => {
     const board = seasonStandings([game("a", "b")], people, season);
     expect(seasonStrip(board, "a")).toEqual({ primary: "#1 · 3 pts", secondary: "You lead the season" });
+  });
+  it("still names the leader to a member whose rank is null", () => {
+    const board = seasonStandings([game("a", "b")], people, season);
+    expect(board.find((r) => r.id === "c")?.rank).toBeNull();
+    expect(seasonStrip(board, "c").primary).toBe("Ana leads · 3 pts");
   });
   it("treats a viewer missing from the board like one who hasn't played", () => {
     const board = seasonStandings([game("a", "b")], people, season);

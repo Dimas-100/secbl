@@ -27,7 +27,8 @@ export interface Standing {
   wins: number;
   losses: number;
   points: number;
-  rank: number;
+  // null until the member has played a game in range (they sit under "Not placed yet").
+  rank: number | null;
 }
 
 // Club dates are YYYY-MM-DD, so string order is date order.
@@ -38,7 +39,7 @@ export function inSeason(playedAt: string, season: SeasonRange): boolean {
 const byName = (a: Standing, b: Standing) =>
   a.display_name.localeCompare(b.display_name) || a.id.localeCompare(b.id);
 
-// Every member listed (zero-point rows last). Points desc, wins desc, then
+// Every member listed (zero-point rows last, unranked). Points desc, wins desc, then
 // points earned against the others in the tied group, then name.
 export function seasonStandings(
   matches: SeasonMatch[],
@@ -47,7 +48,7 @@ export function seasonStandings(
 ): Standing[] {
   const rows = new Map<string, Standing>();
   for (const m of members) {
-    rows.set(m.id, { id: m.id, display_name: m.display_name, played: 0, wins: 0, losses: 0, points: 0, rank: 0 });
+    rows.set(m.id, { id: m.id, display_name: m.display_name, played: 0, wins: 0, losses: 0, points: 0, rank: null });
   }
   // A member keeps the points from every game they played, even against
   // someone who has since been suspended and is no longer listed.
@@ -87,8 +88,9 @@ export function seasonStandings(
     out.push(...group);
     i = j;
   }
+  // Zero-game members sort last, so the played rows are 1..n with no gaps.
   out.forEach((r, idx) => {
-    r.rank = idx + 1;
+    r.rank = r.played > 0 ? idx + 1 : null;
   });
   return out;
 }

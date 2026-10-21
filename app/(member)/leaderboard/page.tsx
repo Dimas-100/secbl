@@ -10,7 +10,8 @@ import { TitleBadge } from "@/components/title-badge";
 import { UnderlineTabs } from "@/components/underline-tabs";
 import { createClient } from "@/lib/supabase/server";
 import { clubDateOf } from "@/lib/events";
-import { formatClubDate, seasonCountdownLabel, seasonProgress } from "@/lib/season";
+import { compareRank, isPlaced, toRankRow } from "@/lib/ranking";
+import { formatClubDate, seasonCountdownLabel, seasonProgress, type Standing } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings, loadSeasons } from "@/lib/season-data";
 import { movementSince, seasonLabel } from "@/lib/stats";
 import { cn } from "@/lib/utils";
@@ -118,8 +119,13 @@ export default async function LeaderboardPage({
   const current = Object.fromEntries(visible.map((r) => [r.id, r.rating]));
   const moves = movementSince(weekHistory ?? [], current);
 
-  const podium = visible.slice(0, 3);
-  const rest = visible.slice(3);
+  // One ladder order (lib/ranking.ts): only members with a confirmed game hold
+  // a rank; the rest wait under "Not placed yet".
+  const ordered = [...visible].sort((a, b) => compareRank(toRankRow(a), toRankRow(b)));
+  const placedRows = ordered.filter((r) => isPlaced(toRankRow(r)));
+  const unplacedRows = ordered.filter((r) => !isPlaced(toRankRow(r)));
+  const podium = placedRows.slice(0, 3);
+  const rest = placedRows.slice(3);
   // Second, first, third — the classic podium silhouette.
   const podiumOrder = [podium[1], podium[0], podium[2]];
 
@@ -128,6 +134,103 @@ export default async function LeaderboardPage({
     ((schools ?? []) as (SchoolMarkSchool & { id: string })[]).map((s) => [s.id, s])
   );
   const maxAvg = Math.max(1, ...schoolRows.map((s) => s.avg_rating));
+
+  const rankedStandings = standings.filter((s) => s.rank !== null);
+  const unrankedStandings = standings.filter((s) => s.rank === null);
+
+  // The rank slot keeps its width when empty so names line up.
+  const seasonRow = (s: Standing) => {
+    const p = peopleById[s.id];
+    const isMe = s.id === user.id;
+    return (
+      <li key={s.id}>
+        <ListRow
+          href={`/players/${s.id}`}
+          className={cn(
+            isMe && "bg-card -mx-3 rounded-[14px] border-b-transparent px-3",
+            s.rank === null && "opacity-60"
+          )}
+          leading={
+            <>
+              <span
+                className={cn("stat-number w-[22px] text-[13px]", s.rank === 1 ? "text-brass" : "text-muted-foreground")}
+              >
+                {s.rank}
+              </span>
+              <Avatar person={p ?? { id: s.id, display_name: s.display_name }} size="sm" />
+            </>
+          }
+          title={
+            <span className="flex items-center gap-1.5">
+              <span className="truncate">{s.display_name}</span>
+              <TitleBadge title={levelOf(levels, s.id).title} size={20} />
+            </span>
+          }
+          meta={
+            <span className="flex items-center gap-1.5">
+              {p && (
+                <>
+                  <SchoolMark school={schoolById[p.school_id]} size={16} />
+                  {p.school_short_name}
+                  <span aria-hidden="true">·</span>
+                </>
+              )}
+              {s.wins}–{s.losses}
+            </span>
+          }
+          trailing={
+            <>
+              <span className="stat-number text-[15px]">{s.points}</span>
+              <span className="text-muted-foreground text-[12px]">pts</span>
+            </>
+          }
+        />
+      </li>
+    );
+  };
+
+  const playerRow = (r: Row, rank: number | null) => {
+    const isMe = r.id === user.id;
+    return (
+      <li key={r.id}>
+        <ListRow
+          href={`/players/${r.id}`}
+          className={cn(isMe && "bg-card -mx-3 rounded-[14px] border-b-transparent px-3", rank === null && "opacity-60")}
+          leading={
+            <>
+              <span className="text-muted-foreground stat-number w-[22px] text-[13px]">{rank}</span>
+              <Avatar person={r} size="sm" />
+            </>
+          }
+          title={
+            <span className="flex items-center gap-1.5">
+              <span className="truncate">{r.display_name}</span>
+              <TitleBadge title={levelOf(levels, r.id).title} size={20} />
+            </span>
+          }
+          meta={
+            <span className="flex items-center gap-1.5">
+              <SchoolMark school={schoolById[r.school_id]} size={16} />
+              {r.school_short_name}
+              <span aria-hidden="true">·</span>
+              <Movement value={moves[r.id]} />
+            </span>
+          }
+          trailing={
+            <>
+              <span className="stat-number text-[15px]">
+                {r.rating}
+                {r.matches_played < 10 && <span className="text-muted-foreground"> *</span>}
+              </span>
+              <span className="text-muted-foreground text-[12px]">
+                {r.wins}–{r.losses}
+              </span>
+            </>
+          }
+        />
+      </li>
+    );
+  };
 
   return (
     <main className="flex flex-col gap-7">
@@ -189,59 +292,16 @@ export default async function LeaderboardPage({
                 )}
               </div>
               <ol aria-label="Season standings" className="flex flex-col">
-                {standings.map((s) => {
-                  const p = peopleById[s.id];
-                  const isMe = s.id === user.id;
-                  return (
-                    <li key={s.id}>
-                      <ListRow
-                        href={`/players/${s.id}`}
-                        className={cn(
-                          isMe && "bg-card -mx-3 rounded-[14px] border-b-transparent px-3",
-                          s.played === 0 && "opacity-60"
-                        )}
-                        leading={
-                          <>
-                            <span
-                              className={cn(
-                                "stat-number w-[22px] text-[13px]",
-                                s.rank === 1 && s.played > 0 ? "text-brass" : "text-muted-foreground"
-                              )}
-                            >
-                              {s.rank}
-                            </span>
-                            <Avatar person={p ?? { id: s.id, display_name: s.display_name }} size="sm" />
-                          </>
-                        }
-                        title={
-                          <span className="flex items-center gap-1.5">
-                            <span className="truncate">{s.display_name}</span>
-                            <TitleBadge title={levelOf(levels, s.id).title} size={20} />
-                          </span>
-                        }
-                        meta={
-                          <span className="flex items-center gap-1.5">
-                            {p && (
-                              <>
-                                <SchoolMark school={schoolById[p.school_id]} size={16} />
-                                {p.school_short_name}
-                                <span aria-hidden="true">·</span>
-                              </>
-                            )}
-                            {s.wins}–{s.losses}
-                          </span>
-                        }
-                        trailing={
-                          <>
-                            <span className="stat-number text-[15px]">{s.points}</span>
-                            <span className="text-muted-foreground text-[12px]">pts</span>
-                          </>
-                        }
-                      />
-                    </li>
-                  );
-                })}
+                {rankedStandings.map(seasonRow)}
               </ol>
+              {unrankedStandings.length > 0 && (
+                <section className="flex flex-col gap-1.5">
+                  <span className="eyebrow">Not placed yet</span>
+                  <ol aria-label="Not placed yet" className="flex flex-col">
+                    {unrankedStandings.map(seasonRow)}
+                  </ol>
+                </section>
+              )}
               <p className="text-muted-foreground text-[12px]">
                 3 pts a win · 1 pt a loss · games played {formatClubDate(viewed.starts_on)}
                 {viewed.ends_on ? ` – ${formatClubDate(viewed.ends_on)}` : " onward"}
@@ -284,7 +344,7 @@ export default async function LeaderboardPage({
             </div>
           )}
 
-          {visible.length === 0 && (
+          {placedRows.length === 0 && (
             <p className="text-muted-foreground py-10 text-center text-sm">
               Nobody is ranked here yet. Ratings move once a match is confirmed.{" "}
               <Link href="/matches/new" className="text-brass">
@@ -326,50 +386,18 @@ export default async function LeaderboardPage({
           )}
 
           {rest.length > 0 && (
-            <ol aria-label={`Players ranked 4 to ${visible.length}`} className="flex flex-col">
-              {rest.map((r, i) => {
-                const isMe = r.id === user.id;
-                return (
-                  <li key={r.id}>
-                    <ListRow
-                      href={`/players/${r.id}`}
-                      className={cn(isMe && "bg-card -mx-3 rounded-[14px] border-b-transparent px-3")}
-                      leading={
-                        <>
-                          <span className="text-muted-foreground stat-number w-[22px] text-[13px]">{i + 4}</span>
-                          <Avatar person={r} size="sm" />
-                        </>
-                      }
-                      title={
-                        <span className="flex items-center gap-1.5">
-                          <span className="truncate">{r.display_name}</span>
-                          <TitleBadge title={levelOf(levels, r.id).title} size={20} />
-                        </span>
-                      }
-                      meta={
-                        <span className="flex items-center gap-1.5">
-                          <SchoolMark school={schoolById[r.school_id]} size={16} />
-                          {r.school_short_name}
-                          <span aria-hidden="true">·</span>
-                          <Movement value={moves[r.id]} />
-                        </span>
-                      }
-                      trailing={
-                        <>
-                          <span className="stat-number text-[15px]">
-                            {r.rating}
-                            {r.matches_played < 10 && <span className="text-muted-foreground"> *</span>}
-                          </span>
-                          <span className="text-muted-foreground text-[12px]">
-                            {r.wins}–{r.losses}
-                          </span>
-                        </>
-                      }
-                    />
-                  </li>
-                );
-              })}
+            <ol aria-label={`Players ranked 4 to ${placedRows.length}`} className="flex flex-col">
+              {rest.map((r, i) => playerRow(r, i + 4))}
             </ol>
+          )}
+
+          {unplacedRows.length > 0 && (
+            <section className="flex flex-col gap-1.5">
+              <span className="eyebrow">Not placed yet</span>
+              <ol aria-label="Not placed yet" className="flex flex-col">
+                {unplacedRows.map((r) => playerRow(r, null))}
+              </ol>
+            </section>
           )}
 
           {visible.length > 0 && (
