@@ -36,11 +36,52 @@ describe("resumableDraft", () => {
     const raw = JSON.stringify({ at: now - 60_000, opponentId: "a", you: "x", them: 2 });
     expect(resumableDraft(raw, now)).toEqual({ opponentId: "a", you: 0, them: 2 });
   });
+
+  // What the scoreboard saves on mount: a board with an opponent and no point
+  // played. The scoreboard would replace it without asking, so the sheet
+  // offers no game to go back to (spec Decisions; ruling R3).
+  const board = { at: now - 60_000, opponentId: "a", game: "8ball", date: "2026-10-21" };
+
+  it("is null for an untouched even board (0–0)", () => {
+    const raw = JSON.stringify({ ...board, raceTo: 5, spot: 0, spotTo: null, you: 0, them: 0 });
+    expect(resumableDraft(raw, now)).toBeNull();
+  });
+
+  it("is null for an untouched spotted board, whichever side has the spot", () => {
+    const toYou = JSON.stringify({ ...board, raceTo: 5, spot: 2, spotTo: "you", you: 2, them: 0 });
+    const toThem = JSON.stringify({ ...board, raceTo: 5, spot: 2, spotTo: "them", you: 0, them: 2 });
+    expect(resumableDraft(toYou, now)).toBeNull();
+    expect(resumableDraft(toThem, now)).toBeNull();
+  });
+
+  it("offers a board once a point is played, spotted or not", () => {
+    const even = JSON.stringify({ ...board, raceTo: 5, spot: 0, spotTo: null, you: 3, them: 2 });
+    expect(resumableDraft(even, now)).toEqual({ opponentId: "a", you: 3, them: 2 });
+    const spotted = JSON.stringify({ ...board, raceTo: 5, spot: 2, spotTo: "you", you: 2, them: 1 });
+    expect(resumableDraft(spotted, now)).toEqual({ opponentId: "a", you: 2, them: 1 });
+  });
+
+  it("on open play, any score is a game", () => {
+    const raw = JSON.stringify({ ...board, raceTo: null, spot: 0, spotTo: null, you: 1, them: 0 });
+    expect(resumableDraft(raw, now)).toEqual({ opponentId: "a", you: 1, them: 0 });
+  });
+
+  it("reads malformed format fields as no race and no spot", () => {
+    const junk = { ...board, raceTo: "5", spot: "2", spotTo: "left" };
+    expect(resumableDraft(JSON.stringify({ ...junk, you: 0, them: 0 }), now)).toBeNull();
+    expect(resumableDraft(JSON.stringify({ ...junk, you: 2, them: 0 }), now)).toEqual({ opponentId: "a", you: 2, them: 0 });
+  });
 });
 
 describe("resumeLine", () => {
   it("shows the score with an en dash and the opponent's first name", () => {
     expect(resumeLine({ opponentId: "a", you: 3, them: 2 }, "Jordan Lee")).toBe("3–2 vs Jordan");
+  });
+
+  it("ignores stray whitespace around and inside the name", () => {
+    expect(resumeLine({ opponentId: "a", you: 3, them: 2 }, "  Jordan   Lee ")).toBe("3–2 vs Jordan");
+    expect(resumeLine({ opponentId: "a", you: 3, them: 2 }, "Jordan\tLee")).toBe("3–2 vs Jordan");
+    expect(resumeLine({ opponentId: "a", you: 3, them: 2 }, "Jordan")).toBe("3–2 vs Jordan");
   });
 });
 

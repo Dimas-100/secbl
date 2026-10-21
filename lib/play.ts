@@ -1,7 +1,8 @@
 // Pure helpers for the Play sheet (the tab bar's middle button), kept out of
 // the component so vitest covers them without DOM tooling.
 
-import { DRAFT_MAX_AGE_MS } from "@/lib/report-form";
+import type { Side } from "@/lib/race";
+import { DRAFT_MAX_AGE_MS, boardScored } from "@/lib/report-form";
 
 export interface ResumableDraft {
   opponentId: string;
@@ -10,8 +11,12 @@ export interface ResumableDraft {
 }
 
 // The scoreboard's localStorage draft, if it is a game worth resuming: it
-// parses, has an opponent picked, and is younger than the scoreboard's own
-// 12-hour window. Only the fields the sheet shows are returned.
+// parses, has an opponent picked, is younger than the scoreboard's own
+// 12-hour window, and a point has been played (boardScored — the same test
+// the scoreboard's switch guard uses, so an untouched board, spotted or 0–0,
+// is no game to go back to). A missing or malformed format field reads as no
+// race and no spot, so it can never make a board look scored by itself.
+// Only the fields the sheet shows are returned.
 export function resumableDraft(raw: string | null, nowMs: number): ResumableDraft | null {
   if (!raw) return null;
   try {
@@ -19,7 +24,12 @@ export function resumableDraft(raw: string | null, nowMs: number): ResumableDraf
     if (!d || typeof d.opponentId !== "string") return null;
     if (typeof d.at !== "number" || !(nowMs - d.at < DRAFT_MAX_AGE_MS)) return null;
     const score = (v: unknown) => (typeof v === "number" ? v : 0);
-    return { opponentId: d.opponentId, you: score(d.you), them: score(d.them) };
+    const raceTo = typeof d.raceTo === "number" && d.raceTo > 0 ? d.raceTo : null;
+    const spot = typeof d.spot === "number" && d.spot > 0 ? d.spot : 0;
+    const spotTo: Side | null = d.spotTo === "you" || d.spotTo === "them" ? d.spotTo : null;
+    const board = { raceTo, spot, spotTo, you: score(d.you), them: score(d.them) };
+    if (!boardScored(board)) return null;
+    return { opponentId: d.opponentId, you: board.you, them: board.them };
   } catch {
     return null;
   }
@@ -27,7 +37,7 @@ export function resumableDraft(raw: string | null, nowMs: number): ResumableDraf
 
 // "3–2 vs Jordan". U+2013 en dash between scores, matching the rest of the app.
 export function resumeLine(d: ResumableDraft, opponentName: string): string {
-  return `${d.you}–${d.them} vs ${opponentName.split(" ")[0]}`;
+  return `${d.you}–${d.them} vs ${opponentName.trim().split(/\s+/)[0] || opponentName}`;
 }
 
 export const PLAY_FACES = 4;

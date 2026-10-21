@@ -14,11 +14,26 @@ export function draftKey(meId: string): string {
   return `secbl:draft-game:${meId}`;
 }
 
+// Whether a point has been played on this board: the scores moved off its
+// starting scores. A spotted board starts nonzero (startBoard), so 2–0 on a
+// 2-game spot is untouched. The scoreboard's switch guard and the Play sheet's
+// "Back to your game" row both use this, so the row shows exactly when the
+// scoreboard would ask before replacing the game.
+export function boardScored(draft: {
+  raceTo: number | null;
+  spot: number;
+  spotTo: Side | null;
+  you: number;
+  them: number;
+}): boolean {
+  const start = startingScores(draft.raceTo, draft.spot, draft.spotTo);
+  return draft.you !== start.you || draft.them !== start.them;
+}
+
 // What the scoreboard does when it opens with a called opponent (Play sheet,
-// player page, club night) and may already hold a draft. A scored game
-// against someone else is never replaced silently: the form asks first.
-// "Scored" means the scores moved off the board's starting scores — a spotted
-// board starts nonzero (startBoard), so 2–0 on a 2-game spot is untouched.
+// player page, club night) or the member picks someone else, and may already
+// hold a draft. A scored game against someone else is never replaced
+// silently: the form asks first.
 export function openingBoard(
   draft: {
     opponentId: string | null;
@@ -31,9 +46,7 @@ export function openingBoard(
   calledId: string | undefined
 ): "keep" | "switch" | "ask" {
   if (!calledId || draft.opponentId === calledId) return "keep";
-  const start = startingScores(draft.raceTo, draft.spot, draft.spotTo);
-  const scored = draft.you !== start.you || draft.them !== start.them;
-  if (draft.opponentId !== null && scored) return "ask";
+  if (draft.opponentId !== null && boardScored(draft)) return "ask";
   return "switch";
 }
 

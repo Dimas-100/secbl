@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  boardScored,
   duplicateNotice,
   findDuplicate,
   openingBoard,
@@ -116,6 +117,24 @@ describe("findDuplicate since a club-night table call", () => {
     expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", "2026-10-15T21:00:00Z")).toBeNull();
     expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", "2026-10-15T19:00:00Z")).toMatchObject({ id: "m1" });
     expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", null)).toMatchObject({ id: "m1" });
+  });
+});
+
+describe("boardScored", () => {
+  it("is false on the starting scores: even, spotted either way, open play", () => {
+    expect(boardScored({ raceTo: 5, spot: 0, spotTo: null, you: 0, them: 0 })).toBe(false);
+    expect(boardScored({ raceTo: 5, spot: 2, spotTo: "you", you: 2, them: 0 })).toBe(false);
+    expect(boardScored({ raceTo: 5, spot: 2, spotTo: "them", you: 0, them: 2 })).toBe(false);
+    expect(boardScored({ raceTo: null, spot: 0, spotTo: null, you: 0, them: 0 })).toBe(false);
+  });
+  it("is true once either score moves off the start", () => {
+    expect(boardScored({ raceTo: 5, spot: 0, spotTo: null, you: 3, them: 2 })).toBe(true);
+    expect(boardScored({ raceTo: 5, spot: 2, spotTo: "you", you: 2, them: 1 })).toBe(true);
+    expect(boardScored({ raceTo: 5, spot: 2, spotTo: "them", you: 0, them: 3 })).toBe(true);
+    expect(boardScored({ raceTo: null, spot: 0, spotTo: null, you: 0, them: 1 })).toBe(true);
+  });
+  it("counts a spotted side reset below its start as moved", () => {
+    expect(boardScored({ raceTo: 5, spot: 2, spotTo: "you", you: 0, them: 0 })).toBe(true);
   });
 });
 
