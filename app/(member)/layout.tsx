@@ -24,7 +24,7 @@ export default async function MemberLayout({ children }: { children: React.React
     <PresenceProvider meId={profile.id}>
       <div className="mx-auto w-full max-w-3xl px-6 pb-32">
         {children}
-        <TabBar profileHref={`/players/${profile.id}`} />
+        <TabBar profileHref={`/players/${profile.id}`} meId={profile.id} />
       </div>
     </PresenceProvider>
   );
