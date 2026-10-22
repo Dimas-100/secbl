@@ -28,7 +28,9 @@ self.addEventListener("push", (event) => {
         renotify: !!data.tag,
         data: { url },
         icon: "/icon-192.png",
-        badge: "/icon-192.png",
+        // Android draws the status-bar badge from its alpha alone, so it gets
+        // the white rack (scripts/render-icons.mjs), not the opaque icon.
+        badge: "/badge-96.png",
       });
     })()
   );

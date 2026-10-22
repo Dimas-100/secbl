@@ -25,7 +25,7 @@ export default async function InstallCardPage() {
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col items-center justify-center gap-6 px-6 py-10 print:min-h-0 print:max-w-none print:gap-0 print:p-0">
       <article className="bg-card flex w-full flex-col items-center gap-6 rounded-[24px] px-7 pt-9 pb-8 text-center shadow-[inset_0_0_0_1px_var(--hairline-row)] print:rounded-none print:bg-white print:text-black print:shadow-none">
         <span className="eyebrow print:text-black/60">You&apos;re invited</span>
-        <BrandLogo className="h-auto w-36" />
+        <BrandLogo size="lg" />
         <h1 className="display text-[30px] leading-[1.05]">
           Track your matches.
           <br />

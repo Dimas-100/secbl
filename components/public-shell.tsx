@@ -29,7 +29,7 @@ export function PublicShell({
       )}
     >
       <header className="flex flex-col items-center gap-5 text-center">
-        <BrandLogo className={cn("h-auto", compact ? "w-28" : "w-40")} />
+        <BrandLogo size={compact ? "md" : "lg"} />
         <div className="flex flex-col gap-2">
           <span className="eyebrow">{eyebrow}</span>
           <h1 className="display text-[30px] leading-[1.05]">{title}</h1>
