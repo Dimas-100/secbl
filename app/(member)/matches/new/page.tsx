@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
 import { clubDateOf } from "@/lib/events";
+import { boardParams } from "@/lib/report-form";
 import { createClient } from "@/lib/supabase/server";
 import type { OpponentOption } from "./report-form";
 import { ReportMatchFormLoader } from "./report-form-loader";
@@ -8,9 +8,9 @@ import { ReportMatchFormLoader } from "./report-form-loader";
 export default async function NewMatchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; opponent?: string; find?: string }>;
+  searchParams: Promise<{ error?: string; opponent?: string; find?: string; game?: string; race?: string; rematch?: string }>;
 }) {
-  const { error, opponent, find } = await searchParams;
+  const { error, opponent, find, game, race, rematch } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -52,20 +52,24 @@ export default async function NewMatchPage({
 
   const today = clubDateOf(new Date().toISOString());
 
+  // The scoreboard renders its own header: its title follows the board
+  // ("New game", then "vs {first}"), which only the client knows.
   return (
     <main className="flex flex-col gap-8">
-      <PageHeader title="Log a game" back="/" backIcon="close" backLabel="Close" trailing={null} />
-      {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
       <ReportMatchFormLoader
         opponents={options}
         recentIds={recentIds}
         today={today}
         meId={user.id}
         myRating={me?.rating ?? 450}
-        // Club night's "Start game": the board opens with the called opponent.
+        // Club night's "Start game", a face, Play {name}, Rematch: the board
+        // opens with the called opponent.
         initialOpponentId={options.some((o) => o.id === opponent) ? opponent : undefined}
         // The Play sheet's "Other": the picker opens on arrival.
         initialPickerOpen={find === "1"}
+        // Rematch (the game-counts screen): the same game and race, validated.
+        seed={boardParams({ game, race, rematch })}
+        error={error}
       />
     </main>
   );

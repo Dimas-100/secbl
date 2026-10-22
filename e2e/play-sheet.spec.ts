@@ -139,7 +139,13 @@ test("the Play sheet resumes a game, offers faces and opens club night", async (
   await expect(guard).toHaveCount(0);
   await expect(board.opponent).toHaveValue(b.id);
 
-  // Picking C from the picker (the sheet's Other) asks the same way.
+  // A restored scored draft opens folded into its summary line; Edit opens
+  // the setup again. Picking C from the picker (the sheet's Other) asks the
+  // same way.
+  const setup = page.getByRole("main").getByRole("group", { name: "Game setup" });
+  await expect(setup.getByText("8-ball · race to 5 · no spot")).toBeVisible();
+  await setup.getByRole("button", { name: "Edit" }).click();
+  await expect(setup).toHaveCount(0);
   await page.getByRole("button", { name: b.name, exact: true }).click();
   const picker = page.getByRole("dialog", { name: "Pick opponent" });
   await picker.getByLabel("Search members").fill(c.name);

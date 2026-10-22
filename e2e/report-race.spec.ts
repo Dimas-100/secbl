@@ -49,9 +49,12 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
   const pageA = await ctxA.newPage();
   await logIn(pageA, strong.email);
   await pageA.goto("/matches/new");
+  const boardMain = pageA.getByRole("main");
+  await expect(boardMain.getByRole("heading", { name: "New game" })).toBeVisible();
   await pageA.getByRole("button", { name: "Search players" }).click();
   await pageA.getByLabel("Search members").fill("E2E Race Weak");
   await pageA.getByRole("button", { name: new RegExp(weak.name) }).click();
+  await expect(boardMain.getByRole("heading", { name: "vs E2E" })).toBeVisible();
   await pageA.getByLabel("Race to 3").check({ force: true });
   // A 200-point gap in a race to 3 suggests 2 on the wire to Weak; make it 1.
   await expect(pageA.getByText(/2 on the wire to E2E/)).toBeVisible();
@@ -60,6 +63,12 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
 
   const inc = pageA.getByRole("button", { name: /^Increase You score/ });
   await inc.click();
+  // The first point folds the setup into one summary line with Edit, so the
+  // score gets the room (spec 2026-10-21-play-and-progress §4).
+  const setup = boardMain.getByRole("group", { name: "Game setup" });
+  await expect(setup.getByText("8-ball · race to 3 · 1 on the wire to E2E")).toBeVisible();
+  await expect(setup.getByRole("button", { name: "Edit" })).toBeVisible();
+  await expect(pageA.getByLabel("Race to 3")).toHaveCount(0);
   await inc.click();
   await expect(pageA.getByText("You need 1 · E2E needs 2")).toBeVisible();
   await inc.click();

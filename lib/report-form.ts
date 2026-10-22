@@ -1,9 +1,57 @@
 // Pure logic for the one-screen report form, kept out of the component so
 // vitest covers it without DOM tooling.
 
-import { startingScores, suggestedSpot, type Side } from "@/lib/race";
+import { RACES, startingScores, suggestedSpot, type Side } from "@/lib/race";
 import { formatClubDate } from "@/lib/season";
 import type { MatchStatus } from "@/lib/types";
+
+// The games the scoreboard offers, in pill order.
+export const GAME_TYPES = [
+  { value: "8ball", label: "8-ball" },
+  { value: "9ball", label: "9-ball" },
+  { value: "10ball", label: "10-ball" },
+  { value: "other", label: "Other" },
+] as const;
+
+// What a link into the scoreboard asks for (the game-counts screen's Rematch,
+// lib/result-moment rematchHref): a game and race the scoreboard offers, or
+// nothing — a stale or hand-edited value is ignored, never trusted. "open" is
+// open play. `rematch` marks a board whose duplicate check starts when it
+// opened.
+export interface BoardSeed {
+  game: string | null;
+  raceTo: number | null | "open";
+  rematch: boolean;
+}
+
+export function boardParams(sp: { game?: string; race?: string; rematch?: string }): BoardSeed {
+  const game = GAME_TYPES.find((g) => g.value === sp.game)?.value ?? null;
+  const race = typeof sp.race === "string" && /^\d+$/.test(sp.race) ? Number(sp.race) : null;
+  const raceTo = sp.race === "open" ? "open" : (RACES.find((r) => r === race) ?? null);
+  return { game, raceTo, rematch: sp.rematch === "1" };
+}
+
+// The folded setup's one line: "8-ball · race to 5 · no spot",
+// "9-ball · open race · no spot", "8-ball · race to 3 · 1 on the wire to Ana".
+export function foldSummary(
+  d: { game: string; raceTo: number | null; spot: number; spotTo: Side | null },
+  opponentFirst: string
+): string {
+  const game = GAME_TYPES.find((g) => g.value === d.game)?.label ?? d.game;
+  const race = d.raceTo ? `race to ${d.raceTo}` : "open race";
+  const spot =
+    d.raceTo && d.spot > 0 && d.spotTo ? `${d.spot} on the wire to ${d.spotTo === "you" ? "you" : opponentFirst}` : "no spot";
+  return `${game} · ${race} · ${spot}`;
+}
+
+// The later of two times (ISO strings), skipping any that isn't one: the
+// duplicate check starts at whichever came last of a Rematch board opening
+// and the pair's club-night table call.
+export function laterTime(a: string | null | undefined, b: string | null | undefined): string | null {
+  const times = [a, b].filter((t): t is string => typeof t === "string" && !Number.isNaN(Date.parse(t)));
+  if (times.length === 0) return null;
+  return times.reduce((x, y) => (Date.parse(y) > Date.parse(x) ? y : x));
+}
 
 // The scoreboard keeps its in-progress game in localStorage under a per-member
 // key, and treats a draft older than 12 hours as abandoned. The Play sheet
@@ -61,6 +109,21 @@ export function startBoard(
   const { spot, to } = suggestedSpot(raceTo, myRating, opponentRating);
   const start = startingScores(raceTo, spot, to);
   return { raceTo, spot, spotTo: spot > 0 ? to : null, ...start };
+}
+
+// The board a called opponent gets (Play sheet, player page, club night,
+// Rematch): the game and race a Rematch link asks for, else 8-ball and the
+// default race, then startBoard's spot for that race. The spot is suggested
+// afresh from today's ratings, never copied from the last game.
+export function seededBoard(
+  seed: BoardSeed,
+  opponentRating: number,
+  myRating: number,
+  defaultRace: number
+): { game: string; raceTo: number | null; spot: number; spotTo: Side | null; you: number; them: number } {
+  const game = seed.game ?? "8ball";
+  if (seed.raceTo === "open") return { game, raceTo: null, spot: 0, spotTo: null, you: 0, them: 0 };
+  return { game, ...startBoard(opponentRating, myRating, seed.raceTo ?? defaultRace) };
 }
 
 export function recentOpponents<T extends { id: string; display_name: string }>(
