@@ -7,11 +7,13 @@ import {
   formatClubDate,
   inSeason,
   nextSeasonStart,
+  pointsUnit,
   seasonChampion,
   seasonCountdownLabel,
   seasonProgress,
   seasonStandings,
   seasonStrip,
+  unrankedLabel,
   type SeasonMatch,
 } from "@/lib/season";
 
@@ -52,8 +54,18 @@ describe("seasonStandings", () => {
       ["c", 2 * POINTS_LOSS, 0, 2],
       ["d", 0, 0, 0],
     ]);
-    expect(rows.map((r) => r.rank)).toEqual([1, 2, 3, 4]);
+    expect(rows.map((r) => r.rank)).toEqual([1, 2, 3, null]);
     expect(rows[0].played).toBe(2);
+  });
+
+  it("leaves a member with no games in range unranked, and numbers the rest 1..n with no gaps", () => {
+    const rows = seasonStandings([game("c", "a"), game("c", "a", "2026-08-01")], members, season);
+    expect(rows.map((r) => [r.id, r.rank])).toEqual([
+      ["c", 1],
+      ["a", 2],
+      ["b", null],
+      ["d", null],
+    ]);
   });
 
   it("ranks more wins above on equal points", () => {
@@ -154,14 +166,39 @@ describe("seasonStrip", () => {
   });
   it("leads with your place, then the leader", () => {
     const board = seasonStandings([game("a", "b")], people, season);
-    expect(seasonStrip(board, "b")).toEqual({ primary: "#2 · 1 pts", secondary: "Ana leads · 3 pts" });
+    expect(seasonStrip(board, "b")).toEqual({ primary: "#2 · 1 pt", secondary: "Ana leads · 3 pts" });
   });
   it("tells the leader they lead", () => {
     const board = seasonStandings([game("a", "b")], people, season);
     expect(seasonStrip(board, "a")).toEqual({ primary: "#1 · 3 pts", secondary: "You lead the season" });
   });
+  it("still names the leader to a member whose rank is null", () => {
+    const board = seasonStandings([game("a", "b")], people, season);
+    expect(board.find((r) => r.id === "c")?.rank).toBeNull();
+    expect(seasonStrip(board, "c").primary).toBe("Ana leads · 3 pts");
+  });
+  it("says 1 pt for a leader with a single point", () => {
+    // The winner is no longer listed (suspended), so Ben's loss leads.
+    const board = seasonStandings([game("gone", "b")], people, season);
+    expect(seasonStrip(board, "b")).toEqual({ primary: "#1 · 1 pt", secondary: "You lead the season" });
+    expect(seasonStrip(board, "c").primary).toBe("Ben leads · 1 pt");
+  });
   it("treats a viewer missing from the board like one who hasn't played", () => {
     const board = seasonStandings([game("a", "b")], people, season);
     expect(seasonStrip(board, "nobody").primary).toBe("Ana leads · 3 pts");
+  });
+});
+
+describe("pointsUnit", () => {
+  it("is pt for exactly one point, pts otherwise", () => {
+    expect(pointsUnit(1)).toBe("pt");
+    expect([0, 2, 3, 11].map(pointsUnit)).toEqual(["pts", "pts", "pts", "pts"]);
+  });
+});
+
+describe("unrankedLabel", () => {
+  it("says Not placed yet while the season runs and Didn't play once it is closed", () => {
+    expect(unrankedLabel("open")).toBe("Not placed yet");
+    expect(unrankedLabel("closed")).toBe("Didn't play");
   });
 });

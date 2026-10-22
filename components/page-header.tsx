@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronLeft, X } from "lucide-react";
+import { BackButton } from "@/components/nav-history";
 import { MessagesButton } from "@/components/messages-button";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,7 @@ export function PageHeader({
   back,
   backLabel = "Back",
   backIcon = "chevron",
+  history,
   trailing,
   children,
   className,
@@ -22,6 +24,8 @@ export function PageHeader({
   back?: string;
   backLabel?: string;
   backIcon?: "chevron" | "close";
+  // Back returns to the previous in-app page; `back` is only the fallback.
+  history?: boolean;
   trailing?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
@@ -32,13 +36,17 @@ export function PageHeader({
     return (
       <header className={cn("flex flex-col gap-4 pt-3", className)}>
         <div className="flex items-center justify-between gap-3">
-          <Link
-            href={back}
-            aria-label={backLabel}
-            className="press flex size-11 shrink-0 items-center justify-center rounded-full shadow-[inset_0_0_0_1px_var(--hairline-strong)]"
-          >
-            <BackIcon className="size-5" strokeWidth={1.7} />
-          </Link>
+          {history ? (
+            <BackButton fallback={back} label={backLabel} icon={backIcon} />
+          ) : (
+            <Link
+              href={back}
+              aria-label={backLabel}
+              className="press flex size-11 shrink-0 items-center justify-center rounded-full shadow-[inset_0_0_0_1px_var(--hairline-strong)]"
+            >
+              <BackIcon className="size-5" strokeWidth={1.7} />
+            </Link>
+          )}
           <h1 className="min-w-0 flex-1 truncate text-center text-[17px] font-semibold tracking-[-0.01em]">
             {title}
           </h1>

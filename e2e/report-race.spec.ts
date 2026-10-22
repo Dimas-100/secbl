@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { cleanupTracked, serviceClient, trackUser } from "./cleanup";
+import { privateSchool } from "./private-school";
 
 test.afterEach(cleanupTracked);
 
@@ -8,12 +9,14 @@ const PASSWORD = "e2e-password-123!";
 // The live scoreboard end to end: a stronger player logs a race to 3 giving
 // one game on the wire, the rail locks at the finish, the weaker player sees
 // the format on the confirm row and confirms, and the stored row carries the
-// format with scores as the board showed them.
+// format with scores as the board showed them. The users live in a school
+// with no approved real members and no open club night, so the result screen
+// offers Rematch (a night would make it Back in line, ruling S4-R1).
 test("a race to 3 with a one-game spot is logged, confirmed and labelled", async ({ browser }) => {
   test.setTimeout(120_000);
   const stamp = Date.now();
   const service = serviceClient();
-  const { data: school } = await service.from("schools").select("id").limit(1).single();
+  const schoolId = await privateSchool(service, { noOpenNight: true });
 
   async function makeUser(tag: string, rating: number) {
     const email = `e2e-race-${tag}-${stamp}@example.com`;
@@ -21,7 +24,7 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
       email,
       password: PASSWORD,
       email_confirm: true,
-      user_metadata: { display_name: `E2E Race ${tag} ${stamp}`, school_id: school!.id },
+      user_metadata: { display_name: `E2E Race ${tag} ${stamp}`, school_id: schoolId },
     });
     if (error) throw error;
     trackUser(data.user!.id);
@@ -46,9 +49,12 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
   const pageA = await ctxA.newPage();
   await logIn(pageA, strong.email);
   await pageA.goto("/matches/new");
+  const boardMain = pageA.getByRole("main");
+  await expect(boardMain.getByRole("heading", { name: "New game" })).toBeVisible();
   await pageA.getByRole("button", { name: "Search players" }).click();
   await pageA.getByLabel("Search members").fill("E2E Race Weak");
   await pageA.getByRole("button", { name: new RegExp(weak.name) }).click();
+  await expect(boardMain.getByRole("heading", { name: "vs E2E" })).toBeVisible();
   await pageA.getByLabel("Race to 3").check({ force: true });
   // A 200-point gap in a race to 3 suggests 2 on the wire to Weak; make it 1.
   await expect(pageA.getByText(/2 on the wire to E2E/)).toBeVisible();
@@ -57,6 +63,12 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
 
   const inc = pageA.getByRole("button", { name: /^Increase You score/ });
   await inc.click();
+  // The first point folds the setup into one summary line with Edit, so the
+  // score gets the room (spec 2026-10-21-play-and-progress §4).
+  const setup = boardMain.getByRole("group", { name: "Game setup" });
+  await expect(setup.getByText("8-ball · race to 3 · 1 on the wire to E2E")).toBeVisible();
+  await expect(setup.getByRole("button", { name: "Edit" })).toBeVisible();
+  await expect(pageA.getByLabel("Race to 3")).toHaveCount(0);
   await inc.click();
   await expect(pageA.getByText("You need 1 · E2E needs 2")).toBeVisible();
   await inc.click();
@@ -71,16 +83,36 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
   await expect(pageB.getByText("Race to 3 · 1 on the wire to you")).toBeVisible();
   await pageB.getByRole("button", { name: "Confirm" }).click();
   await expect(pageB.getByText(/ratings updated/i)).toBeVisible({ timeout: 20_000 });
-  // The result card: the loser's side, their rating change and XP, dismissable.
-  const card = pageB.getByRole("region", { name: "Latest result" });
-  await expect(card.getByRole("heading", { name: "Lost 1–3 vs E2E" })).toBeVisible();
-  await expect(card.getByText("+80 XP")).toBeVisible();
-  await card.getByRole("button", { name: "Nice" }).click();
-  await expect(card).toHaveCount(0);
+  // The game counts: the loser's screen, told straight (the coral change, the
+  // XP still earned, a first game putting them on the board, no consolation).
+  // Rematch is only checked by its href here: following it, and the duplicate
+  // check it starts from this game, is e2e/report-rematch.spec.ts's job.
+  const { data: counted } = await service.from("matches").select("id").eq("reporter_id", strong.id).single();
+  const screen = pageB.getByRole("dialog", { name: "Latest result" });
+  await expect(screen.getByText("Loss", { exact: true })).toBeVisible();
+  await expect(screen.getByRole("heading", { name: "E2E beat you 3–1" })).toBeVisible();
+  await expect(screen.getByText("8-ball · race to 3 · 1 spot")).toBeVisible();
+  await expect(screen.getByText(/^−\d+$/)).toBeVisible();
+  await expect(screen.getByText("+80 XP")).toBeVisible();
+  await expect(screen.getByText(/^On the board at #\d+$/)).toBeVisible();
+  await expect(screen.getByText("8-ball record now 0–1")).toBeVisible();
+  await expect(screen.getByRole("link", { name: "Rematch" })).toHaveAttribute(
+    "href",
+    `/matches/new?opponent=${strong.id}&game=8ball&race=3&rematch=1&after=${counted!.id}`
+  );
+  await screen.getByRole("button", { name: "Done" }).click();
+  await expect(screen).toHaveCount(0);
+  // Dismissed on this device: a reload keeps it gone. The screen opens a
+  // frame after hydration, so give it time to (wrongly) appear.
   await pageB.reload();
-  await expect(pageB.getByRole("region", { name: "Latest result" })).toHaveCount(0);
+  await expect(pageB.getByRole("heading", { name: /^recent$/i })).toBeVisible();
+  await pageB.waitForTimeout(1500);
+  await expect(pageB.getByRole("dialog", { name: "Latest result" })).toHaveCount(0);
+  await expect(pageB.getByRole("heading", { name: /^recent$/i })).toBeVisible();
   await pageB.goto(`/players/${weak.id}`);
-  await expect(pageB.getByText(/race to 3 · 1 spot/)).toBeVisible();
+  // Inside the visible main landmark: a production build can leave a hidden
+  // copy of the page body.
+  await expect(pageB.getByRole("main").getByText(/race to 3 · 1 spot/)).toBeVisible();
 
   const { data: m } = await service
     .from("matches")

@@ -30,7 +30,10 @@ test("a game counted on the spot moves the ladder, and the opponent can flag it"
   const a = await makeUser("A");
   const b = await makeUser("B");
 
-  async function logIn(page: Page, email: string) {
+  // `result`: a game of theirs counted since they last looked, so its screen
+  // opens over Home (and hides the page from the accessibility tree) until
+  // Done clears it.
+  async function logIn(page: Page, email: string, result?: string) {
     await page.goto("/login");
     await page.fill('input[name="email"]', email);
     await page.fill('input[name="password"]', PASSWORD);
@@ -38,6 +41,12 @@ test("a game counted on the spot moves the ladder, and the opponent can flag it"
       page.waitForURL((u) => !u.pathname.startsWith("/login")),
       page.click('button[type="submit"]'),
     ]);
+    if (result) {
+      const screen = page.getByRole("dialog", { name: "Latest result" });
+      await expect(screen.getByRole("heading", { name: result })).toBeVisible();
+      await screen.getByRole("button", { name: "Done" }).click();
+      await expect(screen).toHaveCount(0);
+    }
     await expect(page.getByRole("heading", { name: /^recent$/i })).toBeVisible();
   }
 
@@ -71,6 +80,10 @@ test("a game counted on the spot moves the ladder, and the opponent can flag it"
   await logIn(pageA, a.email);
   await countRace(pageA, b.name, 3, 1);
   await expect(pageA.getByText(/Counted — ratings updated/)).toBeVisible({ timeout: 20_000 });
+  // Counting it lands on Home with the game's screen open at once.
+  await expect(
+    pageA.getByRole("dialog", { name: "Latest result" }).getByRole("heading", { name: "You beat E2E 3–1" })
+  ).toBeVisible();
   const { data: counted } = await service.from("matches").select("id, status, agreed_at").or(pair);
   expect(counted).toHaveLength(1);
   expect(counted![0].status).toBe("confirmed");
@@ -79,9 +92,10 @@ test("a game counted on the spot moves the ladder, and the opponent can flag it"
   expect(moved[a.id].rating).toBeGreaterThan(450);
   expect(moved[b.id].rating).toBeLessThan(450);
 
-  // B says it's wrong: out of the ladder, into the admin's disputes.
+  // B says it's wrong: out of the ladder, into the admin's disputes. The game
+  // already counted, so B's Home opens on its screen; Done clears it first.
   const pageB = await (await browser.newContext()).newPage();
-  await logIn(pageB, b.email);
+  await logIn(pageB, b.email, "E2E beat you 3–1");
   await expect(pageB.getByRole("heading", { name: "Logged for you" })).toBeVisible();
   await expect(pageB.getByText(/beat you/)).toBeVisible();
   await pageB.getByRole("button", { name: "Not right?" }).click();

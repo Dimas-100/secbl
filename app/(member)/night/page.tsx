@@ -32,7 +32,7 @@ export default async function NightPage({ searchParams }: { searchParams: Promis
   if (!night) {
     return (
       <main className="flex flex-col gap-8">
-        <PageHeader title="Club night" back="/" trailing={null} />
+        <PageHeader title="Club night" back="/" history trailing={null} />
         {errorNote}
         <p className="text-muted-foreground text-[15px] leading-relaxed">
           Start the line when you get to the tables. Everyone joins from their phone; the app calls the next two to
@@ -75,7 +75,7 @@ export default async function NightPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="flex flex-col gap-8">
-      <PageHeader title="Club night" back="/" trailing={null} />
+      <PageHeader title="Club night" back="/" history trailing={null} />
       {errorNote}
 
       <section className="flex flex-col gap-3">

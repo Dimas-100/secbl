@@ -1,9 +1,8 @@
-import { expect, test, type Page } from "@playwright/test";
-import { cleanupTracked, serviceClient, trackUser } from "./cleanup";
+import { expect, test } from "@playwright/test";
+import { cleanupTracked, serviceClient } from "./cleanup";
+import { logIn, onTrail, privateSchool, userMaker } from "./private-school";
 
 test.afterEach(cleanupTracked);
-
-const PASSWORD = "e2e-password-123!";
 
 // Spec 2026-10-20-club-night: a night with one table — two members get in
 // line, both are called (the first keeps score), a counted result frees the
@@ -14,60 +13,20 @@ test("a club night calls the line to the table and frees it on the result", asyn
   const stamp = Date.now();
   const service = serviceClient();
 
-  const { data: schools } = await service.from("schools").select("id");
-  let schoolId: string | null = null;
-  for (const s of schools ?? []) {
-    const { count } = await service
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("school_id", s.id)
-      .eq("status", "approved");
-    if (count === 0) {
-      schoolId = s.id;
-      break;
-    }
-  }
-  test.skip(!schoolId, "every school has a real member — no private school to test in");
-  const { count: open } = await service
-    .from("club_nights")
-    .select("id", { count: "exact", head: true })
-    .eq("school_id", schoolId!)
-    .is("closed_at", null);
-  test.skip((open ?? 0) > 0, "a night is already open in the test school");
-
-  async function makeUser(tag: string) {
-    const email = `e2e-night-${tag}-${stamp}@example.com`;
-    const name = `E2E Night ${tag} ${stamp}`;
-    const { data, error } = await service.auth.admin.createUser({
-      email,
-      password: PASSWORD,
-      email_confirm: true,
-      user_metadata: { display_name: name, school_id: schoolId },
-    });
-    if (error) throw error;
-    trackUser(data.user!.id);
-    await service.from("profiles").update({ status: "approved", rating: 450 }).eq("id", data.user!.id);
-    return { id: data.user!.id, email, name };
-  }
+  const schoolId = await privateSchool(service, { noOpenNight: true });
+  const makeUser = userMaker(service, schoolId, "Night", stamp);
   const a = await makeUser("A");
   const b = await makeUser("B");
-
-  async function logIn(page: Page, email: string) {
-    await page.goto("/login");
-    await page.fill('input[name="email"]', email);
-    await page.fill('input[name="password"]', PASSWORD);
-    await Promise.all([
-      page.waitForURL((u) => !u.pathname.startsWith("/login")),
-      page.click('button[type="submit"]'),
-    ]);
-    await expect(page.getByRole("heading", { name: /^recent$/i })).toBeVisible();
-  }
 
   // A starts a one-table night and gets in line.
   const pageA = await (await browser.newContext()).newPage();
   await logIn(pageA, a.email);
   await pageA.goto("/night");
+  await onTrail(pageA, "/night");
+  // The page body streams in after the layout hydrates; wait for it to show.
+  await expect(pageA.getByRole("button", { name: "Start club night" })).toBeVisible();
   await pageA.getByLabel("1 table").check({ force: true });
+  await expect(pageA.getByLabel("1 table")).toBeChecked();
   await pageA.getByRole("button", { name: "Start club night" }).click();
   await pageA.getByRole("button", { name: "Get in line" }).click();
   await expect(pageA.getByText("You're next in line")).toBeVisible();
@@ -80,6 +39,7 @@ test("a club night calls the line to the table and frees it on the result", asyn
   await expect(pageB.getByRole("link", { name: "Watch the table" })).toBeVisible();
 
   await pageA.goto("/night");
+  await onTrail(pageA, "/night");
   await expect(pageA.getByText(/You're up on table 1/).first()).toBeVisible();
   await pageA.getByRole("link", { name: "Start game" }).first().click();
   await expect(pageA).toHaveURL(new RegExp(`/matches/new\\?opponent=${b.id}`));
@@ -93,12 +53,32 @@ test("a club night calls the line to the table and frees it on the result", asyn
   for (let i = 0; i < 3; i++) await pageA.getByRole("button", { name: /^Increase You score/ }).click();
   await pageA.getByRole("button", { name: "We agreed — count it" }).click();
   await expect(pageA.getByText(/Counted — ratings updated/)).toBeVisible({ timeout: 20_000 });
+  // The game counts during the night (ruling S4-R1): A is out of the line,
+  // so the screen offers Back in line in place of Rematch.
+  const screen = pageA.getByRole("dialog", { name: "Latest result" });
+  await expect(screen.getByRole("heading", { name: "You beat E2E 3–1" })).toBeVisible();
+  await expect(screen.getByRole("button", { name: "Back in line" })).toBeVisible();
+  await expect(screen.getByRole("link", { name: "Rematch" })).toHaveCount(0);
 
   await pageA.goto("/night");
-  await expect(pageA.getByText("Free", { exact: true })).toBeVisible();
-  await expect(pageA.getByText("Nobody in line.")).toBeVisible();
+  await onTrail(pageA, "/night");
+  // Scoped to the page's main landmark: a bare text match also counts the
+  // hidden streamed copy of the body, so it can briefly match twice.
+  const nightMain = pageA.getByRole("main").filter({ hasText: "Club night" });
+  await expect(nightMain.getByText("Free", { exact: true })).toBeVisible();
+  await expect(nightMain.getByText("Nobody in line.")).toBeVisible();
+
+  // Leaving Home did not dismiss the screen; Back in line does, and puts A
+  // at the end of tonight's line.
+  await pageA.goto("/");
+  await screen.getByRole("button", { name: "Back in line" }).click();
+  await expect(screen).toHaveCount(0);
+  await expect(pageA.getByRole("main").getByText("You're next in line")).toBeVisible({ timeout: 20_000 });
 
   // A started it, so A ends it.
+  await pageA.goto("/night");
+  await onTrail(pageA, "/night");
+  await expect(nightMain.getByText("Free", { exact: true })).toBeVisible();
   pageA.once("dialog", (d) => void d.accept());
   await pageA.getByRole("button", { name: "End club night" }).click();
   await expect(pageA.getByRole("button", { name: "Start club night" })).toBeVisible();

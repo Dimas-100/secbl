@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { AvatarStack } from "@/components/avatar-stack";
-import { CelebrationCard } from "@/components/celebration-card";
 import { ActivityRow } from "@/components/activity-row";
+import { FirstGameCard, type FirstGameFace } from "@/components/first-game-card";
+import { GameCountsScreen, type GameCountsProps } from "@/components/game-counts-screen";
 import { ListRow } from "@/components/list-row";
 import { LiveGameCard } from "@/components/live-game-card";
 import { LiveHome } from "@/components/live-home";
@@ -12,10 +13,10 @@ import { MessagesButton } from "@/components/messages-button";
 import { NightCard } from "@/components/night-card";
 import { loadNight } from "@/lib/night-data";
 import { NotifyPrompt } from "@/components/notify-prompt";
+import { ProgressCard } from "@/components/progress-card";
+import { ResumeGameCard } from "@/components/resume-game-card";
 import { SectionHeading } from "@/components/section-heading";
 import { ShowMore } from "@/components/show-more";
-import { Sparkline } from "@/components/sparkline";
-import { StatGrid, StatTile } from "@/components/stat-tile";
 import { StreakFlame } from "@/components/streak-flame";
 import { SubmitButton } from "@/components/submit-button";
 import { TitleBadge } from "@/components/title-badge";
@@ -23,17 +24,25 @@ import { createClient } from "@/lib/supabase/server";
 import { confirmMatch, disputeAgreedMatch, rejectMatch } from "@/app/(member)/matches/actions";
 import { AGREED_WINDOW_MS, canFlag, flagDeadlineLabel } from "@/lib/agreed";
 import { talkSummary, type LiveComment } from "@/lib/table-talk";
-import { freshMatch, headline } from "@/lib/celebration";
-import { clubDateOf, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
+import { earnedAchievements } from "@/lib/achievements";
+import { freshMatch } from "@/lib/celebration";
+import { clubDateOf, clubMonthStart, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
 import { FEED_SELECT, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
+import { confirmMeta, facesEyebrow, firstName, formDots, nextLine, playedFrom, xpNote } from "@/lib/home";
 import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
-import type { TitleName } from "@/lib/levels";
-import { formatLabel } from "@/lib/race";
+import { levelFromXp, nextBadge } from "@/lib/levels";
+import { myNightStatus } from "@/lib/night";
+import { fetchAllPages } from "@/lib/paging";
+import { playFaces } from "@/lib/play";
+import { formatShort } from "@/lib/race";
+import { aboveOf, leadOf, toRankRow, type RankRow } from "@/lib/ranking";
+import { firstWinOver, gameRankMove, momentLines, rematchHref, resultHeadline, secondAction } from "@/lib/result-moment";
 import { seasonCountdownLabel, seasonStrip } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
-import { currentStreak, overallRank, ratingChangeSince, seasonLabel, winRate, type StatMatch } from "@/lib/stats";
-import { cn } from "@/lib/utils";
+import { byPlayOrder, currentStreak, ratingChangeSince, type PlayOrdered, type StatMatch } from "@/lib/stats";
+import { cn, GOLD_EDGE } from "@/lib/utils";
+import { gameSplits, type YouMatch } from "@/lib/you";
 import { loadXp } from "@/lib/xp-data";
 import type { RsvpResponse } from "@/lib/types";
 
@@ -42,6 +51,24 @@ type NextRsvp = {
   response: RsvpResponse;
   profile: AvatarIdentity | AvatarIdentity[] | null;
 };
+
+type RatedRef = { id: string; rating: number };
+
+// One of your confirmed games, for what the newest one changed: the record
+// in its game type, a first win over them, the achievements it unlocked.
+type MomentMatch = StatMatch &
+  YouMatch &
+  PlayOrdered & {
+    reporter: RatedRef | RatedRef[] | null;
+    opponent: RatedRef | RatedRef[] | null;
+  };
+
+const MOMENT_COLS =
+  "id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, game_type, played_at, created_at, confirmed_at, reporter:profiles!matches_reporter_id_fkey(id, rating), opponent:profiles!matches_opponent_id_fkey(id, rating)";
+
+// What happened on the ladder after the newest game counted (ruling S4-R5).
+type LaterRating = { profile_id: string; rating_before: number; created_at: string };
+type LaterGame = { reporter_id: string; opponent_id: string; winner_id: string };
 
 export default async function HomePage({
   searchParams,
@@ -58,11 +85,12 @@ export default async function HomePage({
 
   const now = new Date();
   const nowIso = now.toISOString();
-  const monthAgo = new Date(now.getTime() - 30 * 86_400_000);
+  // "This month" is the club calendar month (ruling S2-R4), as on the You page.
+  const monthStart = clubMonthStart(now);
 
   const [
     { data: me },
-    { data: board },
+    { data: board, error: boardError },
     { data: history },
     { data: toConfirm },
     { data: awaiting },
@@ -77,18 +105,20 @@ export default async function HomePage({
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, display_name, rating, matches_played, avatar_url, ball, schools(short_name)")
+      .select("id, display_name, rating, matches_played, avatar_url, ball, school_id, schools(short_name)")
       .eq("id", user.id)
       .single(),
     // Rank, wins and losses come from the same view the leaderboard renders,
     // so the home block can never disagree with the Ranks tab.
-    supabase.from("leaderboard").select("id, wins, losses"),
+    supabase.from("leaderboard").select("id, rating, wins, losses, display_name"),
+    // "This month" on the progress card: every rated game since the 1st, not
+    // a fixed count, so a busy month still finds its first rating.
     supabase
       .from("rating_history")
       .select("rating_before, rating_after, created_at")
       .eq("profile_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(30),
+      .gte("created_at", monthStart.toISOString())
+      .order("created_at", { ascending: false }),
     supabase
       .from("matches")
       .select(
@@ -133,11 +163,12 @@ export default async function HomePage({
       )
       .gte("updated_at", new Date(now.getTime() - LIVE_STALE_MS).toISOString())
       .order("updated_at", { ascending: false }),
-    // Your newest confirmed games: the streak flame and the result card.
+    // Your newest confirmed games: the streak flame, the form dots and the
+    // game-counts screen.
     supabase
       .from("matches")
       .select(
-        "id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, confirmed_at, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
+        "id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, game_type, race_to, spot, confirmed_at, played_at, created_at, reporter:profiles!matches_reporter_id_fkey(id, display_name, avatar_url, ball), opponent:profiles!matches_opponent_id_fkey(id, display_name, avatar_url, ball)"
       )
       .eq("status", "confirmed")
       .or(`reporter_id.eq.${user.id},opponent_id.eq.${user.id}`)
@@ -159,46 +190,18 @@ export default async function HomePage({
     loadNight(supabase, user.id, now),
   ]);
   const flaggable = (agreedForMe ?? []).filter((m) => canFlag(m, user.id, now));
-  const mine30 = (myMatches ?? []) as (StatMatch & { reporter: unknown; opponent: unknown })[];
-  const streak = currentStreak(mine30, user.id);
+  // Called to a table tonight: that card joins what needs you at the top; out
+  // of the line or waiting in it, the night stays further down.
+  const nightStatus = myNightStatus(nightData.night, nightData.line, nightData.tables, user.id, now);
+  const atTable = nightStatus.kind === "playing";
+  // Newest confirmed first: the game-counts screen is the game that just counted.
+  const mine30 = (myMatches ?? []) as (StatMatch &
+    PlayOrdered & { game_type: string; race_to: number | null; spot: number; reporter: unknown; opponent: unknown })[];
+  // The same games as they were played (ruling S3-R7): the flame and the dots
+  // read "the last N", so a batch confirmed out of order can't misstate them.
+  const mineByPlay = [...mine30].sort(byPlayOrder);
+  const streak = currentStreak(mineByPlay, user.id);
   const streakLength = streak?.kind === "W" ? streak.length : 0;
-
-  // The result card: the newest confirmed game in the last day, with what it
-  // did to the rating and XP, and the badge or streak mark it caused.
-  const fresh = freshMatch(mine30, now);
-  let celebration: React.ComponentProps<typeof CelebrationCard> | null = null;
-  if (fresh) {
-    const [{ data: hist }, { data: moments }] = await Promise.all([
-      supabase
-        .from("rating_history")
-        .select("rating_before, rating_after")
-        .eq("match_id", fresh.id)
-        .eq("profile_id", user.id)
-        .maybeSingle(),
-      supabase.from("activity").select("kind, data").eq("match_id", fresh.id).eq("actor_id", user.id),
-    ]);
-    const opponentRaw = fresh.reporter_id === user.id ? fresh.opponent : fresh.reporter;
-    const opponent = one(opponentRaw as FeedPerson | FeedPerson[] | null);
-    const badgeRow = (moments ?? []).find((r) => r.kind === "badge");
-    const streakRow = (moments ?? []).find((r) => r.kind === "streak");
-    if (hist && opponent) {
-      celebration = {
-        matchId: fresh.id,
-        won: fresh.winner_id === user.id,
-        headline: headline(fresh, user.id, opponent.display_name),
-        opponent,
-        ratingBefore: hist.rating_before,
-        ratingAfter: hist.rating_after,
-        xpEarned: xp.perMatch.get(fresh.id) ?? 0,
-        xpCapped: xp.capped.has(fresh.id),
-        level: level.level,
-        intoLevel: level.intoLevel,
-        needed: level.needed,
-        badge: badgeRow ? (String((badgeRow.data as { title?: string }).title) as TitleName) : null,
-        streak: streakRow ? Number((streakRow.data as { length?: number }).length) : null,
-      };
-    }
-  }
   const feedRows = (feed ?? []) as unknown as FeedRow[];
 
   const mySchool = one(me?.schools as { short_name: string } | { short_name: string }[] | null)?.short_name ?? null;
@@ -231,27 +234,261 @@ export default async function HomePage({
     }
     for (const [gameId, comments] of perGame) talkByGame.set(gameId, talkSummary(comments, talkNames));
   }
-  // Your place in the running season and who leads it, for the strip under the stats.
-  const strip = openSeason ? seasonStrip(await loadSeasonStandings(supabase, openSeason), user.id) : null;
+  // Games played come from the same view as rank, so placement and the Next
+  // line can never disagree with the Ranks tab. If that read fails, the
+  // profile's count keeps a veteran off the Step 1 card and the Next line,
+  // which needs rank, is left out.
+  if (boardError) console.error("home: couldn't read the leaderboard", boardError);
+  const rankRows: RankRow[] = (board ?? []).map(toRankRow);
+  const { played, rankKnown } = playedFrom(
+    rankRows.find((r) => r.id === user.id),
+    me?.matches_played
+  );
+  const boardNames = new Map((board ?? []).map((r) => [String(r.id), String(r.display_name ?? "Member")]));
+
+  // The game-counts screen (spec 2026-10-21-play-and-progress §3): the newest
+  // confirmed game in the last day, what it did to the rating and XP, and at
+  // most three true lines about what changed.
+  const fresh = freshMatch(mine30, now);
+  const today = clubDateOf(nowIso);
+  // A paged read that throws on a failed page, so a partial list is never
+  // counted from: the caller drops what needs it instead.
+  function allPages<T>(
+    what: string,
+    page: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>
+  ) {
+    return fetchAllPages<T>((from, to) =>
+      page(from, to).then(({ data, error: readError }) => {
+        if (readError) throw new Error(readError.message);
+        return (data ?? []) as T[];
+      })
+    ).catch((err: unknown) => {
+      console.error(`home: couldn't read ${what}`, err);
+      return null;
+    });
+  }
+
+  // One more wave, all at once: your place in the running season and who
+  // leads it, for the strip under the progress card; for a member with no game
+  // yet, the people to play (approved members in the Play sheet's order, with
+  // no recent opponents); and, while a game is fresh, the result screen's reads.
+  const [strip, members, freshReads] = await Promise.all([
+    openSeason ? loadSeasonStandings(supabase, openSeason).then((s) => seasonStrip(s, user.id)) : null,
+    played === 0
+      ? supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url, ball, school_id")
+          .eq("status", "approved")
+          .neq("id", user.id)
+          .then(({ data }) => (data ?? []) as (FirstGameFace & { school_id: string | null })[])
+      : null,
+    fresh
+      ? Promise.all([
+          // Both players' ratings going in: the ladder before this game.
+          supabase.from("rating_history").select("profile_id, rating_before, rating_after").eq("match_id", fresh.id),
+          // The badge and streak rows this game wrote for you.
+          supabase.from("activity").select("kind, data").eq("match_id", fresh.id).eq("actor_id", user.id),
+          // Your best rating before this game (the 500 / 600 club).
+          supabase
+            .from("rating_history")
+            .select("rating_after")
+            .eq("profile_id", user.id)
+            .or(`match_id.is.null,match_id.neq.${fresh.id}`)
+            .order("rating_after", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          // Every confirmed game of yours (paged).
+          allPages<MomentMatch>("your games for the result screen", (from, to) =>
+            supabase
+              .from("matches")
+              .select(MOMENT_COLS)
+              .eq("status", "confirmed")
+              .or(`reporter_id.eq.${user.id},opponent_id.eq.${user.id}`)
+              .order("id")
+              .range(from, to)
+          ),
+          // Everything that moved the ladder after this game counted (ruling
+          // S4-R5): rating changes stamped strictly later (this game's own are
+          // stamped with its confirmed_at), and games confirmed strictly later.
+          // A day's worth at most, so small.
+          allPages<LaterRating>("the ratings since the result", (from, to) =>
+            supabase
+              .from("rating_history")
+              .select("profile_id, rating_before, created_at")
+              .gt("created_at", fresh.confirmed_at!)
+              .or(`match_id.is.null,match_id.neq.${fresh.id}`)
+              .order("id")
+              .range(from, to)
+          ),
+          allPages<LaterGame>("the games since the result", (from, to) =>
+            supabase
+              .from("matches")
+              .select("reporter_id, opponent_id, winner_id")
+              .eq("status", "confirmed")
+              .gt("confirmed_at", fresh.confirmed_at!)
+              .neq("id", fresh.id)
+              .order("id")
+              .range(from, to)
+          ),
+        ])
+      : null,
+  ]);
+
+  let moment: GameCountsProps | null = null;
+  if (fresh && freshReads) {
+    const opponentId = fresh.reporter_id === user.id ? fresh.opponent_id : fresh.reporter_id;
+    const [
+      { data: hist, error: histError },
+      { data: moments, error: momentsError },
+      { data: peakRow, error: peakError },
+      allMine,
+      laterHistory,
+      laterMatches,
+    ] = freshReads;
+    // A failed read keeps its fallback (no screen without your rating
+    // history; no badge, streak or achievement lines), but is never silent.
+    if (histError) console.error("home: couldn't read the result's rating history", histError);
+    if (momentsError) console.error("home: couldn't read the result's badge and streak rows", momentsError);
+    if (peakError) console.error("home: couldn't read your best rating for the result screen", peakError);
+    const mine = (hist ?? []).find((h) => h.profile_id === user.id);
+    const iReported = fresh.reporter_id === user.id;
+    const opponent = one((iReported ? fresh.opponent : fresh.reporter) as FeedPerson | FeedPerson[] | null);
+    if (mine && opponent) {
+      const won = fresh.winner_id === user.id;
+      const opponentFirst = firstName(opponent.display_name);
+
+      // The ladder as it stood the instant this game counted, against it with
+      // the game taken back out (rulings S4-R3, S4-R5): what anyone played
+      // since is not this game's doing. Without the ladder or what came after
+      // it, the rank line is left out rather than guessed.
+      const move =
+        boardError || !laterHistory || !laterMatches
+          ? null
+          : gameRankMove({
+              today: rankRows,
+              laterHistory,
+              laterMatches,
+              winnerId: fresh.winner_id,
+              loserId: won ? opponentId : user.id,
+              ratingBefore: new Map((hist ?? []).map((h) => [h.profile_id, h.rating_before])),
+              meId: user.id,
+              opponentId,
+            });
+
+      // Your games as they were played (ruling S3-R7), this one included.
+      const byPlay = allMine?.some((m) => m.id === fresh.id) ? [...allMine].sort(byPlayOrder) : null;
+      let achievementsUnlocked: string[] = [];
+      if (byPlay && !peakError) {
+        // With and without this game, everything else as it is now. Cup and
+        // season titles are the feed's to announce, so neither side counts them.
+        const opponentRatings: Record<string, number> = {};
+        for (const m of byPlay) {
+          for (const p of [one(m.reporter), one(m.opponent)]) if (p) opponentRatings[p.id] = p.rating;
+        }
+        const ratingNow = me?.rating ?? mine.rating_after;
+        const base = { viewerId: user.id, rating: ratingNow, opponentRatings, tournamentsWon: 0, seasonsWon: 0 };
+        const peakWithout = Math.max(peakRow?.rating_after ?? mine.rating_before, mine.rating_before);
+        const peakWith = Math.max(peakWithout, mine.rating_after, ratingNow);
+        const without = byPlay.filter((m) => m.id !== fresh.id);
+        const had = new Set(earnedAchievements({ ...base, peak: peakWithout, matches: without }).map((a) => a.id));
+        achievementsUnlocked = earnedAchievements({ ...base, peak: peakWith, matches: byPlay })
+          .filter((a) => !had.has(a.id))
+          .map((a) => a.label);
+      }
+      const split = byPlay ? gameSplits(byPlay, user.id).find((s) => s.game === fresh.game_type) : undefined;
+
+      const badgeTitle = (moments ?? []).find((r) => r.kind === "badge")?.data?.title;
+      const streakRow = (moments ?? []).find((r) => r.kind === "streak");
+      const streakRun = streakRow ? Number((streakRow.data as { length?: number }).length) : NaN;
+      const xpEarned = xp.perMatch.get(fresh.id) ?? 0;
+
+      const second = secondAction({
+        nightOpen: nightData.night !== null,
+        nightOpenedAt: nightData.night?.opened_at ?? null,
+        myNightKind: nightStatus.kind,
+        confirmedAt: fresh.confirmed_at!,
+        playedAt: fresh.played_at,
+        today,
+      });
+      moment = {
+        matchId: fresh.id,
+        won,
+        headline: resultHeadline(
+          won,
+          opponentFirst,
+          iReported ? fresh.reporter_score : fresh.opponent_score,
+          iReported ? fresh.opponent_score : fresh.reporter_score
+        ),
+        sub: [GAME_LABEL[fresh.game_type] ?? fresh.game_type, formatShort(fresh.race_to, fresh.spot)]
+          .filter(Boolean)
+          .join(" · "),
+        ratingBefore: mine.rating_before,
+        ratingAfter: mine.rating_after,
+        xpEarned,
+        xpCapped: xp.capped.has(fresh.id),
+        level: level.level,
+        intoLevel: level.intoLevel,
+        needed: level.needed,
+        lines: momentLines({
+          move: move && {
+            kind: move.kind,
+            to: move.to,
+            other: move.otherId ? firstName(boardNames.get(move.otherId) ?? "Member") : null,
+          },
+          // The game is the newest in XP order, so taking its XP off the
+          // total is the level before it.
+          levelBefore: levelFromXp(xp.total - xpEarned).level,
+          levelAfter: level.level,
+          titleUnlocked: typeof badgeTitle === "string" ? badgeTitle : null,
+          achievementsUnlocked,
+          firstWinOver: byPlay && firstWinOver(byPlay, user.id, fresh.id) ? opponentFirst : null,
+          winStreak: Number.isFinite(streakRun) ? streakRun : null,
+          gameRecord: split ? { label: split.label, wins: split.wins, losses: split.losses } : null,
+        }),
+        action:
+          second === "back_in_line" && nightData.night
+            ? { kind: "back_in_line", nightId: nightData.night.id }
+            : {
+                kind: "rematch",
+                href: rematchHref({ opponentId, gameType: fresh.game_type, raceTo: fresh.race_to, matchId: fresh.id }),
+              },
+      };
+    }
+  }
+
+  let firstGameFaces: FirstGameFace[] = [];
+  let firstGameEyebrow = "";
+  if (members) {
+    const mySchoolId: string | null = me?.school_id ?? null;
+    const byId = new Map(members.map((m) => [m.id, m]));
+    const picked = playFaces([], members, mySchoolId).flatMap((id) => byId.get(id) ?? []);
+    firstGameFaces = picked.map((m) => ({
+      id: m.id,
+      display_name: m.display_name,
+      avatar_url: m.avatar_url,
+      ball: m.ball,
+    }));
+    firstGameEyebrow = facesEyebrow(
+      picked.map((m) => m.school_id),
+      mySchoolId,
+      mySchool
+    );
+  }
 
   const rating = me?.rating ?? 450;
-  const played = me?.matches_played ?? 0;
-  const provisional = played < 10;
+  const change = ratingChangeSince(history ?? [], monthStart, rating);
+  const above = aboveOf(rankRows, user.id);
+  const lead = leadOf(rankRows, user.id);
+  const badge = nextBadge(level, xp.total);
+  const next = rankKnown
+    ? nextLine({
+        played,
+        above: above ? { name: boardNames.get(above.id) ?? "Member", rank: above.rank, gap: above.gap } : null,
+        lead: lead ? { name: boardNames.get(lead.id) ?? "Member", gap: lead.gap } : null,
+        badge: badge ? { title: badge.title, xpToGo: badge.xpToGo } : null,
+      })
+    : null;
 
-  const myRow = (board ?? []).find((r) => r.id === user.id);
-  const wins = Number(myRow?.wins ?? 0);
-  const losses = Number(myRow?.losses ?? 0);
-  const rate = winRate(wins, losses);
-  const rank = overallRank(board ?? [], user.id);
-
-  const chronological = [...(history ?? [])].reverse();
-  const ratings =
-    chronological.length > 0
-      ? [chronological[0].rating_before, ...chronological.map((h) => h.rating_after)]
-      : [rating];
-  const change = ratingChangeSince(history ?? [], monthAgo, rating);
-
-  const today = clubDateOf(nowIso);
   const greeting = greetingFor(now, me?.display_name ?? "").split(",")[0];
   const first = (me?.display_name ?? "").trim().split(/\s+/)[0] || "there";
 
@@ -293,11 +530,171 @@ export default async function HomePage({
 
       {message && <p className="bg-card rounded-2xl p-3 text-sm">{message}</p>}
       {error && <p className="bg-destructive/10 text-destructive rounded-2xl p-3 text-sm">{error}</p>}
-      {celebration && <CelebrationCard {...celebration} />}
+      {/* Keyed by the game, so a newer one opens fresh. */}
+      {moment && <GameCountsScreen key={moment.matchId} {...moment} />}
+
+      {/* What needs you (spec §2), gold-edged, before anything else. The
+          resume card renders on the client, so an empty stack hides itself. */}
+      <div className="flex flex-col gap-6 empty:hidden">
+        {(toConfirm ?? []).length > 0 && (
+          <section className="flex flex-col gap-2.5">
+            <h2 className="eyebrow">Confirm results</h2>
+            {(toConfirm ?? []).map((m) => {
+              const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
+              const name = reporter?.display_name ?? "Member";
+              return (
+                <div key={m.id} className={cn(GOLD_EDGE, "flex flex-col gap-3.5")}>
+                  <div className="flex items-center gap-3">
+                    <Avatar person={reporter ?? { id: "unknown", display_name: null }} size="md" />
+                    <div className="flex min-w-0 flex-col gap-[3px]">
+                      <p className="truncate text-[15px] leading-tight">
+                        <span className="font-medium">{firstName(name)}</span> logged a game
+                      </p>
+                      {/* Wraps rather than truncates: the spot, at the end,
+                          is part of what the confirmer is agreeing to. */}
+                      <p className="text-muted-foreground line-clamp-2 text-[12px] leading-tight">
+                        {confirmMeta({
+                          reporterName: name,
+                          // You are always the opponent here; the reporter join
+                          // can be null (RLS hides a non-approved profile).
+                          reporterWon: m.winner_id !== user.id,
+                          reporterScore: m.reporter_score,
+                          opponentScore: m.opponent_score,
+                          gameType: m.game_type,
+                          raceTo: m.race_to,
+                          spot: m.spot,
+                          spotToMe: m.spot_to === user.id,
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {/* Disabled while in flight: a double tap must not send it twice. */}
+                    <form action={rejectMatch} className="flex-1">
+                      <input type="hidden" name="match_id" value={m.id} />
+                      <SubmitButton variant="ghost" className="w-full" pendingChildren="Sending…">
+                        Not right
+                      </SubmitButton>
+                    </form>
+                    <form action={confirmMatch} className="flex-1">
+                      <input type="hidden" name="match_id" value={m.id} />
+                      <SubmitButton className="w-full" pendingChildren="Confirming…">
+                        Confirm
+                      </SubmitButton>
+                    </form>
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        )}
+
+        {atTable && (
+          <section className="flex flex-col gap-2.5">
+            <h2 className="eyebrow">Your table</h2>
+            <div className={GOLD_EDGE}>
+              <NightCard data={nightData} meId={user.id} back="/" now={now} />
+            </div>
+          </section>
+        )}
+
+        {flaggable.length > 0 && (
+          <section className="flex flex-col gap-2.5">
+            <h2 className="eyebrow">Logged for you</h2>
+            {flaggable.map((m) => {
+              const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
+              // As above: you are the opponent, so anything but you winning is theirs.
+              const theyWon = m.winner_id !== user.id;
+              return (
+                <ListRow
+                  key={m.id}
+                  className={cn(GOLD_EDGE, "border-b-0")}
+                  leading={<Avatar person={reporter ?? { id: "unknown", display_name: null }} size="md" />}
+                  title={
+                    <>
+                      {reporter?.display_name ?? "Member"} · {theyWon ? "beat you" : "lost to you"}{" "}
+                      <span className="stat-number">
+                        {m.reporter_score}–{m.opponent_score}
+                      </span>
+                    </>
+                  }
+                  meta={`Counted · flag until ${flagDeadlineLabel(m.confirmed_at!, now)}`}
+                  trailing={
+                    <form action={disputeAgreedMatch}>
+                      <input type="hidden" name="match_id" value={m.id} />
+                      {/* Disabled while in flight: a double tap must not send two flags. */}
+                      <SubmitButton
+                        variant="link"
+                        size="xs"
+                        className="text-muted-foreground px-0 text-[13px] font-normal no-underline"
+                        pendingChildren="Flagging…"
+                      >
+                        Not right?
+                      </SubmitButton>
+                    </form>
+                  }
+                />
+              );
+            })}
+          </section>
+        )}
+
+        <ResumeGameCard meId={user.id} />
+      </div>
+
       <NotifyPrompt />
       <LiveHome />
 
-      {nightData.night && (
+      <section className="flex flex-col gap-3">
+        {played === 0 ? (
+          <FirstGameCard eyebrow={firstGameEyebrow} faces={firstGameFaces} />
+        ) : (
+          <ProgressCard
+            meId={user.id}
+            rating={rating}
+            change={change}
+            form={formDots(mineByPlay, user.id)}
+            played={played}
+            level={level}
+            xpNote={xpNote(level, xp.total)}
+            next={next}
+          />
+        )}
+        {openSeason && strip && (
+          <Link
+            href="/leaderboard?tab=season"
+            className="press bg-card flex items-center justify-between gap-3 rounded-[20px] px-5 py-4 shadow-[inset_0_0_0_1px_var(--hairline-row)]"
+          >
+            <span className="flex min-w-0 flex-col gap-1.5">
+              <span className="eyebrow">
+                {openSeason.name} · {seasonCountdownLabel(openSeason, today)}
+              </span>
+              <span className="stat-number truncate text-[20px] leading-none">{strip.primary}</span>
+              <span className="text-muted-foreground truncate text-[12px] leading-tight">{strip.secondary}</span>
+            </span>
+            <ChevronRight className="text-muted-foreground size-4 shrink-0" strokeWidth={1.7} />
+          </Link>
+        )}
+      </section>
+
+      {(awaiting ?? []).length > 0 && (
+        <section className="flex flex-col gap-1.5">
+          <SectionHeading>Waiting on</SectionHeading>
+          {(awaiting ?? []).map((m) => {
+            const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
+            return (
+              <ListRow
+                key={m.id}
+                leading={<Avatar person={opponent ?? { id: "unknown", display_name: null }} size="md" />}
+                title={opponent?.display_name ?? "Member"}
+                meta="Hasn't confirmed your report yet"
+              />
+            );
+          })}
+        </section>
+      )}
+
+      {nightData.night && !atTable && (
         <section className="flex flex-col gap-3">
           <Link href="/night" className="eyebrow press flex items-center gap-2">
             <span aria-hidden="true" className="bg-win size-2 rounded-full motion-safe:animate-pulse" />
@@ -323,154 +720,6 @@ export default async function HomePage({
               <LiveGameCard key={g.reporter_id} row={g} viewerId={user.id} talk={talkByGame.get(g.id as string)} />
             ))}
           />
-        </section>
-      )}
-
-      <section className="flex flex-col gap-[18px]">
-        <span className="eyebrow">Rating · {openSeason?.name ?? seasonLabel(today)}</span>
-        <div className="flex items-end justify-between gap-4">
-          <span className="hero-number">{rating}</span>
-          {change !== null && (
-            <span className={cn("stat-number pb-1.5 text-[13px]", change >= 0 ? "text-win" : "text-loss")}>
-              {change >= 0 ? "+" : "−"}
-              {Math.abs(change)} this month
-            </span>
-          )}
-        </div>
-        <Sparkline ratings={ratings} />
-        <StatGrid cols={3}>
-          <StatTile label="Overall rank" value={rank ? `#${rank}` : "–"} />
-          <StatTile
-            label="Win rate"
-            value={rate === null ? "–" : `${rate}%`}
-            note={`${wins}–${losses}${provisional ? " · provisional" : ""}`}
-          />
-          <StatTile
-            label={`Level · ${level.title}`}
-            value={`Lvl ${level.level}`}
-            note={`${Math.round((level.intoLevel / level.needed) * 100)}% to ${level.level + 1}`}
-          />
-        </StatGrid>
-        {openSeason && strip && (
-          <Link
-            href="/leaderboard?tab=season"
-            className="press bg-card flex items-center justify-between gap-3 rounded-[20px] px-5 py-4 shadow-[inset_0_0_0_1px_var(--hairline-row)]"
-          >
-            <span className="flex min-w-0 flex-col gap-1.5">
-              <span className="eyebrow">
-                {openSeason.name} · {seasonCountdownLabel(openSeason, today)}
-              </span>
-              <span className="stat-number truncate text-[20px] leading-none">{strip.primary}</span>
-              <span className="text-muted-foreground truncate text-[12px] leading-tight">{strip.secondary}</span>
-            </span>
-            <ChevronRight className="text-muted-foreground size-4 shrink-0" strokeWidth={1.7} />
-          </Link>
-        )}
-      </section>
-
-      {(toConfirm ?? []).length > 0 && (
-        <section className="flex flex-col gap-1.5">
-          <SectionHeading>Confirm results</SectionHeading>
-          {(toConfirm ?? []).map((m) => {
-            const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
-            const theyWon = m.winner_id === reporter?.id;
-            return (
-              <ListRow
-                key={m.id}
-                leading={<Avatar person={reporter ?? { id: "unknown", display_name: null }} size="md" />}
-                title={
-                  <>
-                    {reporter?.display_name ?? "Member"} · {theyWon ? "beat you" : "lost to you"}{" "}
-                    <span className="stat-number">
-                      {m.reporter_score}–{m.opponent_score}
-                    </span>
-                  </>
-                }
-                meta={[
-                  GAME_LABEL[m.game_type] ?? m.game_type,
-                  formatLabel(
-                    m.race_to,
-                    m.spot,
-                    m.spot_to === user.id ? "you" : (reporter?.display_name ?? "them").split(" ")[0]
-                  ),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-                trailing={
-                  <span className="flex items-center gap-4 text-[13px]">
-                    <form action={rejectMatch}>
-                      <input type="hidden" name="match_id" value={m.id} />
-                      <button type="submit" className="text-muted-foreground press">
-                        Reject
-                      </button>
-                    </form>
-                    <form action={confirmMatch}>
-                      <input type="hidden" name="match_id" value={m.id} />
-                      <button type="submit" className="text-brass press font-medium">
-                        Confirm
-                      </button>
-                    </form>
-                  </span>
-                }
-              />
-            );
-          })}
-        </section>
-      )}
-
-      {flaggable.length > 0 && (
-        <section className="flex flex-col gap-1.5">
-          <SectionHeading>Logged for you</SectionHeading>
-          {flaggable.map((m) => {
-            const reporter = Array.isArray(m.reporter) ? m.reporter[0] : m.reporter;
-            const theyWon = m.winner_id === reporter?.id;
-            return (
-              <ListRow
-                key={m.id}
-                leading={<Avatar person={reporter ?? { id: "unknown", display_name: null }} size="md" />}
-                title={
-                  <>
-                    {reporter?.display_name ?? "Member"} · {theyWon ? "beat you" : "lost to you"}{" "}
-                    <span className="stat-number">
-                      {m.reporter_score}–{m.opponent_score}
-                    </span>
-                  </>
-                }
-                meta={`Counted · flag until ${flagDeadlineLabel(m.confirmed_at!, now)}`}
-                trailing={
-                  <form action={disputeAgreedMatch}>
-                    <input type="hidden" name="match_id" value={m.id} />
-                    {/* Disabled while in flight: a double tap must not send two flags. */}
-                    <SubmitButton
-                      variant="link"
-                      size="xs"
-                      className="text-muted-foreground px-0 text-[13px] font-normal no-underline"
-                      pendingChildren="Flagging…"
-                    >
-                      Not right?
-                    </SubmitButton>
-                  </form>
-                }
-              />
-            );
-          })}
-        </section>
-      )}
-
-      {(awaiting ?? []).length > 0 && (
-        <section className="flex flex-col gap-1.5">
-          <SectionHeading>Waiting on</SectionHeading>
-          {(awaiting ?? []).map((m) => {
-            const opponent = Array.isArray(m.opponent) ? m.opponent[0] : m.opponent;
-            return (
-              <ListRow
-                key={m.id}
-                leading={<Avatar person={opponent ?? { id: "unknown", display_name: null }} size="md" />}
-                title={opponent?.display_name ?? "Member"}
-                meta="Hasn't confirmed your report yet"
-              />
-            );
-          })}
         </section>
       )}
 

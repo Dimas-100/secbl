@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  clubMonthName,
+  clubMonthStart,
   clubWeekOf,
+  shortClubDate,
   eventMentionsSchool,
   addClubWeek,
   clubDateOf,
@@ -226,5 +229,59 @@ describe("clubWeekOf", () => {
     expect(clubWeekOf("2026-03-09T03:30:00Z")).toBe("2026-03-02");
     // Mon Mar 9 2026 00:00 EDT = 04:00Z
     expect(clubWeekOf("2026-03-09T04:00:00Z")).toBe("2026-03-09");
+  });
+});
+
+describe("clubMonthStart", () => {
+  it("is midnight on the 1st of the club month, as an instant", () => {
+    // Wed Oct 21 2026, 11:00 EDT -> Oct 1 00:00 EDT = 04:00Z.
+    expect(clubMonthStart(new Date("2026-10-21T15:00:00Z")).toISOString()).toBe("2026-10-01T04:00:00.000Z");
+  });
+  it("keeps a UTC instant that is still last month in New York in that month", () => {
+    // 2026-11-01T02:30Z is Oct 31, 10:30 PM EDT: still October at the club.
+    expect(clubMonthStart(new Date("2026-11-01T02:30:00Z")).toISOString()).toBe("2026-10-01T04:00:00.000Z");
+  });
+  it("rolls to the new month at 00:00 club time on the 1st", () => {
+    expect(clubMonthStart(new Date("2026-11-01T04:00:00Z")).toISOString()).toBe("2026-11-01T04:00:00.000Z");
+    expect(clubMonthStart(new Date("2026-11-01T03:59:59Z")).toISOString()).toBe("2026-10-01T04:00:00.000Z");
+  });
+  it("uses the offset in force on the 1st, not today's, across DST", () => {
+    // Nov 30 2026, 10:00 PM EST (03:00Z Dec 1): November began in EDT.
+    expect(clubMonthStart(new Date("2026-12-01T03:00:00Z")).toISOString()).toBe("2026-11-01T04:00:00.000Z");
+    // Mar 20 2026 (EDT): March began in EST.
+    expect(clubMonthStart(new Date("2026-03-20T16:00:00Z")).toISOString()).toBe("2026-03-01T05:00:00.000Z");
+  });
+  it("handles standard time in winter", () => {
+    expect(clubMonthStart(new Date("2026-01-15T12:00:00Z")).toISOString()).toBe("2026-01-01T05:00:00.000Z");
+  });
+});
+
+describe("clubMonthName", () => {
+  it("names the club month an instant falls in", () => {
+    expect(clubMonthName("2026-10-21T15:00:00Z")).toBe("October");
+    expect(clubMonthName("2026-01-15T12:00:00Z")).toBe("January");
+  });
+  it("is still last month in New York when UTC has rolled over", () => {
+    // Oct 31, 10:30 PM EDT.
+    expect(clubMonthName("2026-11-01T02:30:00Z")).toBe("October");
+    // Nov 1, 00:30 EDT.
+    expect(clubMonthName("2026-11-01T04:30:00Z")).toBe("November");
+  });
+});
+
+describe("shortClubDate", () => {
+  const today = "2026-10-21";
+  it("reads a club date in this club year as Mon D", () => {
+    expect(shortClubDate("2026-10-13", today)).toBe("Oct 13");
+    expect(shortClubDate("2026-09-05", today)).toBe("Sep 5");
+  });
+  it("adds the year when the date isn't in today's club year", () => {
+    expect(shortClubDate("2025-12-12", today)).toBe("Dec 12, 2025");
+    expect(shortClubDate("2026-12-31", "2027-01-01")).toBe("Dec 31, 2026");
+    expect(shortClubDate("2027-01-01", "2027-01-01")).toBe("Jan 1");
+  });
+  it("never shifts the day, whatever the zone", () => {
+    expect(shortClubDate("2026-11-01", today)).toBe("Nov 1");
+    expect(shortClubDate("2026-12-31", today)).toBe("Dec 31");
   });
 });

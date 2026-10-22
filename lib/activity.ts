@@ -3,16 +3,12 @@
 // profile uses, then stored with the match that caused them so a void takes
 // them away again. Writing lives in lib/activity-write.ts (server only).
 import { TITLES, type LevelInfo, type TitleName } from "@/lib/levels";
+import { rankedIds, type RankRow } from "@/lib/ranking";
 import { currentStreak, type StatMatch } from "@/lib/stats";
 
 // Ladder passes are only a moment near the top; lower down they happen
 // every night and would drown the feed.
 export const PASS_TOP = 10;
-
-export interface BoardRow {
-  id: string;
-  rating: number;
-}
 
 export function isStreakMark(n: number): boolean {
   return n === 3 || n === 5 || (n >= 10 && n % 5 === 0);
@@ -26,24 +22,31 @@ export function badgeMoment(before: LevelInfo, after: LevelInfo): { title: Title
   return { title: after.title, level: after.level };
 }
 
-export function streakMoment(newestFirst: StatMatch[], winnerId: string): { length: number } | null {
-  const s = currentStreak(newestFirst, winnerId);
+// The winner's current run at a mark, from their games newest first in play
+// order (byPlayOrder, ruling S3-R7). With matchId (the game just confirmed),
+// only when that game is part of the run: a game confirmed late that was
+// played before the run is not what made it, and must not carry its moment.
+export function streakMoment(
+  playOrder: StatMatch[],
+  winnerId: string,
+  matchId?: string
+): { length: number } | null {
+  const s = currentStreak(playOrder, winnerId);
   if (!s || s.kind !== "W" || !isStreakMark(s.length)) return null;
+  if (matchId !== undefined && !playOrder.slice(0, s.length).some((m) => m.id === matchId)) return null;
   return { length: s.length };
 }
 
-const order = (board: BoardRow[]) =>
-  [...board].sort((a, b) => b.rating - a.rating || a.id.localeCompare(b.id)).map((r) => r.id);
-
 // The winner moved up into the top PASS_TOP; `otherId` is the highest-placed
-// player they jumped over.
+// player they jumped over. Only members with a confirmed game hold a rank, so
+// jumping someone who has not played is not a pass (lib/ranking.ts).
 export function passMoment(
-  before: BoardRow[],
-  after: BoardRow[],
+  before: RankRow[],
+  after: RankRow[],
   winnerId: string
 ): { rank: number; otherId: string } | null {
-  const b = order(before);
-  const a = order(after);
+  const b = rankedIds(before);
+  const a = rankedIds(after);
   const rb = b.indexOf(winnerId) + 1;
   const ra = a.indexOf(winnerId) + 1;
   if (rb === 0 || ra === 0 || ra >= rb || ra > PASS_TOP) return null;

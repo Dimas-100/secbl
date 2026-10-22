@@ -128,13 +128,19 @@ test("a season runs from open to champion with the feed and live now along the w
   await pageB.getByRole("button", { name: "Confirm" }).click();
   // A cold dev compile of the confirm path can take a while the first time.
   await expect(pageB.getByText(/ratings updated/i)).toBeVisible({ timeout: 20_000 });
-  await expect(pageB.getByText("Lost 0–3", { exact: true })).toBeVisible();
+  // The game counts: Bravo's screen tells the loss over Home; Done clears it,
+  // and the result is in the feed underneath.
+  const screen = pageB.getByRole("dialog", { name: "Latest result" });
+  await expect(screen.getByRole("heading", { name: "E2E beat you 3–0" })).toBeVisible();
+  await screen.getByRole("button", { name: "Done" }).click();
+  await expect(screen).toHaveCount(0);
+  await expect(pageB.getByRole("main").getByText("Lost 0–3", { exact: true })).toBeVisible();
 
-  // Standings: 3 for the win, 1 for the loss.
+  // Standings: 3 for the win, 1 for the loss ("1 pt", never "1 pts").
   await pageB.goto("/leaderboard?tab=season");
   const standings = pageB.getByRole("list", { name: "Season standings" });
   await expect(standings.getByRole("link", { name: new RegExp(`1.*${a.name}.*1–0.*3 pts`) })).toBeVisible();
-  await expect(standings.getByRole("link", { name: new RegExp(`${b.name}.*0–1.*1 pts`) })).toBeVisible();
+  await expect(standings.getByRole("link", { name: new RegExp(`${b.name}.*0–1.*1 pt(?!s)`) })).toBeVisible();
 
   // The admin sees the season on Admin, with Alpha leading.
   const ctxAdmin = await browser.newContext();

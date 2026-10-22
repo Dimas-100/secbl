@@ -10,7 +10,7 @@ import { freeTableAfterReport } from "@/lib/night-data";
 import { matchAgreedPayload, matchReportedPayload } from "@/lib/push";
 import { notify } from "@/lib/push-send";
 import { formatShort, validateResult } from "@/lib/race";
-import { findDuplicate, type DuplicateGame, type PairMatchRow } from "@/lib/report-form";
+import { duplicateSince, findDuplicate, type DuplicateGame, type PairMatchRow } from "@/lib/report-form";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import type { Match } from "@/lib/types";
 import { confirmMatch } from "../actions";
@@ -22,11 +22,16 @@ function fail(message: string): never {
 // A pending or confirmed game between these two on that day, if any. Both
 // directions: the pair is matched with two IN lists (reporter ≠ opponent is a
 // table constraint), so no user input is spliced into a filter string.
+// `since` is the created_at of the game a Rematch board follows (read on the
+// server by the page, ruling S4-R6): that game and anything logged before it
+// are not this one (spec 2026-10-21-play-and-progress §3). A time after this
+// server's now is ignored.
 async function loadDuplicate(
   supabase: SupabaseClient,
   meId: string,
   opponentId: string,
-  playedAt: string
+  playedAt: string,
+  since: string | null
 ): Promise<DuplicateGame | null> {
   if (!opponentId || !playedAt) return null;
   const [{ data }, { data: calledAt }] = await Promise.all([
@@ -46,18 +51,22 @@ async function loadDuplicate(
     meId,
     opponentId,
     playedAt,
-    typeof calledAt === "string" ? calledAt : null
+    duplicateSince(since, typeof calledAt === "string" ? calledAt : null, new Date())
   );
 }
 
 // Asked by the form when Send is tapped, before anything is written.
-export async function findDuplicateReport(opponentId: string, playedAt: string): Promise<DuplicateGame | null> {
+export async function findDuplicateReport(
+  opponentId: string,
+  playedAt: string,
+  since?: string | null
+): Promise<DuplicateGame | null> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  return loadDuplicate(supabase, user.id, String(opponentId), String(playedAt));
+  return loadDuplicate(supabase, user.id, String(opponentId), String(playedAt), typeof since === "string" ? since : null);
 }
 
 // "Confirm theirs" from the duplicate notice: the board is finished with, so
@@ -125,7 +134,8 @@ export async function reportMatch(formData: FormData) {
   // The form already asked; this catches two players sending the same game
   // at the same moment. "Log as a new game" is the deliberate way past it.
   const playedAt = String(formData.get("played_at"));
-  if (formData.get("allow_duplicate") !== "1" && (await loadDuplicate(supabase, user.id, opponentId, playedAt))) {
+  const since = String(formData.get("since") ?? "") || null;
+  if (formData.get("allow_duplicate") !== "1" && (await loadDuplicate(supabase, user.id, opponentId, playedAt, since))) {
     fail("You two already have a game logged that day — check Home before sending it again.");
   }
 

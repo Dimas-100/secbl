@@ -69,10 +69,12 @@ test("member personalises their profile: ball, tagline, favourite game and photo
   expect(profile!.favorite_game).toBe("9ball");
   expect(profile!.avatar_url).toContain(`/avatars/${userId}/`);
 
-  // The player page reflects all of it.
+  // The player page reflects all of it. Looked up inside the visible main
+  // landmark: a production build can leave a hidden copy of the page body.
   await page.goto(`/players/${userId}`);
-  await expect(page.getByText("Breaks and runs. Mostly runs.")).toBeVisible();
-  await expect(page.getByText("Plays 9-ball")).toBeVisible();
+  const main = page.getByRole("main");
+  await expect(main.getByText("Breaks and runs. Mostly runs.")).toBeVisible();
+  await expect(main.getByText("Plays 9-ball")).toBeVisible();
   await expect(page.getByRole("heading", { name: /achievements/i })).toBeVisible();
 
   // Removing the photo clears the URL again.

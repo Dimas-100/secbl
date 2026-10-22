@@ -34,7 +34,7 @@ export default async function LiveGamePage({ params }: { params: Promise<{ repor
   if (!game) {
     return (
       <main className="flex flex-col gap-8">
-        <PageHeader title="Live" back="/" trailing={null} />
+        <PageHeader title="Live" back="/" history trailing={null} />
         <div className="flex flex-col items-center gap-3 py-10 text-center">
           <p className="text-[17px] font-medium">This game is over.</p>
           <Link href="/" className="text-brass text-[14px]">
@@ -66,7 +66,7 @@ export default async function LiveGamePage({ params }: { params: Promise<{ repor
 
   return (
     <main className="flex flex-col gap-6">
-      <PageHeader title={`${firstName(reporter)} vs ${firstName(opponent)}`} back="/" trailing={null} />
+      <PageHeader title={`${firstName(reporter)} vs ${firstName(opponent)}`} back="/" history trailing={null} />
       <LiveGameCard row={row} viewerId={user.id} link={false} />
       <section className="flex flex-col gap-3">
         <span className="eyebrow">Table talk</span>

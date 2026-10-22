@@ -3,11 +3,12 @@
 // Runs after the confirmation is saved and never throws — a missing moment
 // must not fail a result, exactly like push.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { badgeMoment, passMoment, streakMoment, type BoardRow } from "@/lib/activity";
+import { badgeMoment, passMoment, streakMoment } from "@/lib/activity";
 import { clubWeekOf } from "@/lib/events";
 import { levelFromXp, xpFromMatches } from "@/lib/levels";
 import { fetchAllPages } from "@/lib/paging";
-import type { StatMatch } from "@/lib/stats";
+import { boardBefore, toRankRow, type RankRow } from "@/lib/ranking";
+import { byPlayOrder, type PlayOrdered, type StatMatch } from "@/lib/stats";
 import { loadXpMatches } from "@/lib/xp-data";
 
 export async function recordMatchMoments(service: SupabaseClient, matchId: string): Promise<void> {
@@ -36,34 +37,39 @@ export async function recordMatchMoments(service: SupabaseClient, matchId: strin
       if (badge) rows.push({ kind: "badge", actor_id: pid, match_id: matchId, data: badge });
     }
 
-    // Streak: the winner's run, newest first.
+    // Streak: the winner's run as the games were played (ruling S3-R7). The
+    // query's order picks the newest 60 by play; byPlayOrder is the one
+    // definition of that order, so the run is read through it.
     const { data: hist } = await service
       .from("matches")
-      .select("id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, confirmed_at")
+      .select("id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, confirmed_at, played_at, created_at")
       .eq("status", "confirmed")
       .or(`reporter_id.eq.${winner},opponent_id.eq.${winner}`)
-      .order("confirmed_at", { ascending: false })
+      .order("played_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(60);
-    const streak = streakMoment((hist ?? []) as StatMatch[], winner);
+    const played = ((hist ?? []) as (StatMatch & PlayOrdered)[]).sort(byPlayOrder);
+    const streak = streakMoment(played, winner, matchId);
     if (streak) rows.push({ kind: "streak", actor_id: winner, match_id: matchId, data: streak });
 
-    // Pass: the ladder with both players' pre-match ratings vs the ladder now.
-    const board = await fetchAllPages<BoardRow>((from, to) =>
+    // Pass: the ladder with this match taken back out (boardBefore) vs the
+    // ladder now (lib/ranking.ts decides who holds a rank).
+    const board = await fetchAllPages<RankRow>((from, to) =>
       service
-        .from("profiles")
-        .select("id, rating")
-        .eq("status", "approved")
+        .from("leaderboard")
+        .select("id, rating, wins, losses")
         .order("id")
         .range(from, to)
-        .then(({ data }) => (data ?? []) as BoardRow[])
+        .then(({ data }) => (data ?? []).map(toRankRow))
     );
     const { data: hrows } = await service
       .from("rating_history")
       .select("profile_id, rating_before")
       .eq("match_id", matchId);
     const beforeRating = new Map((hrows ?? []).map((h) => [h.profile_id as string, h.rating_before as number]));
-    const before = board.map((p) => (beforeRating.has(p.id) ? { id: p.id, rating: beforeRating.get(p.id)! } : p));
+    const loser = (m.reporter_id === winner ? m.opponent_id : m.reporter_id) as string;
+    const before = boardBefore(board, winner, loser, beforeRating);
     const pass = passMoment(before, board, winner);
     if (pass) {
       rows.push({ kind: "pass", actor_id: winner, other_id: pass.otherId, match_id: matchId, data: { rank: pass.rank } });

@@ -32,7 +32,7 @@ export default async function LadderPage({ params }: { params: Promise<{ id: str
 
   return (
     <main className="flex flex-col gap-8">
-      <PageHeader title="Ladder" back={`/players/${id}`} trailing={null} />
+      <PageHeader title="Ladder" back={`/players/${id}`} history trailing={null} />
 
       <section className="flex flex-col gap-1.5">
         <span className="eyebrow">
@@ -76,7 +76,7 @@ export default async function LadderPage({ params }: { params: Promise<{ id: str
               </div>
               {current && (
                 <div className="flex flex-col gap-2 pl-[54px]">
-                  <LevelBar value={level.intoLevel} max={level.needed} />
+                  <LevelBar value={level.intoLevel} max={level.needed} label={`Level ${level.level} progress`} />
                   <span className="text-muted-foreground text-[12px]">
                     {level.intoLevel} / {level.needed} XP to level {level.level + 1}
                     {level.nextTitle &&

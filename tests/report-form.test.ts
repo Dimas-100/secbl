@@ -1,15 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
+  GAME_TYPES,
+  boardParams,
+  boardScored,
   duplicateNotice,
+  duplicateSince,
   findDuplicate,
+  foldSummary,
+  laterTime,
+  openingBoard,
   recentOpponents,
   resultLine,
+  seededBoard,
   startBoard,
   stepScore,
   submitState,
   type PairMatchRow,
 } from "@/lib/report-form";
-import { suggestedSpot } from "@/lib/race";
+import { RACES, suggestedSpot } from "@/lib/race";
+import { rematchHref } from "@/lib/result-moment";
 
 const roster = [
   { id: "a", display_name: "Ana" },
@@ -115,6 +124,226 @@ describe("findDuplicate since a club-night table call", () => {
     expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", "2026-10-15T21:00:00Z")).toBeNull();
     expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", "2026-10-15T19:00:00Z")).toMatchObject({ id: "m1" });
     expect(findDuplicate([earlier], "ben", "ana", "2026-10-15", null)).toMatchObject({ id: "m1" });
+  });
+});
+
+// Spec 2026-10-21-play-and-progress §3 and ruling S4-R6: a Rematch board's
+// check starts at the game it rematches (that game's created_at), so the game
+// it follows is not a duplicate, but every report of the rematch itself is
+// still caught, however late the board was opened.
+describe("findDuplicate since the rematched game", () => {
+  const first = row({ id: "first", status: "confirmed", created_at: "2026-10-15T20:00:00.123456+00:00" });
+  const anchor = first.created_at;
+  it("ignores the rematched game itself and anything logged before it", () => {
+    const older = row({ id: "older", status: "confirmed", created_at: "2026-10-15T19:00:00Z" });
+    expect(findDuplicate([first, older], "ben", "ana", "2026-10-15", anchor)).toBeNull();
+  });
+  it("still finds the opponent's report of the rematch", () => {
+    const theirs = row({ id: "theirs", created_at: "2026-10-15T20:31:00Z" });
+    expect(findDuplicate([first, theirs], "ben", "ana", "2026-10-15", anchor)?.id).toBe("theirs");
+  });
+  it("finds it when they logged the rematch before this board was even opened", () => {
+    // The 2026-10-15 double count: the opponent sent the rematch at 20:10,
+    // this board opened at 20:40. The anchor is the game, not the opening.
+    const theirs = row({ id: "theirs", created_at: "2026-10-15T20:10:00Z" });
+    expect(findDuplicate([first, theirs], "ben", "ana", "2026-10-15", anchor)?.id).toBe("theirs");
+  });
+  it("catches a report a second after the rematched game", () => {
+    const quick = row({ id: "quick", created_at: "2026-10-15T20:00:01Z" });
+    expect(findDuplicate([first, quick], "ben", "ana", "2026-10-15", anchor)?.id).toBe("quick");
+  });
+});
+
+describe("laterTime", () => {
+  const board = "2026-10-15T20:05:00Z";
+  const call = "2026-10-15T21:00:00+00:00";
+  it("takes the later of the rematched game's time and the table call", () => {
+    expect(laterTime(board, call)).toBe(call);
+    expect(laterTime("2026-10-15T21:30:00Z", call)).toBe("2026-10-15T21:30:00Z");
+  });
+  it("takes whichever one there is, and ignores what isn't a time", () => {
+    expect(laterTime(board, null)).toBe(board);
+    expect(laterTime(null, call)).toBe(call);
+    expect(laterTime(null, null)).toBeNull();
+    expect(laterTime("not a time", call)).toBe(call);
+    expect(laterTime("not a time", undefined)).toBeNull();
+  });
+});
+
+describe("duplicateSince", () => {
+  const now = new Date("2026-10-15T22:00:00Z");
+  const call = "2026-10-15T21:00:00+00:00";
+  it("starts the check at the later of the rematched game's time and the table call", () => {
+    expect(duplicateSince("2026-10-15T21:30:00Z", call, now)).toBe("2026-10-15T21:30:00Z");
+    expect(duplicateSince("2026-10-15T20:05:00Z", call, now)).toBe(call);
+    expect(duplicateSince("2026-10-15T20:05:00Z", null, now)).toBe("2026-10-15T20:05:00Z");
+    expect(duplicateSince(null, null, now)).toBeNull();
+  });
+  it("does not trust a time after the server's now: the check stays strict", () => {
+    expect(duplicateSince("2026-10-15T23:00:00Z", null, now)).toBeNull();
+    expect(duplicateSince("2026-10-15T23:00:00Z", call, now)).toBe(call);
+    expect(duplicateSince("garbage", null, now)).toBeNull();
+  });
+  it("keeps the opponent's report of the rematch in view when the time is ignored", () => {
+    // A time an hour ahead (edited or skewed): trusted, it would hide their report.
+    const theirs = row({ id: "theirs", created_at: "2026-10-15T21:40:00Z" });
+    const since = duplicateSince("2026-10-15T23:00:00Z", null, now);
+    expect(findDuplicate([theirs], "ben", "ana", "2026-10-15", since)?.id).toBe("theirs");
+  });
+});
+
+describe("boardParams", () => {
+  const id = "0b9e6a4c-2f1d-4c3e-9a8b-7c6d5e4f3a21";
+  it("reads the game, the race, the rematch flag and the rematched game", () => {
+    expect(boardParams({ game: "9ball", race: "7", rematch: "1", after: id })).toEqual({
+      game: "9ball",
+      raceTo: 7,
+      rematch: true,
+      after: id,
+    });
+  });
+  it("reads an open race", () => {
+    expect(boardParams({ game: "8ball", race: "open" })).toEqual({ game: "8ball", raceTo: "open", rematch: false, after: null });
+  });
+  it("takes the rematched game only as a UUID", () => {
+    for (const after of ["m1", "", `${id} `, `${id},x`, "not-a-uuid-at-all-0000-000000000000", "constructor"]) {
+      expect(boardParams({ rematch: "1", after }).after).toBeNull();
+    }
+    expect(boardParams({ rematch: "1", after: id.toUpperCase() }).after).toBe(id.toUpperCase());
+  });
+  it("accepts every game and race the scoreboard offers", () => {
+    for (const g of GAME_TYPES) expect(boardParams({ game: g.value }).game).toBe(g.value);
+    for (const r of RACES) expect(boardParams({ race: String(r) }).raceTo).toBe(r);
+  });
+  it("ignores values the scoreboard doesn't offer", () => {
+    expect(boardParams({ game: "snooker", race: "99", rematch: "yes" })).toEqual({
+      game: null,
+      raceTo: null,
+      rematch: false,
+      after: null,
+    });
+    for (const race of ["4", "0", "-3", "5.0", " 5", "", "Open"]) expect(boardParams({ race }).raceTo).toBeNull();
+    expect(boardParams({ game: "constructor" }).game).toBeNull();
+    expect(boardParams({})).toEqual({ game: null, raceTo: null, rematch: false, after: null });
+  });
+  it("round-trips the result screen's Rematch link, open race included", () => {
+    for (const raceTo of [3, 9, null]) {
+      const href = rematchHref({ opponentId: "opp-1", gameType: "10ball", raceTo, matchId: id });
+      const sp = Object.fromEntries(new URL(href, "https://club.test").searchParams);
+      expect(sp.opponent).toBe("opp-1");
+      expect(boardParams(sp)).toEqual({ game: "10ball", raceTo: raceTo ?? "open", rematch: true, after: id });
+    }
+  });
+});
+
+describe("seededBoard", () => {
+  it("without a seed is the board a called opponent always got", () => {
+    expect(seededBoard(boardParams({}), 650, 450, 5)).toEqual({ game: "8ball", ...startBoard(650, 450, 5) });
+  });
+  it("takes a Rematch link's game and race, and suggests the spot afresh from today's ratings", () => {
+    const s = suggestedSpot(3, 450, 650);
+    expect(s.spot).toBeGreaterThan(0);
+    expect(seededBoard({ game: "9ball", raceTo: 3, rematch: true, after: null }, 650, 450, 5)).toEqual({
+      game: "9ball",
+      raceTo: 3,
+      spot: s.spot,
+      spotTo: "you",
+      you: s.spot,
+      them: 0,
+    });
+  });
+  it("opens an open race with no spot", () => {
+    expect(seededBoard({ game: "10ball", raceTo: "open", rematch: true, after: null }, 650, 450, 5)).toEqual({
+      game: "10ball",
+      raceTo: null,
+      spot: 0,
+      spotTo: null,
+      you: 0,
+      them: 0,
+    });
+  });
+});
+
+describe("foldSummary", () => {
+  const today = "2026-10-21";
+  const on = { date: today };
+  it("names the game, the race and an even race", () => {
+    expect(foldSummary({ game: "8ball", raceTo: 5, spot: 0, spotTo: null, ...on }, "Ana", today)).toBe(
+      "8-ball · race to 5 · no spot"
+    );
+  });
+  it("names the spot and who has it", () => {
+    expect(foldSummary({ game: "9ball", raceTo: 7, spot: 2, spotTo: "them", ...on }, "Ana", today)).toBe(
+      "9-ball · race to 7 · 2 on the wire to Ana"
+    );
+    expect(foldSummary({ game: "10ball", raceTo: 3, spot: 1, spotTo: "you", ...on }, "Ana", today)).toBe(
+      "10-ball · race to 3 · 1 on the wire to you"
+    );
+  });
+  it("says open race in open play", () => {
+    expect(foldSummary({ game: "other", raceTo: null, spot: 0, spotTo: null, ...on }, "Ana", today)).toBe(
+      "Other · open race · no spot"
+    );
+  });
+  it("names the day when the game isn't today's, so a backdated game never hides it (ruling S4-R7)", () => {
+    const d = { game: "8ball", raceTo: 5, spot: 0, spotTo: null };
+    expect(foldSummary({ ...d, date: "2026-10-19" }, "Ana", today)).toBe("8-ball · race to 5 · no spot · Oct 19");
+    expect(foldSummary({ ...d, date: "2025-12-12" }, "Ana", today)).toBe("8-ball · race to 5 · no spot · Dec 12, 2025");
+  });
+});
+
+describe("boardScored", () => {
+  it("is false on the starting scores: even, spotted either way, open play", () => {
+    expect(boardScored({ raceTo: 5, spot: 0, spotTo: null, you: 0, them: 0 })).toBe(false);
+    expect(boardScored({ raceTo: 5, spot: 2, spotTo: "you", you: 2, them: 0 })).toBe(false);
+    expect(boardScored({ raceTo: 5, spot: 2, spotTo: "them", you: 0, them: 2 })).toBe(false);
+    expect(boardScored({ raceTo: null, spot: 0, spotTo: null, you: 0, them: 0 })).toBe(false);
+  });
+  it("is true once either score moves off the start", () => {
+    expect(boardScored({ raceTo: 5, spot: 0, spotTo: null, you: 3, them: 2 })).toBe(true);
+    expect(boardScored({ raceTo: 5, spot: 2, spotTo: "you", you: 2, them: 1 })).toBe(true);
+    expect(boardScored({ raceTo: 5, spot: 2, spotTo: "them", you: 0, them: 3 })).toBe(true);
+    expect(boardScored({ raceTo: null, spot: 0, spotTo: null, you: 0, them: 1 })).toBe(true);
+  });
+  it("counts a spotted side reset below its start as moved", () => {
+    expect(boardScored({ raceTo: 5, spot: 2, spotTo: "you", you: 0, them: 0 })).toBe(true);
+  });
+});
+
+describe("openingBoard", () => {
+  const even = { raceTo: 5, spot: 0, spotTo: null } as const;
+  const scored = { opponentId: "a", ...even, you: 2, them: 1 };
+  it("keeps the draft when nobody was called", () => {
+    expect(openingBoard(scored, undefined)).toBe("keep");
+  });
+  it("keeps the draft when it is already against the called opponent", () => {
+    expect(openingBoard(scored, "a")).toBe("keep");
+  });
+  it("asks before replacing a scored game against someone else", () => {
+    expect(openingBoard(scored, "b")).toBe("ask");
+    expect(openingBoard({ opponentId: "a", ...even, you: 0, them: 3 }, "b")).toBe("ask");
+  });
+  it("switches silently from an unscored board", () => {
+    expect(openingBoard({ opponentId: "a", ...even, you: 0, them: 0 }, "b")).toBe("switch");
+  });
+  it("switches when the draft has no opponent yet", () => {
+    expect(openingBoard({ opponentId: null, ...even, you: 0, them: 0 }, "b")).toBe("switch");
+    expect(openingBoard({ opponentId: null, ...even, you: 1, them: 0 }, "b")).toBe("switch");
+  });
+  it("treats an untouched spotted board as unscored", () => {
+    const spotted = { opponentId: "a", raceTo: 5, spot: 2, spotTo: "you" } as const;
+    expect(openingBoard({ ...spotted, you: 2, them: 0 }, "b")).toBe("switch");
+    expect(openingBoard({ ...spotted, spotTo: "them", you: 0, them: 2 }, "b")).toBe("switch");
+  });
+  it("asks once a point is played beyond the spot's start", () => {
+    const spotted = { opponentId: "a", raceTo: 5, spot: 2, spotTo: "you" } as const;
+    expect(openingBoard({ ...spotted, you: 3, them: 0 }, "b")).toBe("ask");
+    expect(openingBoard({ ...spotted, you: 2, them: 1 }, "b")).toBe("ask");
+  });
+  it("on open play, any score counts", () => {
+    const open = { opponentId: "a", raceTo: null, spot: 0, spotTo: null } as const;
+    expect(openingBoard({ ...open, you: 0, them: 0 }, "b")).toBe("switch");
+    expect(openingBoard({ ...open, you: 1, them: 0 }, "b")).toBe("ask");
   });
 });
 

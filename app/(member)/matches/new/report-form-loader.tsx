@@ -6,11 +6,18 @@ import type { ReportMatchForm as Form } from "./report-form";
 
 // The scoreboard restores an in-progress race from localStorage, which only
 // exists in the browser — so it renders client-only, with a quiet skeleton
-// in the server HTML instead of a form that would flash and then change.
+// in the server HTML instead of a form that would flash and then change. The
+// skeleton keeps the header's place: the form draws its own header, whose
+// title depends on the restored board.
 const ReportMatchForm = dynamic(() => import("./report-form").then((m) => m.ReportMatchForm), {
   ssr: false,
   loading: () => (
     <div aria-hidden="true" className="flex animate-pulse flex-col gap-8">
+      <div className="flex items-center justify-between gap-3 pt-3">
+        <div className="size-11 rounded-full shadow-[inset_0_0_0_1px_var(--hairline-strong)]" />
+        <div className="bg-card h-4 w-28 rounded-full" />
+        <div className="size-11" />
+      </div>
       <div className="bg-card h-12 rounded-full" />
       <div className="bg-card h-12 rounded-full" />
       <div className="bg-card h-40 rounded-[20px]" />

@@ -21,7 +21,29 @@ export function opponentOf(m: StatMatch, viewerId: string): string {
   return m.reporter_id === viewerId ? m.opponent_id : m.reporter_id;
 }
 
-// Matches must be newest-first (the order every page already queries in).
+export interface PlayOrdered {
+  id: string;
+  played_at: string;
+  created_at: string;
+}
+
+// The one play order (ruling S3-R7): newest first by played_at (the club
+// date), then created_at (when it was logged), then id, all descending. Every
+// "last N" and streak follows it, so a batch confirmed in a different order
+// than it was played still reads as the games were played. Sort a copy:
+// [...matches].sort(byPlayOrder). created_at compares as an instant, then as
+// text, which keeps PostgREST's microseconds in order.
+export function byPlayOrder(a: PlayOrdered, b: PlayOrdered): number {
+  if (a.played_at !== b.played_at) return a.played_at < b.played_at ? 1 : -1;
+  const ta = Date.parse(a.created_at);
+  const tb = Date.parse(b.created_at);
+  if (ta !== tb && !Number.isNaN(ta) && !Number.isNaN(tb)) return tb - ta;
+  if (a.created_at !== b.created_at) return a.created_at < b.created_at ? 1 : -1;
+  if (a.id !== b.id) return a.id < b.id ? 1 : -1;
+  return 0;
+}
+
+// Matches newest first in play order (byPlayOrder).
 export function currentStreak(
   newestFirst: StatMatch[],
   viewerId: string
@@ -34,12 +56,6 @@ export function currentStreak(
     length += 1;
   }
   return { kind, length };
-}
-
-export function winRate(wins: number, losses: number): number | null {
-  const total = wins + losses;
-  if (total === 0) return null;
-  return Math.round((wins / total) * 100);
 }
 
 // Rating now minus the rating just before the first change inside the window.
@@ -66,24 +82,10 @@ export function peakRating(
   return best;
 }
 
-// Ratings oldest → newest, scaled into a width × height box. A single value
-// draws as a flat line so the hero never shows an empty chart.
-export function sparklinePoints(ratings: number[], width: number, height: number): [number, number][] {
-  if (ratings.length === 0) return [];
-  const series = ratings.length === 1 ? [ratings[0], ratings[0]] : ratings;
-  const min = Math.min(...series);
-  const max = Math.max(...series);
-  const flat = max === min;
-  return series.map((r, i) => {
-    const x = (i / (series.length - 1)) * width;
-    const y = flat ? height / 2 : height - ((r - min) / (max - min)) * height;
-    return [Number(x.toFixed(2)), Number(y.toFixed(2))];
-  });
-}
-
 // "Today" / "Yesterday" / "Sat, Oct 3" for a played_at calendar date, given
-// today's club date (from lib/events clubDateOf). Dates are plain YYYY-MM-DD,
-// so this never touches time zones.
+// today's club date (from lib/events clubDateOf), with the year when it isn't
+// today's club year ("Fri, Dec 12, 2025"). Dates are plain YYYY-MM-DD, so
+// this never touches time zones.
 export function labelPlayedDate(playedAt: string, todayClubDate: string): string {
   if (playedAt === todayClubDate) return "Today";
   const yesterday = new Date(`${todayClubDate}T00:00:00Z`);
@@ -94,6 +96,7 @@ export function labelPlayedDate(playedAt: string, todayClubDate: string): string
     weekday: "short",
     month: "short",
     day: "numeric",
+    ...(playedAt.slice(0, 4) === todayClubDate.slice(0, 4) ? {} : { year: "numeric" }),
   });
 }
 
@@ -111,10 +114,6 @@ export function groupByPlayedDate<T extends { played_at: string }>(
   return groups;
 }
 
-export function sparklinePath(points: [number, number][]): string {
-  return points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x} ${y}`).join(" ");
-}
-
 // The win over the highest-rated opponent (by their current rating).
 export function bestWin(
   matches: StatMatch[],
@@ -130,22 +129,6 @@ export function bestWin(
     if (!best || rating > best.rating) best = { matchId: m.id, opponentId: opp, rating };
   }
   return best;
-}
-
-export function headToHead(
-  matches: StatMatch[],
-  viewerId: string,
-  otherId: string
-): { wins: number; losses: number } {
-  let wins = 0;
-  let losses = 0;
-  for (const m of matches) {
-    const pair = new Set([m.reporter_id, m.opponent_id]);
-    if (!pair.has(viewerId) || !pair.has(otherId)) continue;
-    if (m.winner_id === viewerId) wins += 1;
-    else losses += 1;
-  }
-  return { wins, losses };
 }
 
 // Per-player movement for the leaderboard: current rating minus the rating
@@ -175,14 +158,9 @@ export function seasonLabel(clubDate: string): string {
   return `${name} ${year}`;
 }
 
-// 1-based position in a rating-ordered board; null when the member has no row.
-export function overallRank(board: { id: string }[], id: string): number | null {
-  const i = board.findIndex((r) => r.id === id);
-  return i === -1 ? null : i + 1;
-}
-
 // The longest run of wins anywhere in the history (the live streak is
-// currentStreak; this is the record). Matches newest-first, confirmed only.
+// currentStreak; this is the record). Matches newest first in play order
+// (byPlayOrder), confirmed only.
 export function longestWinStreak(newestFirst: StatMatch[], viewerId: string): number {
   let best = 0;
   let run = 0;

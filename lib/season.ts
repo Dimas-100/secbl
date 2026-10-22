@@ -27,7 +27,9 @@ export interface Standing {
   wins: number;
   losses: number;
   points: number;
-  rank: number;
+  // null until the member has played a game in range (they sit under "Not placed
+  // yet", or "Didn't play" once the season is closed).
+  rank: number | null;
 }
 
 // Club dates are YYYY-MM-DD, so string order is date order.
@@ -38,7 +40,7 @@ export function inSeason(playedAt: string, season: SeasonRange): boolean {
 const byName = (a: Standing, b: Standing) =>
   a.display_name.localeCompare(b.display_name) || a.id.localeCompare(b.id);
 
-// Every member listed (zero-point rows last). Points desc, wins desc, then
+// Every member listed (zero-point rows last, unranked). Points desc, wins desc, then
 // points earned against the others in the tied group, then name.
 export function seasonStandings(
   matches: SeasonMatch[],
@@ -47,7 +49,7 @@ export function seasonStandings(
 ): Standing[] {
   const rows = new Map<string, Standing>();
   for (const m of members) {
-    rows.set(m.id, { id: m.id, display_name: m.display_name, played: 0, wins: 0, losses: 0, points: 0, rank: 0 });
+    rows.set(m.id, { id: m.id, display_name: m.display_name, played: 0, wins: 0, losses: 0, points: 0, rank: null });
   }
   // A member keeps the points from every game they played, even against
   // someone who has since been suspended and is no longer listed.
@@ -87,10 +89,17 @@ export function seasonStandings(
     out.push(...group);
     i = j;
   }
+  // Zero-game members sort last, so the played rows are 1..n with no gaps.
   out.forEach((r, idx) => {
-    r.rank = idx + 1;
+    r.rank = r.played > 0 ? idx + 1 : null;
   });
   return out;
+}
+
+// The label over a season's members with no games in it: still to be placed
+// while the season runs; once it is closed, nobody is (spec §7).
+export function unrankedLabel(status: "open" | "closed"): string {
+  return status === "closed" ? "Didn't play" : "Not placed yet";
 }
 
 export function seasonChampion(standings: Standing[]): Standing | null {
@@ -99,17 +108,24 @@ export function seasonChampion(standings: Standing[]): Standing | null {
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 
+// "1 pt", "3 pts": the unit after a points number, on the strip and the
+// Season tab alike (as Home's Next line reads a 1-point gap).
+export function pointsUnit(points: number): string {
+  return points === 1 ? "pt" : "pts";
+}
+const pointsLabel = (points: number) => `${points} ${pointsUnit(points)}`;
+
 // The Home strip: your place first, then the race. It always names the
 // leader once anyone has played, so a member who hasn't played yet never
 // reads the season as empty.
 export function seasonStrip(standings: Standing[], meId: string): { primary: string; secondary: string } {
   const leader = seasonChampion(standings);
   if (!leader) return { primary: "No games yet", secondary: `${POINTS_WIN} pts a win, ${POINTS_LOSS} a loss` };
-  const leads = `${firstName(leader.display_name)} leads · ${leader.points} pts`;
+  const leads = `${firstName(leader.display_name)} leads · ${pointsLabel(leader.points)}`;
   const mine = standings.find((s) => s.id === meId);
   if (!mine || mine.played === 0) return { primary: leads, secondary: "Your first game puts you on the board" };
   return {
-    primary: `#${mine.rank} · ${mine.points} pts`,
+    primary: `#${mine.rank} · ${pointsLabel(mine.points)}`,
     secondary: mine.id === leader.id ? "You lead the season" : leads,
   };
 }
