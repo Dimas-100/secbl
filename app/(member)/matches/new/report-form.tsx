@@ -72,6 +72,9 @@ interface Draft {
   // of the rematch is. It belongs to the board, so it is kept in the draft and
   // dropped when the opponent changes.
   since: string | null;
+  // Start game (or a score tap) was pressed: the setup stays folded even at
+  // the starting score. A new opponent is a new game, so it resets.
+  started: boolean;
 }
 
 function freshDraft(today: string): Draft {
@@ -86,6 +89,7 @@ function freshDraft(today: string): Draft {
     them: 0,
     date: today,
     since: null,
+    started: false,
   };
 }
 
@@ -108,8 +112,8 @@ function loadDraft(key: string, opponents: OpponentOption[], today: string): Dra
 // The live scoreboard. One screen, no keyboard: the people you actually
 // play, game and race pills, a spot if the ratings call for one, two hero
 // numbers on rails that fill toward the finish, and a narrated submit in a
-// sticky footer. Once a point is played the setup folds into one line and
-// the score gets the room. The draft survives a locked phone via
+// sticky footer. Start game (or the first point) folds the setup into one
+// line and the score gets the room. The draft survives a locked phone via
 // localStorage.
 export function ReportMatchForm({
   opponents,
@@ -176,17 +180,22 @@ export function ReportMatchForm({
   const [d, setD] = useState<Draft>(opening.draft);
   // The called opponent while the switch-guard notice is up.
   const [askId, setAskId] = useState<string | null>(opening.askId);
-  // Edit opens the folded setup; the next score tap folds it again.
+  // Edit opens the folded setup; Back to the score or the next score tap
+  // folds it again.
   const [unfolded, setUnfolded] = useState(false);
   const router = useRouter();
   const { opponentId, game, raceTo, spot, spotTo, you, them, date } = d;
   const patch = (next: Partial<Draft>) => setD((cur) => ({ ...cur, ...next, at: Date.now() }));
+  const startGame = () => {
+    patch({ started: true });
+    setUnfolded(false);
+  };
   const setYou = (v: number) => {
-    patch({ you: v });
+    patch({ you: v, started: true });
     setUnfolded(false);
   };
   const setThem = (v: number) => {
-    patch({ them: v });
+    patch({ them: v, started: true });
     setUnfolded(false);
   };
   const setDate = (v: string) => patch({ date: v });
@@ -255,10 +264,13 @@ export function ReportMatchForm({
   }
   const firstName = (o: OpponentOption | null) => (o ? o.display_name.split(" ")[0] : null);
   const first = firstName(selected) ?? "Them";
-  // The setup folds into one summary line once a point is played against a
-  // chosen opponent. Not before one is chosen: picking someone restarts the
-  // board from its spot, so a score without an opponent is not a game yet.
-  const folded = selected !== null && boardScored(d) && !unfolded;
+  // The setup folds into one summary line once the game against a chosen
+  // opponent is started or a point is played (a restored draft from before
+  // Start game has only its score). Not before one is chosen: picking someone
+  // restarts the board from its spot, so a score without an opponent is not a
+  // game yet.
+  const inPlay = d.started || boardScored(d);
+  const folded = selected !== null && inPlay && !unfolded;
   // The date editor is part of the setup; folded, the hidden input carries it.
   const dateOpen = editingDate && !folded;
   // A notice belongs to the opponent and day it was found for.
@@ -303,8 +315,10 @@ export function ReportMatchForm({
       spotTo: to,
       you: start.you,
       them: start.them,
-      // A Rematch board's anchor is about its opponent only.
+      // A Rematch board's anchor is about its opponent only, and a new
+      // opponent is a game not started yet.
       since: next.opponent === undefined ? d.since : null,
+      started: next.opponent === undefined ? d.started : false,
     });
     buzzed.current = null;
   }
@@ -747,6 +761,13 @@ export function ReportMatchForm({
                 Cancel
               </button>
             </>
+          ) : selected && !folded && s.disabled ? (
+            // The setup is up and there is nothing to send yet: start the
+            // game with these picks and open the scoreboard. After Edit, the
+            // same button folds it back.
+            <Button type="button" size="xl" className="w-full" onClick={startGame}>
+              {inPlay ? "Back to the score" : "Start game"}
+            </Button>
           ) : s.disabled ? (
             <>
               <SubmitButton size="xl" className="w-full" disabled pendingChildren="Sending…">

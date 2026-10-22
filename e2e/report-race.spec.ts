@@ -61,14 +61,21 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
   await pageA.getByRole("button", { name: "Fewer games on the wire" }).click();
   await expect(pageA.getByText("Race to 3 · 1 on the wire to E2E")).toBeVisible();
 
-  const inc = pageA.getByRole("button", { name: /^Increase You score/ });
-  await inc.click();
-  // The first point folds the setup into one summary line with Edit, so the
-  // score gets the room (spec 2026-10-21-play-and-progress §4).
+  // Start game folds the setup into one summary line with Edit before a
+  // point is played, so the score gets the room (spec
+  // 2026-10-21-play-and-progress §4). Edit opens it again; Back to the score
+  // folds it back.
+  await pageA.getByRole("button", { name: "Start game" }).click();
   const setup = boardMain.getByRole("group", { name: "Game setup" });
   await expect(setup.getByText("8-ball · race to 3 · 1 on the wire to E2E")).toBeVisible();
-  await expect(setup.getByRole("button", { name: "Edit" })).toBeVisible();
   await expect(pageA.getByLabel("Race to 3")).toHaveCount(0);
+  await expect(pageA.getByText("Race on — first to 3")).toBeVisible();
+  await setup.getByRole("button", { name: "Edit" }).click();
+  await expect(setup).toHaveCount(0);
+  await pageA.getByRole("button", { name: "Back to the score" }).click();
+  await expect(setup.getByRole("button", { name: "Edit" })).toBeVisible();
+  const inc = pageA.getByRole("button", { name: /^Increase You score/ });
+  await inc.click();
   await inc.click();
   await expect(pageA.getByText("You need 1 · E2E needs 2")).toBeVisible();
   await inc.click();
