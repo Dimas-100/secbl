@@ -66,7 +66,8 @@ interface Draft {
   you: number;
   them: number;
   date: string;
-  // When a Rematch board opened (ISO), sent as the duplicate check's `since`
+  // When a Rematch board opened (ISO, the server's clock: page.tsx
+  // rematchOpenedAt), sent as the duplicate check's `since`
   // so the game it follows is not flagged. It belongs to the board, so it is
   // kept in the draft (a reload must not move it later, past the opponent's
   // report of this very game) and dropped when the opponent changes.
@@ -119,6 +120,7 @@ export function ReportMatchForm({
   initialOpponentId,
   initialPickerOpen = false,
   seed = NO_SEED,
+  rematchOpenedAt = null,
   error,
 }: {
   opponents: OpponentOption[];
@@ -129,20 +131,25 @@ export function ReportMatchForm({
   initialOpponentId?: string;
   initialPickerOpen?: boolean;
   // A Rematch link's game, race and flag (lib/report-form boardParams),
-  // already validated. Applied only to a board opened for the called opponent.
+  // already validated, and the server's time when that board opened. Both
+  // belong to the link's own opponent (initialOpponentId) only.
   seed?: BoardSeed;
+  rematchOpenedAt?: string | null;
   error?: string;
 }) {
   const draftKey = draftKeyFor(meId);
   const seeded = seed.game !== null || seed.raceTo !== null || seed.rematch;
-  // The board a called opponent gets: the seed's game and race, a spot from
-  // today's ratings, and on a Rematch board the moment it opened.
+  // The board a called opponent gets: a spot from today's ratings and, for
+  // the link's own opponent, its game, race and (Rematch) open time. Anyone
+  // else (picked while the link's board was up, then Start new) gets the
+  // plain board with no `since`, so their duplicate check stays whole.
   function calledBoard(o: OpponentOption): Draft {
+    const own = o.id === initialOpponentId;
     return {
       ...freshDraft(today),
       opponentId: o.id,
-      ...seededBoard(seed, o.rating, myRating, DEFAULT_RACE),
-      since: seed.rematch ? new Date().toISOString() : null,
+      ...seededBoard(own ? seed : NO_SEED, o.rating, myRating, DEFAULT_RACE),
+      since: own && seed.rematch ? rematchOpenedAt : null,
     };
   }
   // One state object for the board, lazily restored from the draft. This

@@ -10,7 +10,7 @@ import { freeTableAfterReport } from "@/lib/night-data";
 import { matchAgreedPayload, matchReportedPayload } from "@/lib/push";
 import { notify } from "@/lib/push-send";
 import { formatShort, validateResult } from "@/lib/race";
-import { findDuplicate, laterTime, type DuplicateGame, type PairMatchRow } from "@/lib/report-form";
+import { duplicateSince, findDuplicate, type DuplicateGame, type PairMatchRow } from "@/lib/report-form";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import type { Match } from "@/lib/types";
 import { confirmMatch } from "../actions";
@@ -22,8 +22,9 @@ function fail(message: string): never {
 // A pending or confirmed game between these two on that day, if any. Both
 // directions: the pair is matched with two IN lists (reporter ≠ opponent is a
 // table constraint), so no user input is spliced into a filter string.
-// `since` is when a Rematch board opened: a game created before it is the one
-// the rematch follows (spec 2026-10-21-play-and-progress §3).
+// `since` is when a Rematch board opened (stamped by the server when the page
+// rendered): a game created before it is the one the rematch follows (spec
+// 2026-10-21-play-and-progress §3). One after this server's now is ignored.
 async function loadDuplicate(
   supabase: SupabaseClient,
   meId: string,
@@ -49,7 +50,7 @@ async function loadDuplicate(
     meId,
     opponentId,
     playedAt,
-    laterTime(since, typeof calledAt === "string" ? calledAt : null)
+    duplicateSince(since, typeof calledAt === "string" ? calledAt : null, new Date())
   );
 }
 

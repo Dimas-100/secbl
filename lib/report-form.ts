@@ -53,6 +53,20 @@ export function laterTime(a: string | null | undefined, b: string | null | undef
   return times.reduce((x, y) => (Date.parse(y) > Date.parse(x) ? y : x));
 }
 
+// Where the server's duplicate check starts: the later of a Rematch board's
+// open time and the pair's club-night table call. An open time after the
+// server's own now is not trusted (an edited or skewed value would hide the
+// opponent's report of the rematch, the 2026-10-15 double count), so it is
+// dropped and the check stays strict.
+export function duplicateSince(
+  since: string | null | undefined,
+  calledAt: string | null | undefined,
+  now: Date
+): string | null {
+  const trusted = typeof since === "string" && Date.parse(since) <= now.getTime() ? since : null;
+  return laterTime(trusted, calledAt);
+}
+
 // The scoreboard keeps its in-progress game in localStorage under a per-member
 // key, and treats a draft older than 12 hours as abandoned. The Play sheet
 // reads the same key to offer "Resume", so both sides share these.

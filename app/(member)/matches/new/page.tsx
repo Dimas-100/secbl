@@ -51,6 +51,11 @@ export default async function NewMatchPage({
   });
 
   const today = clubDateOf(new Date().toISOString());
+  const seed = boardParams({ game, race, rematch });
+  // A Rematch board's open time, on the server's clock (the one created_at
+  // is on), not the phone's: a phone running ahead would push it past the
+  // opponent's report of the rematch and the duplicate check would miss it.
+  const rematchOpenedAt = seed.rematch ? new Date().toISOString() : null;
 
   // The scoreboard renders its own header: its title follows the board
   // ("New game", then "vs {first}"), which only the client knows.
@@ -68,7 +73,8 @@ export default async function NewMatchPage({
         // The Play sheet's "Other": the picker opens on arrival.
         initialPickerOpen={find === "1"}
         // Rematch (the game-counts screen): the same game and race, validated.
-        seed={boardParams({ game, race, rematch })}
+        seed={seed}
+        rematchOpenedAt={rematchOpenedAt}
         error={error}
       />
     </main>

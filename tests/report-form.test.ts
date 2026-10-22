@@ -4,6 +4,7 @@ import {
   boardParams,
   boardScored,
   duplicateNotice,
+  duplicateSince,
   findDuplicate,
   foldSummary,
   laterTime,
@@ -154,6 +155,28 @@ describe("laterTime", () => {
     expect(laterTime(null, null)).toBeNull();
     expect(laterTime("not a time", call)).toBe(call);
     expect(laterTime("not a time", undefined)).toBeNull();
+  });
+});
+
+describe("duplicateSince", () => {
+  const now = new Date("2026-10-15T22:00:00Z");
+  const call = "2026-10-15T21:00:00+00:00";
+  it("starts the check at the later of the Rematch board's open time and the table call", () => {
+    expect(duplicateSince("2026-10-15T21:30:00Z", call, now)).toBe("2026-10-15T21:30:00Z");
+    expect(duplicateSince("2026-10-15T20:05:00Z", call, now)).toBe(call);
+    expect(duplicateSince("2026-10-15T20:05:00Z", null, now)).toBe("2026-10-15T20:05:00Z");
+    expect(duplicateSince(null, null, now)).toBeNull();
+  });
+  it("does not trust an open time after the server's now: the check stays strict", () => {
+    expect(duplicateSince("2026-10-15T23:00:00Z", null, now)).toBeNull();
+    expect(duplicateSince("2026-10-15T23:00:00Z", call, now)).toBe(call);
+    expect(duplicateSince("garbage", null, now)).toBeNull();
+  });
+  it("keeps the opponent's report of the rematch in view when the open time is ignored", () => {
+    // A board stamped an hour ahead: trusted, it would hide their report.
+    const theirs = row({ id: "theirs", created_at: "2026-10-15T21:40:00Z" });
+    const since = duplicateSince("2026-10-15T23:00:00Z", null, now);
+    expect(findDuplicate([theirs], "ben", "ana", "2026-10-15", since)?.id).toBe("theirs");
   });
 });
 
