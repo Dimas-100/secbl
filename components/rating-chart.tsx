@@ -29,6 +29,15 @@ const round = (n: number) => Number(n.toFixed(2));
 
 const CHANGE_TONE = { win: "text-win", loss: "text-loss", muted: "text-muted-foreground" } as const;
 
+// A halo in the page colour behind marker labels, so the brass line never
+// strikes through legible text (the stroke paints first, the fill on top).
+const HALO = {
+  stroke: "var(--background)",
+  strokeWidth: 4,
+  strokeLinejoin: "round",
+  paintOrder: "stroke",
+} as const;
+
 // Labels near an edge grow inward so they never clip.
 function anchorFor(pct: number): { textAnchor: "start" | "middle" | "end"; dx: number } {
   if (pct < 20) return { textAnchor: "start", dx: -R };
@@ -108,6 +117,7 @@ export function RatingChart({
                 x={`${pct(peak.index)}%`}
                 y={y(peak.rating) - (shared ? 11 : 9)}
                 {...anchorFor(pct(peak.index))}
+                {...HALO}
                 className="fill-muted-foreground stat-number text-[11px]"
               >
                 {`peak ${peak.rating}`}
@@ -128,6 +138,7 @@ export function RatingChart({
                 x={`${pct(win.index)}%`}
                 y={y(points[win.index].rating) + 18}
                 {...anchorFor(pct(win.index))}
+                {...HALO}
                 className="fill-muted-foreground text-[11px]"
               >
                 {win.label}
