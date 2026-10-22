@@ -115,7 +115,11 @@ export function firstWinOver(newestFirst: StatMatch[], meId: string, matchId: st
   return !newestFirst.slice(i + 1).some((m) => m.winner_id === meId && opponentOf(m, meId) === them);
 }
 
-export function rematchHref(m: { opponentId: string; gameType: string; raceTo: number | null }): string {
+// The scoreboard for the same opponent, game and race. `after` is the game
+// being rematched (ruling S4-R6): the board's duplicate check ignores that
+// game and anything logged before it, and still catches any report of the
+// rematch, whenever the board was opened.
+export function rematchHref(m: { opponentId: string; gameType: string; raceTo: number | null; matchId: string }): string {
   const race = m.raceTo === null ? "open" : String(m.raceTo);
-  return `/matches/new?opponent=${m.opponentId}&game=${m.gameType}&race=${race}&rematch=1`;
+  return `/matches/new?opponent=${m.opponentId}&game=${m.gameType}&race=${race}&rematch=1&after=${m.matchId}`;
 }

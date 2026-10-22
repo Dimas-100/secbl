@@ -127,25 +127,37 @@ describe("findDuplicate since a club-night table call", () => {
   });
 });
 
-// Spec 2026-10-21-play-and-progress §3: a Rematch board ignores games created
-// before it opened, so the game it follows is not a duplicate, but two reports
-// of the rematch itself (both created after it opened) are still caught.
-describe("findDuplicate since a Rematch board opened", () => {
-  const opened = "2026-10-15T20:05:00Z";
-  const first = row({ id: "first", status: "confirmed", created_at: "2026-10-15T20:00:00Z" });
-  it("ignores the same-day game the rematch follows", () => {
-    expect(findDuplicate([first], "ben", "ana", "2026-10-15", opened)).toBeNull();
+// Spec 2026-10-21-play-and-progress §3 and ruling S4-R6: a Rematch board's
+// check starts at the game it rematches (that game's created_at), so the game
+// it follows is not a duplicate, but every report of the rematch itself is
+// still caught, however late the board was opened.
+describe("findDuplicate since the rematched game", () => {
+  const first = row({ id: "first", status: "confirmed", created_at: "2026-10-15T20:00:00.123456+00:00" });
+  const anchor = first.created_at;
+  it("ignores the rematched game itself and anything logged before it", () => {
+    const older = row({ id: "older", status: "confirmed", created_at: "2026-10-15T19:00:00Z" });
+    expect(findDuplicate([first, older], "ben", "ana", "2026-10-15", anchor)).toBeNull();
   });
   it("still finds the opponent's report of the rematch", () => {
     const theirs = row({ id: "theirs", created_at: "2026-10-15T20:31:00Z" });
-    expect(findDuplicate([first, theirs], "ben", "ana", "2026-10-15", opened)?.id).toBe("theirs");
+    expect(findDuplicate([first, theirs], "ben", "ana", "2026-10-15", anchor)?.id).toBe("theirs");
+  });
+  it("finds it when they logged the rematch before this board was even opened", () => {
+    // The 2026-10-15 double count: the opponent sent the rematch at 20:10,
+    // this board opened at 20:40. The anchor is the game, not the opening.
+    const theirs = row({ id: "theirs", created_at: "2026-10-15T20:10:00Z" });
+    expect(findDuplicate([first, theirs], "ben", "ana", "2026-10-15", anchor)?.id).toBe("theirs");
+  });
+  it("catches a report a second after the rematched game", () => {
+    const quick = row({ id: "quick", created_at: "2026-10-15T20:00:01Z" });
+    expect(findDuplicate([first, quick], "ben", "ana", "2026-10-15", anchor)?.id).toBe("quick");
   });
 });
 
 describe("laterTime", () => {
   const board = "2026-10-15T20:05:00Z";
   const call = "2026-10-15T21:00:00+00:00";
-  it("takes the later of the rematch board's open time and the table call", () => {
+  it("takes the later of the rematched game's time and the table call", () => {
     expect(laterTime(board, call)).toBe(call);
     expect(laterTime("2026-10-15T21:30:00Z", call)).toBe("2026-10-15T21:30:00Z");
   });
@@ -161,19 +173,19 @@ describe("laterTime", () => {
 describe("duplicateSince", () => {
   const now = new Date("2026-10-15T22:00:00Z");
   const call = "2026-10-15T21:00:00+00:00";
-  it("starts the check at the later of the Rematch board's open time and the table call", () => {
+  it("starts the check at the later of the rematched game's time and the table call", () => {
     expect(duplicateSince("2026-10-15T21:30:00Z", call, now)).toBe("2026-10-15T21:30:00Z");
     expect(duplicateSince("2026-10-15T20:05:00Z", call, now)).toBe(call);
     expect(duplicateSince("2026-10-15T20:05:00Z", null, now)).toBe("2026-10-15T20:05:00Z");
     expect(duplicateSince(null, null, now)).toBeNull();
   });
-  it("does not trust an open time after the server's now: the check stays strict", () => {
+  it("does not trust a time after the server's now: the check stays strict", () => {
     expect(duplicateSince("2026-10-15T23:00:00Z", null, now)).toBeNull();
     expect(duplicateSince("2026-10-15T23:00:00Z", call, now)).toBe(call);
     expect(duplicateSince("garbage", null, now)).toBeNull();
   });
-  it("keeps the opponent's report of the rematch in view when the open time is ignored", () => {
-    // A board stamped an hour ahead: trusted, it would hide their report.
+  it("keeps the opponent's report of the rematch in view when the time is ignored", () => {
+    // A time an hour ahead (edited or skewed): trusted, it would hide their report.
     const theirs = row({ id: "theirs", created_at: "2026-10-15T21:40:00Z" });
     const since = duplicateSince("2026-10-15T23:00:00Z", null, now);
     expect(findDuplicate([theirs], "ben", "ana", "2026-10-15", since)?.id).toBe("theirs");
@@ -181,11 +193,23 @@ describe("duplicateSince", () => {
 });
 
 describe("boardParams", () => {
-  it("reads the game, the race and the rematch flag", () => {
-    expect(boardParams({ game: "9ball", race: "7", rematch: "1" })).toEqual({ game: "9ball", raceTo: 7, rematch: true });
+  const id = "0b9e6a4c-2f1d-4c3e-9a8b-7c6d5e4f3a21";
+  it("reads the game, the race, the rematch flag and the rematched game", () => {
+    expect(boardParams({ game: "9ball", race: "7", rematch: "1", after: id })).toEqual({
+      game: "9ball",
+      raceTo: 7,
+      rematch: true,
+      after: id,
+    });
   });
   it("reads an open race", () => {
-    expect(boardParams({ game: "8ball", race: "open" })).toEqual({ game: "8ball", raceTo: "open", rematch: false });
+    expect(boardParams({ game: "8ball", race: "open" })).toEqual({ game: "8ball", raceTo: "open", rematch: false, after: null });
+  });
+  it("takes the rematched game only as a UUID", () => {
+    for (const after of ["m1", "", `${id} `, `${id},x`, "not-a-uuid-at-all-0000-000000000000", "constructor"]) {
+      expect(boardParams({ rematch: "1", after }).after).toBeNull();
+    }
+    expect(boardParams({ rematch: "1", after: id.toUpperCase() }).after).toBe(id.toUpperCase());
   });
   it("accepts every game and race the scoreboard offers", () => {
     for (const g of GAME_TYPES) expect(boardParams({ game: g.value }).game).toBe(g.value);
@@ -196,17 +220,18 @@ describe("boardParams", () => {
       game: null,
       raceTo: null,
       rematch: false,
+      after: null,
     });
     for (const race of ["4", "0", "-3", "5.0", " 5", "", "Open"]) expect(boardParams({ race }).raceTo).toBeNull();
     expect(boardParams({ game: "constructor" }).game).toBeNull();
-    expect(boardParams({})).toEqual({ game: null, raceTo: null, rematch: false });
+    expect(boardParams({})).toEqual({ game: null, raceTo: null, rematch: false, after: null });
   });
   it("round-trips the result screen's Rematch link, open race included", () => {
     for (const raceTo of [3, 9, null]) {
-      const href = rematchHref({ opponentId: "opp-1", gameType: "10ball", raceTo });
+      const href = rematchHref({ opponentId: "opp-1", gameType: "10ball", raceTo, matchId: id });
       const sp = Object.fromEntries(new URL(href, "https://club.test").searchParams);
       expect(sp.opponent).toBe("opp-1");
-      expect(boardParams(sp)).toEqual({ game: "10ball", raceTo: raceTo ?? "open", rematch: true });
+      expect(boardParams(sp)).toEqual({ game: "10ball", raceTo: raceTo ?? "open", rematch: true, after: id });
     }
   });
 });
@@ -218,7 +243,7 @@ describe("seededBoard", () => {
   it("takes a Rematch link's game and race, and suggests the spot afresh from today's ratings", () => {
     const s = suggestedSpot(3, 450, 650);
     expect(s.spot).toBeGreaterThan(0);
-    expect(seededBoard({ game: "9ball", raceTo: 3, rematch: true }, 650, 450, 5)).toEqual({
+    expect(seededBoard({ game: "9ball", raceTo: 3, rematch: true, after: null }, 650, 450, 5)).toEqual({
       game: "9ball",
       raceTo: 3,
       spot: s.spot,
@@ -228,7 +253,7 @@ describe("seededBoard", () => {
     });
   });
   it("opens an open race with no spot", () => {
-    expect(seededBoard({ game: "10ball", raceTo: "open", rematch: true }, 650, 450, 5)).toEqual({
+    expect(seededBoard({ game: "10ball", raceTo: "open", rematch: true, after: null }, 650, 450, 5)).toEqual({
       game: "10ball",
       raceTo: null,
       spot: 0,

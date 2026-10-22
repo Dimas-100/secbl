@@ -378,7 +378,10 @@ export default async function HomePage({
         action:
           second === "back_in_line" && nightData.night
             ? { kind: "back_in_line", nightId: nightData.night.id }
-            : { kind: "rematch", href: rematchHref({ opponentId, gameType: fresh.game_type, raceTo: fresh.race_to }) },
+            : {
+                kind: "rematch",
+                href: rematchHref({ opponentId, gameType: fresh.game_type, raceTo: fresh.race_to, matchId: fresh.id }),
+              },
       };
     }
   }

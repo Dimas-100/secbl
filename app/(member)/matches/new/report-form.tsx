@@ -45,7 +45,7 @@ import { confirmTheirs, findDuplicateReport, reportMatch } from "./actions";
 import { clearLiveGame, publishLiveGame } from "./live-actions";
 
 const DEFAULT_RACE = 5;
-const NO_SEED: BoardSeed = { game: null, raceTo: null, rematch: false };
+const NO_SEED: BoardSeed = { game: null, raceTo: null, rematch: false, after: null };
 
 export interface OpponentOption {
   id: string;
@@ -66,11 +66,11 @@ interface Draft {
   you: number;
   them: number;
   date: string;
-  // When a Rematch board opened (ISO, the server's clock: page.tsx
-  // rematchOpenedAt), sent as the duplicate check's `since`
-  // so the game it follows is not flagged. It belongs to the board, so it is
-  // kept in the draft (a reload must not move it later, past the opponent's
-  // report of this very game) and dropped when the opponent changes.
+  // A Rematch board's anchor: the created_at of the game it rematches, read
+  // on the server (page.tsx rematchAfter, ruling S4-R6), sent as the
+  // duplicate check's `since` so that game is not flagged while any report
+  // of the rematch is. It belongs to the board, so it is kept in the draft and
+  // dropped when the opponent changes.
   since: string | null;
 }
 
@@ -120,7 +120,7 @@ export function ReportMatchForm({
   initialOpponentId,
   initialPickerOpen = false,
   seed = NO_SEED,
-  rematchOpenedAt = null,
+  rematchAfter = null,
   error,
 }: {
   opponents: OpponentOption[];
@@ -131,16 +131,17 @@ export function ReportMatchForm({
   initialOpponentId?: string;
   initialPickerOpen?: boolean;
   // A Rematch link's game, race and flag (lib/report-form boardParams),
-  // already validated, and the server's time when that board opened. Both
-  // belong to the link's own opponent (initialOpponentId) only.
+  // already validated, and the created_at of the game it rematches (null
+  // when the server didn't find it: the check stays strict). Both belong to
+  // the link's own opponent (initialOpponentId) only.
   seed?: BoardSeed;
-  rematchOpenedAt?: string | null;
+  rematchAfter?: string | null;
   error?: string;
 }) {
   const draftKey = draftKeyFor(meId);
   const seeded = seed.game !== null || seed.raceTo !== null || seed.rematch;
   // The board a called opponent gets: a spot from today's ratings and, for
-  // the link's own opponent, its game, race and (Rematch) open time. Anyone
+  // the link's own opponent, its game, race and (Rematch) anchor. Anyone
   // else (picked while the link's board was up, then Start new) gets the
   // plain board with no `since`, so their duplicate check stays whole.
   function calledBoard(o: OpponentOption): Draft {
@@ -149,7 +150,7 @@ export function ReportMatchForm({
       ...freshDraft(today),
       opponentId: o.id,
       ...seededBoard(own ? seed : NO_SEED, o.rating, myRating, DEFAULT_RACE),
-      since: own && seed.rematch ? rematchOpenedAt : null,
+      since: own && seed.rematch ? rematchAfter : null,
     };
   }
   // One state object for the board, lazily restored from the draft. This
@@ -168,11 +169,9 @@ export function ReportMatchForm({
     if (!called) return { draft, askId: null as string | null };
     if (choice === "ask") return { draft, askId: called.id };
     if (choice === "keep" && (!seeded || boardScored(draft))) return { draft, askId: null };
-    const board = calledBoard(called);
-    // The same Rematch board opened again (a reload of its link) keeps its
-    // first open time: a later one could skip the opponent's report of it.
-    if (choice === "keep" && seed.rematch && draft.since) return { draft: { ...board, since: draft.since }, askId: null };
-    return { draft: board, askId: null };
+    // A reload of the link reads the same anchor; a Rematch for a newer game
+    // brings that game's, so an unscored board takes the link's.
+    return { draft: calledBoard(called), askId: null };
   });
   const [d, setD] = useState<Draft>(opening.draft);
   // The called opponent while the switch-guard notice is up.
@@ -304,7 +303,7 @@ export function ReportMatchForm({
       spotTo: to,
       you: start.you,
       them: start.them,
-      // A Rematch board's open time is about its opponent only.
+      // A Rematch board's anchor is about its opponent only.
       since: next.opponent === undefined ? d.since : null,
     });
     buzzed.current = null;

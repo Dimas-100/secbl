@@ -5,19 +5,36 @@ import { createClient } from "@/lib/supabase/server";
 import type { OpponentOption } from "./report-form";
 import { ReportMatchFormLoader } from "./report-form-loader";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default async function NewMatchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; opponent?: string; find?: string; game?: string; race?: string; rematch?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    opponent?: string;
+    find?: string;
+    game?: string;
+    race?: string;
+    rematch?: string;
+    after?: string;
+  }>;
 }) {
-  const { error, opponent, find, game, race, rematch } = await searchParams;
+  const { error, opponent, find, game, race, rematch, after } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: opponents }, { data: me }] = await Promise.all([
+  const seed = boardParams({ game, race, rematch, after });
+  // The game a Rematch board follows (ruling S4-R6), read on the server: a
+  // counted game between you and the link's opponent. Its created_at starts
+  // the duplicate check, so that game is not flagged but any report of the
+  // rematch is, whenever this board opens. Not found, the check stays strict.
+  const rematchedOf =
+    seed.rematch && seed.after && typeof opponent === "string" && UUID_RE.test(opponent) ? opponent : null;
+  const [{ data: opponents }, { data: me }, { data: rematched }] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, display_name, avatar_url, ball, rating, schools(short_name)")
@@ -25,6 +42,16 @@ export default async function NewMatchPage({
       .neq("id", user.id)
       .order("display_name"),
     supabase.from("profiles").select("rating").eq("id", user.id).single(),
+    rematchedOf
+      ? supabase
+          .from("matches")
+          .select("created_at")
+          .eq("id", seed.after!)
+          .eq("status", "confirmed")
+          .in("reporter_id", [user.id, rematchedOf])
+          .in("opponent_id", [user.id, rematchedOf])
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   // Recency drives the opponent row: whoever you actually play, any status.
@@ -51,11 +78,8 @@ export default async function NewMatchPage({
   });
 
   const today = clubDateOf(new Date().toISOString());
-  const seed = boardParams({ game, race, rematch });
-  // A Rematch board's open time, on the server's clock (the one created_at
-  // is on), not the phone's: a phone running ahead would push it past the
-  // opponent's report of the rematch and the duplicate check would miss it.
-  const rematchOpenedAt = seed.rematch ? new Date().toISOString() : null;
+  const initialOpponentId = options.some((o) => o.id === opponent) ? opponent : undefined;
+  const rematchAfter = initialOpponentId && rematched ? (rematched.created_at as string) : null;
 
   // The scoreboard renders its own header: its title follows the board
   // ("New game", then "vs {first}"), which only the client knows.
@@ -69,12 +93,13 @@ export default async function NewMatchPage({
         myRating={me?.rating ?? 450}
         // Club night's "Start game", a face, Play {name}, Rematch: the board
         // opens with the called opponent.
-        initialOpponentId={options.some((o) => o.id === opponent) ? opponent : undefined}
+        initialOpponentId={initialOpponentId}
         // The Play sheet's "Other": the picker opens on arrival.
         initialPickerOpen={find === "1"}
-        // Rematch (the game-counts screen): the same game and race, validated.
+        // Rematch (the game-counts screen): the same game and race, validated,
+        // and the rematched game's created_at for the duplicate check.
         seed={seed}
-        rematchOpenedAt={rematchOpenedAt}
+        rematchAfter={rematchAfter}
         error={error}
       />
     </main>

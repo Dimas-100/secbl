@@ -22,9 +22,10 @@ function fail(message: string): never {
 // A pending or confirmed game between these two on that day, if any. Both
 // directions: the pair is matched with two IN lists (reporter ≠ opponent is a
 // table constraint), so no user input is spliced into a filter string.
-// `since` is when a Rematch board opened (stamped by the server when the page
-// rendered): a game created before it is the one the rematch follows (spec
-// 2026-10-21-play-and-progress §3). One after this server's now is ignored.
+// `since` is the created_at of the game a Rematch board follows (read on the
+// server by the page, ruling S4-R6): that game and anything logged before it
+// are not this one (spec 2026-10-21-play-and-progress §3). A time after this
+// server's now is ignored.
 async function loadDuplicate(
   supabase: SupabaseClient,
   meId: string,

@@ -154,14 +154,14 @@ describe("secondAction", () => {
 });
 
 describe("rematchHref", () => {
-  it("carries the opponent, game, race and the rematch flag", () => {
-    expect(rematchHref({ opponentId: "abc", gameType: "eight_ball", raceTo: 3 })).toBe(
-      "/matches/new?opponent=abc&game=eight_ball&race=3&rematch=1"
+  it("carries the opponent, game, race, the rematch flag and the game it rematches", () => {
+    expect(rematchHref({ opponentId: "abc", gameType: "eight_ball", raceTo: 3, matchId: "m1" })).toBe(
+      "/matches/new?opponent=abc&game=eight_ball&race=3&rematch=1&after=m1"
     );
   });
   it("an open race passes race=open", () => {
-    expect(rematchHref({ opponentId: "abc", gameType: "nine_ball", raceTo: null })).toBe(
-      "/matches/new?opponent=abc&game=nine_ball&race=open&rematch=1"
+    expect(rematchHref({ opponentId: "abc", gameType: "nine_ball", raceTo: null, matchId: "m1" })).toBe(
+      "/matches/new?opponent=abc&game=nine_ball&race=open&rematch=1&after=m1"
     );
   });
 });

@@ -85,8 +85,9 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
   await expect(pageB.getByText(/ratings updated/i)).toBeVisible({ timeout: 20_000 });
   // The game counts: the loser's screen, told straight (the coral change, the
   // XP still earned, a first game putting them on the board, no consolation).
-  // Rematch is checked by its href, never clicked: a Rematch board publishes
-  // a live game to every member's Home.
+  // Rematch is only checked by its href here: following it, and the duplicate
+  // check it starts from this game, is e2e/report-rematch.spec.ts's job.
+  const { data: counted } = await service.from("matches").select("id").eq("reporter_id", strong.id).single();
   const screen = pageB.getByRole("dialog", { name: "Latest result" });
   await expect(screen.getByText("Loss", { exact: true })).toBeVisible();
   await expect(screen.getByRole("heading", { name: "E2E beat you 3–1" })).toBeVisible();
@@ -97,7 +98,7 @@ test("a race to 3 with a one-game spot is logged, confirmed and labelled", async
   await expect(screen.getByText("8-ball record now 0–1")).toBeVisible();
   await expect(screen.getByRole("link", { name: "Rematch" })).toHaveAttribute(
     "href",
-    `/matches/new?opponent=${strong.id}&game=8ball&race=3&rematch=1`
+    `/matches/new?opponent=${strong.id}&game=8ball&race=3&rematch=1&after=${counted!.id}`
   );
   await screen.getByRole("button", { name: "Done" }).click();
   await expect(screen).toHaveCount(0);

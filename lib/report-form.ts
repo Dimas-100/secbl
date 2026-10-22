@@ -16,19 +16,24 @@ export const GAME_TYPES = [
 // What a link into the scoreboard asks for (the game-counts screen's Rematch,
 // lib/result-moment rematchHref): a game and race the scoreboard offers, or
 // nothing — a stale or hand-edited value is ignored, never trusted. "open" is
-// open play. `rematch` marks a board whose duplicate check starts when it
-// opened.
+// open play. `rematch` marks a Rematch board and `after` is the id of the
+// game it rematches (a UUID, else null): the page looks that game up on the
+// server and the duplicate check starts from it (ruling S4-R6).
 export interface BoardSeed {
   game: string | null;
   raceTo: number | null | "open";
   rematch: boolean;
+  after: string | null;
 }
 
-export function boardParams(sp: { game?: string; race?: string; rematch?: string }): BoardSeed {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function boardParams(sp: { game?: string; race?: string; rematch?: string; after?: string }): BoardSeed {
   const game = GAME_TYPES.find((g) => g.value === sp.game)?.value ?? null;
   const race = typeof sp.race === "string" && /^\d+$/.test(sp.race) ? Number(sp.race) : null;
   const raceTo = sp.race === "open" ? "open" : (RACES.find((r) => r === race) ?? null);
-  return { game, raceTo, rematch: sp.rematch === "1" };
+  const after = typeof sp.after === "string" && UUID_RE.test(sp.after) ? sp.after : null;
+  return { game, raceTo, rematch: sp.rematch === "1", after };
 }
 
 // The folded setup's one line: "8-ball · race to 5 · no spot",
@@ -45,19 +50,19 @@ export function foldSummary(
 }
 
 // The later of two times (ISO strings), skipping any that isn't one: the
-// duplicate check starts at whichever came last of a Rematch board opening
-// and the pair's club-night table call.
+// duplicate check starts at whichever came last of the game a Rematch board
+// follows and the pair's club-night table call.
 export function laterTime(a: string | null | undefined, b: string | null | undefined): string | null {
   const times = [a, b].filter((t): t is string => typeof t === "string" && !Number.isNaN(Date.parse(t)));
   if (times.length === 0) return null;
   return times.reduce((x, y) => (Date.parse(y) > Date.parse(x) ? y : x));
 }
 
-// Where the server's duplicate check starts: the later of a Rematch board's
-// open time and the pair's club-night table call. An open time after the
-// server's own now is not trusted (an edited or skewed value would hide the
-// opponent's report of the rematch, the 2026-10-15 double count), so it is
-// dropped and the check stays strict.
+// Where the server's duplicate check starts: the later of the rematched
+// game's created_at (a Rematch board, ruling S4-R6) and the pair's club-night
+// table call. A time after the server's own now is not trusted (an edited
+// value would hide the opponent's report of the rematch, the 2026-10-15
+// double count), so it is dropped and the check stays strict.
 export function duplicateSince(
   since: string | null | undefined,
   calledAt: string | null | undefined,
@@ -220,9 +225,11 @@ export interface DuplicateGame {
 }
 
 // The opponent's report waiting on you comes first (confirming it is the
-// fix); otherwise the newest game. `since` is when the pair was called to a
-// club-night table: a game logged before that call cannot be this one, so a
-// rematch the same evening is not flagged (spec 2026-10-20-club-night §0 #14).
+// fix); otherwise the newest game. `since` (duplicateSince) is when the pair
+// was called to a club-night table, or the created_at of the game a Rematch
+// board follows: a game logged at or before it cannot be this one, so a
+// rematch the same evening is not flagged (spec 2026-10-20-club-night §0 #14,
+// ruling S4-R6), while every report logged after it still is.
 export function findDuplicate(
   rows: PairMatchRow[],
   meId: string,
@@ -234,7 +241,7 @@ export function findDuplicate(
     .filter(
       (r) =>
         r.played_at === playedAt &&
-        (since === null || Date.parse(r.created_at) >= Date.parse(since)) &&
+        (since === null || Date.parse(r.created_at) > Date.parse(since)) &&
         (r.status === "pending" || r.status === "confirmed") &&
         ((r.reporter_id === meId && r.opponent_id === opponentId) ||
           (r.reporter_id === opponentId && r.opponent_id === meId))
