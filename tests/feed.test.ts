@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeActivity, feedStamp, one, type FeedRow } from "@/lib/feed";
+import { RECENT_KINDS, describeActivity, eventRecap, feedStamp, mergeRecent, nightRecap, one, type FeedRow } from "@/lib/feed";
 
 const p = (id: string, name: string, school = "GSU") => ({
   id,
@@ -90,5 +90,104 @@ describe("describeActivity", () => {
     });
     expect(describeActivity(row({ kind: "member_joined" }), "z")).toEqual({ title: "Maya joined from GSU", meta: null, href: "/players/a" });
     expect(describeActivity(row({ kind: "member_joined" }), "a").title).toBe("You joined from GSU");
+  });
+});
+
+describe("RECENT_KINDS", () => {
+  it("keeps results, seasons and cups, and leaves out the one-person moments", () => {
+    expect([...RECENT_KINDS].sort()).toEqual(
+      ["cup_started", "cup_won", "match", "season_closed", "season_opened", "season_week_left"].sort()
+    );
+    for (const k of ["badge", "streak", "pass", "member_joined", "cup_round"]) {
+      expect(RECENT_KINDS as readonly string[]).not.toContain(k);
+    }
+  });
+});
+
+describe("eventRecap", () => {
+  const ev = { id: "e1", title: "Fall Social", starts_at: "2026-10-10T22:00:00Z", ends_at: "2026-10-11T01:00:00Z" };
+  it("tells an event after it ends, with who said they were going", () => {
+    const rsvps = [{ response: "going" }, { response: "maybe" }, { response: "going" }, { response: "no" }];
+    expect(eventRecap({ ...ev, rsvps })).toEqual({
+      key: "event:e1",
+      at: "2026-10-11T01:00:00Z",
+      kind: "event",
+      title: "Fall Social",
+      meta: "Event · 2 going",
+      href: "/events/e1",
+    });
+  });
+  it("is just an event with nobody going, and ends when it starts with no end time", () => {
+    const r = eventRecap({ ...ev, ends_at: null, rsvps: [] });
+    expect(r.meta).toBe("Event");
+    expect(r.at).toBe("2026-10-10T22:00:00Z");
+  });
+});
+
+describe("nightRecap", () => {
+  const night = {
+    id: "n1",
+    school_id: "gsu",
+    opened_at: "2026-10-16T22:00:00Z",
+    closed_at: "2026-10-17T02:00:00Z",
+    schools: { short_name: "GSU" },
+  };
+  const g = (a: string, b: string, at: string, sa = "gsu", sb = "gsu") => ({
+    reporter_id: a,
+    opponent_id: b,
+    created_at: at,
+    reporter_school: sa,
+    opponent_school: sb,
+  });
+  it("counts the night's games between its school's members, and the players in them", () => {
+    const games = [
+      g("a", "b", "2026-10-16T22:30:00Z"),
+      g("c", "d", "2026-10-16T23:10:00Z"),
+      g("a", "c", "2026-10-17T01:00:00Z"),
+      g("a", "b", "2026-10-16T21:59:00Z"), // before it opened
+      g("a", "b", "2026-10-17T02:01:00Z"), // after it closed
+      g("a", "x", "2026-10-16T23:00:00Z", "gsu", "ksu"), // someone from another school
+    ];
+    expect(nightRecap(night, games)).toEqual({
+      key: "night:n1",
+      at: "2026-10-17T02:00:00Z",
+      kind: "night",
+      title: "GSU club night",
+      meta: "3 games · 4 players",
+      href: "/night",
+    });
+  });
+  it("says one game in the singular", () => {
+    expect(nightRecap(night, [g("a", "b", "2026-10-16T22:30:00Z")])?.meta).toBe("1 game · 2 players");
+  });
+  it("is nothing for a night with no games", () => {
+    expect(nightRecap(night, [])).toBeNull();
+    expect(nightRecap(night, [g("a", "b", "2026-10-15T22:30:00Z")])).toBeNull();
+  });
+  it("reads plain Club night without a school name", () => {
+    expect(nightRecap({ ...night, schools: null }, [g("a", "b", "2026-10-16T22:30:00Z")])?.title).toBe("Club night");
+  });
+});
+
+describe("mergeRecent", () => {
+  const r = (id: string, at: string) => row({ id, kind: "match", created_at: at });
+  const recap = (key: string, at: string) => ({ key, at, kind: "event" as const, title: key, meta: "Event", href: "/events/x" });
+  it("puts recaps among the feed rows by time, newest first", () => {
+    const merged = mergeRecent(
+      [r("m1", "2026-10-20T12:00:00Z"), r("m2", "2026-10-18T12:00:00Z")],
+      [recap("e", "2026-10-19T12:00:00Z"), recap("f", "2026-10-21T12:00:00Z")],
+      30
+    );
+    expect(merged.map((i) => (i.type === "row" ? i.row.id : i.recap.key))).toEqual(["f", "m1", "e", "m2"]);
+  });
+  it("drops a recap older than the oldest row when the feed was cut at its limit", () => {
+    const rows = [r("m1", "2026-10-20T12:00:00Z"), r("m2", "2026-10-18T12:00:00Z")];
+    const old = recap("old", "2026-10-10T12:00:00Z");
+    expect(mergeRecent(rows, [old], 2).map((i) => i.type)).toEqual(["row", "row"]);
+    // Not cut: everything older is already here, so the recap belongs at the end.
+    expect(mergeRecent(rows, [old], 30).map((i) => i.type)).toEqual(["row", "row", "recap"]);
+  });
+  it("shows recaps alone when there are no rows", () => {
+    expect(mergeRecent([], [recap("e", "2026-10-19T12:00:00Z")], 30)).toHaveLength(1);
   });
 });

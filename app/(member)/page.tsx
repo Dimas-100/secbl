@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { AvatarStack } from "@/components/avatar-stack";
-import { ActivityRow } from "@/components/activity-row";
+import { ActivityRow, RecapRow } from "@/components/activity-row";
 import { FirstGameCard, type FirstGameFace } from "@/components/first-game-card";
 import { GameCountsScreen, type GameCountsProps } from "@/components/game-counts-screen";
 import { ListRow } from "@/components/list-row";
@@ -27,7 +27,7 @@ import { talkSummary, type LiveComment } from "@/lib/table-talk";
 import { earnedAchievements } from "@/lib/achievements";
 import { freshMatch } from "@/lib/celebration";
 import { clubDateOf, clubMonthStart, formatEventWhen, partitionEvents, tallyRsvps } from "@/lib/events";
-import { FEED_SELECT, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
+import { FEED_SELECT, RECENT_KINDS, mergeRecent, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
 import { confirmMeta, facesEyebrow, firstName, formDots, nextLine, playedFrom, xpNote } from "@/lib/home";
 import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
 import { GAME_LABEL, greetingFor } from "@/lib/identity";
@@ -36,6 +36,7 @@ import { myNightStatus } from "@/lib/night";
 import { fetchAllPages } from "@/lib/paging";
 import { playFaces } from "@/lib/play";
 import { formatShort } from "@/lib/race";
+import { loadRecaps } from "@/lib/recent-data";
 import { aboveOf, leadOf, toRankRow, type RankRow } from "@/lib/ranking";
 import { firstWinOver, gameRankMove, momentLines, rematchHref, resultHeadline, secondAction } from "@/lib/result-moment";
 import { seasonCountdownLabel, seasonStrip } from "@/lib/season";
@@ -53,6 +54,9 @@ type NextRsvp = {
 };
 
 type RatedRef = { id: string; rating: number };
+
+// How many stored rows Recent fetches.
+const FEED_LIMIT = 30;
 
 // One of your confirmed games, for what the newest one changed: the record
 // in its game type, a first win over them, the achievements it unlocked.
@@ -102,6 +106,7 @@ export default async function HomePage({
     { data: myMatches },
     { data: agreedForMe },
     nightData,
+    recaps,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -133,15 +138,13 @@ export default async function HomePage({
       .eq("reporter_id", user.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
-    // The league feed: results, badges, streaks, cups, seasons, joins. A pass
-    // ("X passed Y for #1") lands with nearly every win in a club this size,
-    // so it repeats the result above it; the Ranks tab tells that story.
+    // The league feed: results, seasons and cups (lib/feed RECENT_KINDS).
     supabase
       .from("activity")
       .select(FEED_SELECT)
-      .neq("kind", "pass")
+      .in("kind", RECENT_KINDS)
       .order("created_at", { ascending: false })
-      .limit(30),
+      .limit(FEED_LIMIT),
     // Bound the fetch, but let partitionEvents make the actual upcoming/past
     // call so the home card and the calendar can never disagree.
     supabase
@@ -188,6 +191,8 @@ export default async function HomePage({
       .order("confirmed_at", { ascending: false }),
     // Tonight's club night at your school, if one is on.
     loadNight(supabase, user.id, now),
+    // Calendar events and club nights that ended this past month, for Recent.
+    loadRecaps(supabase, now),
   ]);
   const flaggable = (agreedForMe ?? []).filter((m) => canFlag(m, user.id, now));
   // Called to a table tonight: that card joins what needs you at the top; out
@@ -203,6 +208,7 @@ export default async function HomePage({
   const streak = currentStreak(mineByPlay, user.id);
   const streakLength = streak?.kind === "W" ? streak.length : 0;
   const feedRows = (feed ?? []) as unknown as FeedRow[];
+  const recent = mergeRecent(feedRows, recaps, FEED_LIMIT);
 
   const mySchool = one(me?.schools as { short_name: string } | { short_name: string }[] | null)?.short_name ?? null;
   const live = orderLiveGames(
@@ -756,7 +762,7 @@ export default async function HomePage({
 
       <section className="flex flex-col gap-1.5">
         <SectionHeading action={{ href: `/players/${user.id}`, label: "Your games" }}>Recent</SectionHeading>
-        {(feed ?? []).length === 0 && (
+        {recent.length === 0 && (
           <p className="text-muted-foreground py-6 text-center text-sm">
             No results yet this season.{" "}
             <Link href="/matches/new" className="text-brass">
@@ -766,9 +772,13 @@ export default async function HomePage({
         )}
         <ShowMore
           label="Show {hidden} more"
-          items={feedRows.map((row) => (
-            <ActivityRow key={row.id} row={row} viewerId={user.id} now={now} />
-          ))}
+          items={recent.map((item) =>
+            item.type === "row" ? (
+              <ActivityRow key={item.row.id} row={item.row} viewerId={user.id} now={now} />
+            ) : (
+              <RecapRow key={item.recap.key} recap={item.recap} now={now} />
+            )
+          )}
         />
       </section>
     </main>

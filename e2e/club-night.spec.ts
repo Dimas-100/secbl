@@ -82,4 +82,11 @@ test("a club night calls the line to the table and frees it on the result", asyn
   pageA.once("dialog", (d) => void d.accept());
   await pageA.getByRole("button", { name: "End club night" }).click();
   await expect(pageA.getByRole("button", { name: "Start club night" })).toBeVisible();
+
+  // Once it ends, Recent on Home tells the night (lib/feed nightRecap), and
+  // it no longer lists who joined (RECENT_KINDS), these two included.
+  await pageA.goto("/");
+  const homeMain = pageA.getByRole("main");
+  await expect(homeMain.getByText("1 game · 2 players")).toBeVisible({ timeout: 20_000 });
+  await expect(homeMain.getByText(/joined from/)).toHaveCount(0);
 });
