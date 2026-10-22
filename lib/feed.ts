@@ -45,6 +45,19 @@ export interface FeedRow {
   match: FeedMatch | FeedMatch[] | null;
 }
 
+// What Recent on Home shows (owner's call, 2026-10-22): results, seasons and
+// cups. Badges, streaks and joins are about one person and live on the You
+// page and the result screen; a pass repeats the result above it; a cup's
+// rounds repeat its bracket.
+export const RECENT_KINDS = [
+  "match",
+  "season_opened",
+  "season_week_left",
+  "season_closed",
+  "cup_started",
+  "cup_won",
+] as const satisfies readonly ActivityKind[];
+
 const PERSON = "id, display_name, avatar_url, ball, schools(short_name)";
 export const FEED_SELECT =
   `id, kind, actor_id, other_id, match_id, tournament_id, season_id, data, created_at, ` +
@@ -132,4 +145,93 @@ export function describeActivity(
     default:
       return { title: "", meta: null, href: null };
   }
+}
+
+// --- Club events, told after they end ---------------------------------------
+// A calendar event or a club night that has ended joins Recent among the
+// stored rows. Worked out when Home loads (lib/recent-data), not stored: the
+// upcoming event already has its own card above, so only the past ones show.
+
+export interface Recap {
+  key: string;
+  // When it ended: where it sorts among the feed rows.
+  at: string;
+  kind: "event" | "night";
+  title: string;
+  meta: string;
+  href: string;
+}
+
+// "Fall Social" · "Event · 8 going": the RSVPs say who meant to go, not who
+// went, so the count stays in the RSVP's own word.
+export function eventRecap(e: {
+  id: string;
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+  rsvps: { response: string }[];
+}): Recap {
+  const going = e.rsvps.filter((r) => r.response === "going").length;
+  return {
+    key: `event:${e.id}`,
+    at: e.ends_at ?? e.starts_at,
+    kind: "event",
+    title: e.title,
+    meta: going > 0 ? `Event · ${going} going` : "Event",
+    href: `/events/${e.id}`,
+  };
+}
+
+export interface NightGame {
+  reporter_id: string;
+  opponent_id: string;
+  created_at: string;
+  reporter_school: string | null;
+  opponent_school: string | null;
+}
+
+// "GSU club night" · "12 games · 7 players": the games logged between the
+// night's opening and closing by two members of its school (only they can
+// join its line). A night with no games is nothing to tell.
+export function nightRecap(
+  night: {
+    id: string;
+    school_id: string;
+    opened_at: string;
+    closed_at: string;
+    schools?: { short_name: string } | { short_name: string }[] | null;
+  },
+  games: NightGame[]
+): Recap | null {
+  const from = Date.parse(night.opened_at);
+  const to = Date.parse(night.closed_at);
+  const played = games.filter((g) => {
+    const at = Date.parse(g.created_at);
+    return at >= from && at <= to && g.reporter_school === night.school_id && g.opponent_school === night.school_id;
+  });
+  if (played.length === 0) return null;
+  const players = new Set(played.flatMap((g) => [g.reporter_id, g.opponent_id])).size;
+  const school = one(night.schools)?.short_name;
+  return {
+    key: `night:${night.id}`,
+    at: night.closed_at,
+    kind: "night",
+    title: school ? `${school} club night` : "Club night",
+    meta: `${played.length} ${played.length === 1 ? "game" : "games"} · ${players} players`,
+    href: "/night",
+  };
+}
+
+export type RecentItem = { type: "row"; at: string; row: FeedRow } | { type: "recap"; at: string; recap: Recap };
+
+// The feed rows and the recaps in one list, newest first. When the feed came
+// back cut at its limit, the rows older than its last one were never fetched,
+// so a recap from before then would sit among the wrong neighbours: it waits.
+export function mergeRecent(rows: FeedRow[], recaps: Recap[], limit: number): RecentItem[] {
+  const floor = rows.length >= limit && rows.length > 0 ? Date.parse(rows[rows.length - 1].created_at) : null;
+  const items: RecentItem[] = [
+    ...rows.map((row) => ({ type: "row" as const, at: row.created_at, row })),
+    ...recaps.filter((r) => floor === null || Date.parse(r.at) > floor).map((recap) => ({ type: "recap" as const, at: recap.at, recap })),
+  ];
+  return items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 }

@@ -1,10 +1,10 @@
-import { Flag, Medal, Trophy } from "lucide-react";
+import { CalendarDays, Flag, Medal, Trophy, Users } from "lucide-react";
 import { FlameMark } from "@/components/flame-mark";
 import { Avatar } from "@/components/avatar";
 import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
 import { TitleBadge } from "@/components/title-badge";
-import { describeActivity, feedStamp, one, type FeedPerson, type FeedRow } from "@/lib/feed";
+import { describeActivity, feedStamp, one, type FeedPerson, type FeedRow, type Recap } from "@/lib/feed";
 import { GAME_LABEL } from "@/lib/identity";
 import type { TitleName } from "@/lib/levels";
 
@@ -44,6 +44,25 @@ export function ActivityRow({ row, viewerId, now }: { row: FeedRow; viewerId: st
       title={title}
       meta={meta ?? undefined}
       trailing={<span className="text-muted-foreground text-[12px]">{stamp}</span>}
+    />
+  );
+}
+
+// A club event that has ended (lib/feed Recap): the same hairline row, with
+// a calendar for an event and a crowd for a club night.
+export function RecapRow({ recap, now }: { recap: Recap; now: Date }) {
+  const Icon = recap.kind === "night" ? Users : CalendarDays;
+  return (
+    <ListRow
+      href={recap.href}
+      leading={
+        <span className={ICON}>
+          <Icon className="size-[18px]" strokeWidth={1.7} />
+        </span>
+      }
+      title={recap.title}
+      meta={recap.meta}
+      trailing={<span className="text-muted-foreground text-[12px]">{feedStamp(recap.at, now)}</span>}
     />
   );
 }
