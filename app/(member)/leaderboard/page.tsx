@@ -234,19 +234,28 @@ export default async function LeaderboardPage({
             </span>
           }
           meta={
-            <span className="flex items-center gap-1.5">
-              <SchoolMark school={schoolById[r.school_id]} size={16} />
-              {r.school_short_name}
-              {move && (
+            <span className="flex min-w-0 items-center gap-1.5">
+              {/* Your own row leads with the gap, so a narrow screen cuts the school, not the gap. */}
+              {gap && (
+                <>
+                  <span className="shrink-0 whitespace-nowrap">{gap}</span>
+                  <span aria-hidden="true">·</span>
+                </>
+              )}
+              {isMe && move && (
+                <>
+                  <Movement value={moves[r.id]} />
+                  <span aria-hidden="true">·</span>
+                </>
+              )}
+              <span className="flex min-w-0 items-center gap-1.5">
+                <SchoolMark school={schoolById[r.school_id]} size={16} />
+                <span className="truncate">{r.school_short_name}</span>
+              </span>
+              {!isMe && move && (
                 <>
                   <span aria-hidden="true">·</span>
                   <Movement value={moves[r.id]} />
-                </>
-              )}
-              {gap && (
-                <>
-                  <span aria-hidden="true">·</span>
-                  {gap}
                 </>
               )}
             </span>
@@ -400,15 +409,21 @@ export default async function LeaderboardPage({
                 if (!r) return <div key={`empty-${slot}`} />;
                 const rank = slot === 1 ? 1 : slot === 0 ? 2 : 3;
                 const tag = placingTag(r.wins + r.losses);
+                const isMe = r.id === user.id;
+                const gap = isMe ? gapLine(visibleRankRows, r.id) : null;
                 return (
                   <Link
                     key={r.id}
                     href={`/players/${r.id}`}
-                    className="press flex min-w-0 flex-col items-center gap-2.5 text-center"
+                    className={cn(
+                      "press flex min-w-0 flex-col items-center gap-2.5 text-center",
+                      isMe && "bg-card rounded-[14px] px-1 py-3"
+                    )}
                   >
                     <Avatar person={r} size={rank === 1 ? "podium" : "xl"} ring={PODIUM_RING[rank - 1]} />
                     <span className={cn("text-[13px] leading-none font-semibold tracking-[0.06em]", PODIUM_TEXT[rank - 1])}>
                       #{rank}
+                      {isMe && <span className="text-muted-foreground font-normal tracking-normal"> · you</span>}
                     </span>
                     <span className="flex w-full flex-col items-center gap-0.5">
                       <span className="flex w-full items-center justify-center gap-1.5">
@@ -417,6 +432,7 @@ export default async function LeaderboardPage({
                       </span>
                       <span className="text-muted-foreground stat-number text-[12px]">{r.rating}</span>
                       {tag && <PlacingTag text={tag} />}
+                      {gap && <span className="text-muted-foreground text-[11px] leading-tight">{gap}</span>}
                       <Movement value={moves[r.id]} />
                     </span>
                   </Link>

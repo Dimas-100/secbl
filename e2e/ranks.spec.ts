@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { cleanupTracked, serviceClient } from "./cleanup";
-import { logIn, onTrail, privateSchool, userMaker } from "./private-school";
+import { logIn, onTrail, PASSWORD, privateSchool, userMaker } from "./private-school";
 
 test.afterEach(cleanupTracked);
 
@@ -8,7 +8,7 @@ test.afterEach(cleanupTracked);
 // users live in a school with no approved real members, so the club never
 // sees them. Text is looked up inside the visible main landmark (a production
 // build can leave a hidden copy of the page body, ledger R12).
-test("the leaderboard shows placing, movement and a plain Schools tab", async ({ page }) => {
+test("the leaderboard shows placing, movement and a plain Schools tab", async ({ page, browser }) => {
   test.setTimeout(180_000);
   const stamp = Date.now();
   const service = serviceClient();
@@ -74,6 +74,24 @@ test("the leaderboard shows placing, movement and a plain Schools tab", async ({
   await expect(row).not.toContainText("*");
   await expect(row).not.toContainText("this wk");
   await expect(main.getByRole("list", { name: "Not placed yet" }).getByRole("link", { name: a.name })).toHaveCount(0);
+
+  // On the podium, the viewer still sees their own gap and a quiet "you": B
+  // is #2 of the school's own ladder, behind A.
+  const ctxB = await browser.newContext();
+  const pageB = await ctxB.newPage();
+  // B's Home opens on B's own result screen, so sign in by hand instead of
+  // waiting for the Recent heading.
+  await pageB.goto("/login");
+  await pageB.fill('input[name="email"]', b.email);
+  await pageB.fill('input[name="password"]', PASSWORD);
+  await Promise.all([pageB.waitForURL((u) => !u.pathname.startsWith("/login")), pageB.click('button[type="submit"]')]);
+  await pageB.goto("/leaderboard?tab=players&scope=school");
+  const mainB = pageB.getByRole("main");
+  const rowB = mainB.getByRole("link", { name: b.name });
+  await expect(rowB).toContainText("#2");
+  await expect(rowB).toContainText("you");
+  await expect(rowB).toContainText(/\d+ pts? to #1/);
+  await ctxB.close();
 
   // The Schools tab names the schools with no members in one line, only when
   // there are any.
