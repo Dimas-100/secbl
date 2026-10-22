@@ -491,7 +491,7 @@ export default async function PlayerPage({
             {level.intoLevel} / {level.needed} XP
           </span>
         </div>
-        <LevelBar value={level.intoLevel} max={level.needed} />
+        <LevelBar value={level.intoLevel} max={level.needed} label={`Level ${level.level} progress`} />
         {next && (
           <span className="text-muted-foreground flex items-center gap-2 text-[12px]">
             <TitleBadge title={next.title} size={20} locked decorative />

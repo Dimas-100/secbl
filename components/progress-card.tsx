@@ -108,7 +108,7 @@ export function ProgressCard({
           </span>
           <span className="text-muted-foreground stat-number shrink-0">{xpNote}</span>
         </div>
-        <LevelBar value={level.intoLevel} max={level.needed} />
+        <LevelBar value={level.intoLevel} max={level.needed} label={`Level ${level.level} progress`} />
       </div>
 
       {next && (
