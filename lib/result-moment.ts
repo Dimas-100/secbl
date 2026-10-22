@@ -1,6 +1,7 @@
 // The "game counts" moment (Play & Progress stage 4), pure: the headline, what
 // the ladder did to one member, the at-most-three true "what changed" lines,
 // which second button to show, and the rematch link. No DOM, no clock.
+import type { NightStatus } from "@/lib/night";
 import { boardBefore, ladderAt, rankedIds, type RankRow } from "@/lib/ranking";
 import { opponentOf, type StatMatch } from "@/lib/stats";
 
@@ -101,15 +102,20 @@ export function momentLines(input: {
   return lines.slice(0, MAX_LINES);
 }
 
-// Ruling S4-R1: "Back in line" only when a club night is open at my school,
-// I am currently out, and this game was confirmed after the night opened.
+// Rulings S4-R1, S4-R7: "Back in line" only when a club night is open at my
+// school, I am currently out, and this game was played today (its club date)
+// and confirmed after the night opened. A backlog game confirmed tonight was
+// not a table game, so it gets Rematch.
 export function secondAction(input: {
   nightOpen: boolean;
   nightOpenedAt: string | null;
-  myNightKind: string;
+  myNightKind: NightStatus["kind"];
   confirmedAt: string;
+  playedAt: string;
+  today: string;
 }): "rematch" | "back_in_line" {
   if (!input.nightOpen || !input.nightOpenedAt || input.myNightKind !== "out") return "rematch";
+  if (input.playedAt !== input.today) return "rematch";
   const opened = Date.parse(input.nightOpenedAt);
   const confirmed = Date.parse(input.confirmedAt);
   if (Number.isNaN(opened) || Number.isNaN(confirmed)) return "rematch";

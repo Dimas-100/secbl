@@ -407,6 +407,8 @@ export default async function HomePage({
         nightOpenedAt: nightData.night?.opened_at ?? null,
         myNightKind: nightStatus.kind,
         confirmedAt: fresh.confirmed_at!,
+        playedAt: fresh.played_at,
+        today,
       });
       moment = {
         matchId: fresh.id,

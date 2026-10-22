@@ -151,10 +151,12 @@ describe("secondAction", () => {
   const base = {
     nightOpen: true,
     nightOpenedAt: "2026-10-21T18:00:00Z",
-    myNightKind: "out",
+    myNightKind: "out" as const,
     confirmedAt: "2026-10-21T19:00:00Z",
+    playedAt: "2026-10-21",
+    today: "2026-10-21",
   };
-  it("back in line when the night is open, I am out, and the game came after it opened", () => {
+  it("back in line when the night is open, I am out, and today's game came after it opened", () => {
     expect(secondAction(base)).toBe("back_in_line");
   });
   it("rematch when no night is open", () => {
@@ -162,10 +164,19 @@ describe("secondAction", () => {
     expect(secondAction({ ...base, nightOpenedAt: null })).toBe("rematch");
   });
   it("rematch when I am not out", () => {
-    for (const k of ["in_line", "playing", "none"]) expect(secondAction({ ...base, myNightKind: k })).toBe("rematch");
+    for (const k of ["waiting", "playing", "none"] as const) {
+      expect(secondAction({ ...base, myNightKind: k })).toBe("rematch");
+    }
   });
   it("rematch when the game was confirmed before the night opened", () => {
     expect(secondAction({ ...base, confirmedAt: "2026-10-21T17:59:59Z" })).toBe("rematch");
+  });
+  it("rematch for a game played on another day, even one confirmed tonight (ruling S4-R7)", () => {
+    expect(secondAction({ ...base, playedAt: "2026-10-19" })).toBe("rematch");
+  });
+  it("rematch when a time is not a time", () => {
+    expect(secondAction({ ...base, confirmedAt: "garbage" })).toBe("rematch");
+    expect(secondAction({ ...base, nightOpenedAt: "garbage" })).toBe("rematch");
   });
 });
 
