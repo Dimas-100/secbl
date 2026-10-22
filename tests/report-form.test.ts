@@ -265,19 +265,30 @@ describe("seededBoard", () => {
 });
 
 describe("foldSummary", () => {
+  const today = "2026-10-21";
+  const on = { date: today };
   it("names the game, the race and an even race", () => {
-    expect(foldSummary({ game: "8ball", raceTo: 5, spot: 0, spotTo: null }, "Ana")).toBe("8-ball · race to 5 · no spot");
+    expect(foldSummary({ game: "8ball", raceTo: 5, spot: 0, spotTo: null, ...on }, "Ana", today)).toBe(
+      "8-ball · race to 5 · no spot"
+    );
   });
   it("names the spot and who has it", () => {
-    expect(foldSummary({ game: "9ball", raceTo: 7, spot: 2, spotTo: "them" }, "Ana")).toBe(
+    expect(foldSummary({ game: "9ball", raceTo: 7, spot: 2, spotTo: "them", ...on }, "Ana", today)).toBe(
       "9-ball · race to 7 · 2 on the wire to Ana"
     );
-    expect(foldSummary({ game: "10ball", raceTo: 3, spot: 1, spotTo: "you" }, "Ana")).toBe(
+    expect(foldSummary({ game: "10ball", raceTo: 3, spot: 1, spotTo: "you", ...on }, "Ana", today)).toBe(
       "10-ball · race to 3 · 1 on the wire to you"
     );
   });
   it("says open race in open play", () => {
-    expect(foldSummary({ game: "other", raceTo: null, spot: 0, spotTo: null }, "Ana")).toBe("Other · open race · no spot");
+    expect(foldSummary({ game: "other", raceTo: null, spot: 0, spotTo: null, ...on }, "Ana", today)).toBe(
+      "Other · open race · no spot"
+    );
+  });
+  it("names the day when the game isn't today's, so a backdated game never hides it (ruling S4-R7)", () => {
+    const d = { game: "8ball", raceTo: 5, spot: 0, spotTo: null };
+    expect(foldSummary({ ...d, date: "2026-10-19" }, "Ana", today)).toBe("8-ball · race to 5 · no spot · Oct 19");
+    expect(foldSummary({ ...d, date: "2025-12-12" }, "Ana", today)).toBe("8-ball · race to 5 · no spot · Dec 12, 2025");
   });
 });
 

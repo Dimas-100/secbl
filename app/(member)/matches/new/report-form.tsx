@@ -447,7 +447,7 @@ export function ReportMatchForm({
           <Avatar person={selected} size="xs" />
           {/* Wraps, never truncates: with a spot the line runs long on a
               phone, and who holds the spot is the part that would be cut. */}
-          <span className="min-w-0 flex-1 py-1 text-[13px] leading-snug">{foldSummary(d, first)}</span>
+          <span className="min-w-0 flex-1 py-1 text-[13px] leading-snug">{foldSummary(d, first, today)}</span>
           <button
             type="button"
             onClick={() => setUnfolded(true)}

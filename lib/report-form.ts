@@ -1,6 +1,7 @@
 // Pure logic for the one-screen report form, kept out of the component so
 // vitest covers it without DOM tooling.
 
+import { shortClubDate } from "@/lib/events";
 import { RACES, startingScores, suggestedSpot, type Side } from "@/lib/race";
 import { formatClubDate } from "@/lib/season";
 import type { MatchStatus } from "@/lib/types";
@@ -37,16 +38,20 @@ export function boardParams(sp: { game?: string; race?: string; rematch?: string
 }
 
 // The folded setup's one line: "8-ball · race to 5 · no spot",
-// "9-ball · open race · no spot", "8-ball · race to 3 · 1 on the wire to Ana".
+// "9-ball · open race · no spot", "8-ball · race to 3 · 1 on the wire to Ana",
+// and " · Oct 19" when the game is dated another day (ruling S4-R7): folded,
+// the date editor is hidden, so a backdated game must still say so.
 export function foldSummary(
-  d: { game: string; raceTo: number | null; spot: number; spotTo: Side | null },
-  opponentFirst: string
+  d: { game: string; raceTo: number | null; spot: number; spotTo: Side | null; date: string },
+  opponentFirst: string,
+  today: string
 ): string {
   const game = GAME_TYPES.find((g) => g.value === d.game)?.label ?? d.game;
   const race = d.raceTo ? `race to ${d.raceTo}` : "open race";
   const spot =
     d.raceTo && d.spot > 0 && d.spotTo ? `${d.spot} on the wire to ${d.spotTo === "you" ? "you" : opponentFirst}` : "no spot";
-  return `${game} · ${race} · ${spot}`;
+  const day = d.date && d.date !== today ? ` · ${shortClubDate(d.date, today)}` : "";
+  return `${game} · ${race} · ${spot}${day}`;
 }
 
 // The later of two times (ISO strings), skipping any that isn't one: the
