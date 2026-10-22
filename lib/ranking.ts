@@ -47,17 +47,40 @@ export function boardBefore(
   });
 }
 
-// The ladder as this game left it, for the game-counts rank line (ruling
-// S4-R3): the two players back at this game's rating_after, everyone else as
-// today. Without it, games either player played on afterwards would be told as
-// this game's doing. Win/loss counts stay today's (they only break rating
-// ties). A player with no rating_history row for the game is left as is.
-// Returns new rows; then boardBefore() takes the game itself back out.
-export function boardAtMatch(today: RankRow[], ratingAfter: Map<string, number>): RankRow[] {
-  return today.map((p) => {
-    const rating = ratingAfter.get(p.id);
-    return rating === undefined ? p : { ...p, rating };
-  });
+// The ladder as it stood the instant one game counted, for the game-counts
+// rank line (ruling S4-R5), from today's ladder and what happened since:
+// each member back at the rating they carried into their first rating change
+// after the game (the earliest rating_before among rating_history rows created
+// after it; none, today's rating), and every game confirmed after it taken
+// back out of the wins and losses. So a third party's later results, and a
+// member placed only by later games, are never told as this game's doing.
+// The caller reads strictly later rows, so anything stamped in the same
+// instant as the game counts as part of it. Returns new rows; then
+// boardBefore() takes the game itself back out.
+export function ladderAt(
+  today: RankRow[],
+  laterHistory: { profile_id: string; rating_before: number; created_at: string }[],
+  laterMatches: { reporter_id: string; opponent_id: string; winner_id: string }[]
+): RankRow[] {
+  const firstAfter = new Map<string, { at: number; rating: number }>();
+  for (const h of laterHistory) {
+    const at = Date.parse(h.created_at);
+    const seen = firstAfter.get(h.profile_id);
+    if (!seen || at < seen.at) firstAfter.set(h.profile_id, { at, rating: Number(h.rating_before) });
+  }
+  const winsSince = new Map<string, number>();
+  const lossesSince = new Map<string, number>();
+  for (const m of laterMatches) {
+    const loser = m.winner_id === m.reporter_id ? m.opponent_id : m.reporter_id;
+    winsSince.set(m.winner_id, (winsSince.get(m.winner_id) ?? 0) + 1);
+    lossesSince.set(loser, (lossesSince.get(loser) ?? 0) + 1);
+  }
+  return today.map((p) => ({
+    id: p.id,
+    rating: firstAfter.get(p.id)?.rating ?? p.rating,
+    wins: Math.max(0, p.wins - (winsSince.get(p.id) ?? 0)),
+    losses: Math.max(0, p.losses - (lossesSince.get(p.id) ?? 0)),
+  }));
 }
 
 function placed(rows: RankRow[]): RankRow[] {

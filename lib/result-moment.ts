@@ -1,7 +1,7 @@
 // The "game counts" moment (Play & Progress stage 4), pure: the headline, what
 // the ladder did to one member, the at-most-three true "what changed" lines,
 // which second button to show, and the rematch link. No DOM, no clock.
-import { rankedIds, type RankRow } from "@/lib/ranking";
+import { boardBefore, ladderAt, rankedIds, type RankRow } from "@/lib/ranking";
 import { opponentOf, type StatMatch } from "@/lib/stats";
 
 export type RankMoveKind = "up" | "down" | "entered";
@@ -12,13 +12,16 @@ export function resultHeadline(won: boolean, opponentFirst: string, mine: number
 
 // What one confirmed game did to my place on the ladder. "up" names the
 // highest-placed member I jumped (above me before, below me after); "down"
-// names the member now directly above me who was below me before; "entered"
-// is a first ranked game. Members unranked before are never named (they are
-// not in the before ladder). null when nothing moved or I am still unranked.
+// names the opponent when they passed me (below me before, above me after),
+// else the member now directly above me if they were below me before (ruling
+// S4-R7: the one who beat me, not a bystander I dropped under); "entered" is
+// a first ranked game. Members unranked before are never named (they are not
+// in the before ladder). null when nothing moved or I am still unranked.
 export function rankMove(
   before: RankRow[],
   after: RankRow[],
-  meId: string
+  meId: string,
+  opponentId: string | null = null
 ): { kind: RankMoveKind; to: number; otherId: string | null } | null {
   const b = rankedIds(before);
   const a = rankedIds(after);
@@ -31,10 +34,34 @@ export function rankMove(
     return { kind: "up", to: to + 1, otherId };
   }
   if (to > from) {
+    // Below me before, above me now.
+    const passedMe = (id: string | null) =>
+      id !== null && b.indexOf(id) > from && a.indexOf(id) !== -1 && a.indexOf(id) < to;
     const above = a[to - 1];
-    return { kind: "down", to: to + 1, otherId: b.indexOf(above) > from ? above : null };
+    const otherId = passedMe(opponentId) ? opponentId : passedMe(above) ? above : null;
+    return { kind: "down", to: to + 1, otherId };
   }
   return null;
+}
+
+// What this game did to my place, told on the ladder as it stood the instant
+// it counted (rulings S4-R3, S4-R5): today's ladder rolled back past every
+// rating change and game that came after it (ladderAt), against that ladder
+// with this game taken back out (boardBefore). Games anyone played since are
+// not this game's doing.
+export function gameRankMove(input: {
+  today: RankRow[];
+  laterHistory: { profile_id: string; rating_before: number; created_at: string }[];
+  laterMatches: { reporter_id: string; opponent_id: string; winner_id: string }[];
+  winnerId: string;
+  loserId: string;
+  ratingBefore: Map<string, number>;
+  meId: string;
+  opponentId: string;
+}): { kind: RankMoveKind; to: number; otherId: string | null } | null {
+  const after = ladderAt(input.today, input.laterHistory, input.laterMatches);
+  const before = boardBefore(after, input.winnerId, input.loserId, input.ratingBefore);
+  return rankMove(before, after, input.meId, input.opponentId);
 }
 
 const MAX_LINES = 3;

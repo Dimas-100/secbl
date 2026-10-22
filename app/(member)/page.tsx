@@ -36,8 +36,8 @@ import { myNightStatus } from "@/lib/night";
 import { fetchAllPages } from "@/lib/paging";
 import { playFaces } from "@/lib/play";
 import { formatShort } from "@/lib/race";
-import { aboveOf, boardAtMatch, boardBefore, leadOf, toRankRow, type RankRow } from "@/lib/ranking";
-import { firstWinOver, momentLines, rankMove, rematchHref, resultHeadline, secondAction } from "@/lib/result-moment";
+import { aboveOf, leadOf, toRankRow, type RankRow } from "@/lib/ranking";
+import { firstWinOver, gameRankMove, momentLines, rematchHref, resultHeadline, secondAction } from "@/lib/result-moment";
 import { seasonCountdownLabel, seasonStrip } from "@/lib/season";
 import { loadOpenSeason, loadSeasonStandings } from "@/lib/season-data";
 import { byPlayOrder, currentStreak, ratingChangeSince, type PlayOrdered, type StatMatch } from "@/lib/stats";
@@ -65,6 +65,10 @@ type MomentMatch = StatMatch &
 
 const MOMENT_COLS =
   "id, reporter_id, opponent_id, winner_id, reporter_score, opponent_score, game_type, played_at, created_at, confirmed_at, reporter:profiles!matches_reporter_id_fkey(id, rating), opponent:profiles!matches_opponent_id_fkey(id, rating)";
+
+// What happened on the ladder after the newest game counted (ruling S4-R5).
+type LaterRating = { profile_id: string; rating_before: number; created_at: string };
+type LaterGame = { reporter_id: string; opponent_id: string; winner_id: string };
 
 export default async function HomePage({
   searchParams,
@@ -246,47 +250,101 @@ export default async function HomePage({
   // confirmed game in the last day, what it did to the rating and XP, and at
   // most three true lines about what changed.
   const fresh = freshMatch(mine30, now);
+  const today = clubDateOf(nowIso);
+  // A paged read that throws on a failed page, so a partial list is never
+  // counted from: the caller drops what needs it instead.
+  function allPages<T>(
+    what: string,
+    page: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>
+  ) {
+    return fetchAllPages<T>((from, to) =>
+      page(from, to).then(({ data, error: readError }) => {
+        if (readError) throw new Error(readError.message);
+        return (data ?? []) as T[];
+      })
+    ).catch((err: unknown) => {
+      console.error(`home: couldn't read ${what}`, err);
+      return null;
+    });
+  }
+
+  // One more wave, all at once: your place in the running season and who
+  // leads it, for the strip under the progress card; for a member with no game
+  // yet, the people to play (approved members in the Play sheet's order, with
+  // no recent opponents); and, while a game is fresh, the result screen's reads.
+  const [strip, members, freshReads] = await Promise.all([
+    openSeason ? loadSeasonStandings(supabase, openSeason).then((s) => seasonStrip(s, user.id)) : null,
+    played === 0
+      ? supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url, ball, school_id")
+          .eq("status", "approved")
+          .neq("id", user.id)
+          .then(({ data }) => (data ?? []) as (FirstGameFace & { school_id: string | null })[])
+      : null,
+    fresh
+      ? Promise.all([
+          // Both players' ratings going in: the ladder before this game.
+          supabase.from("rating_history").select("profile_id, rating_before, rating_after").eq("match_id", fresh.id),
+          // The badge and streak rows this game wrote for you.
+          supabase.from("activity").select("kind, data").eq("match_id", fresh.id).eq("actor_id", user.id),
+          // Your best rating before this game (the 500 / 600 club).
+          supabase
+            .from("rating_history")
+            .select("rating_after")
+            .eq("profile_id", user.id)
+            .or(`match_id.is.null,match_id.neq.${fresh.id}`)
+            .order("rating_after", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          // Every confirmed game of yours (paged).
+          allPages<MomentMatch>("your games for the result screen", (from, to) =>
+            supabase
+              .from("matches")
+              .select(MOMENT_COLS)
+              .eq("status", "confirmed")
+              .or(`reporter_id.eq.${user.id},opponent_id.eq.${user.id}`)
+              .order("id")
+              .range(from, to)
+          ),
+          // Everything that moved the ladder after this game counted (ruling
+          // S4-R5): rating changes stamped strictly later (this game's own are
+          // stamped with its confirmed_at), and games confirmed strictly later.
+          // A day's worth at most, so small.
+          allPages<LaterRating>("the ratings since the result", (from, to) =>
+            supabase
+              .from("rating_history")
+              .select("profile_id, rating_before, created_at")
+              .gt("created_at", fresh.confirmed_at!)
+              .or(`match_id.is.null,match_id.neq.${fresh.id}`)
+              .order("id")
+              .range(from, to)
+          ),
+          allPages<LaterGame>("the games since the result", (from, to) =>
+            supabase
+              .from("matches")
+              .select("reporter_id, opponent_id, winner_id")
+              .eq("status", "confirmed")
+              .gt("confirmed_at", fresh.confirmed_at!)
+              .neq("id", fresh.id)
+              .order("id")
+              .range(from, to)
+          ),
+        ])
+      : null,
+  ]);
+
   let moment: GameCountsProps | null = null;
-  if (fresh) {
+  if (fresh && freshReads) {
     const opponentId = fresh.reporter_id === user.id ? fresh.opponent_id : fresh.reporter_id;
     const [
       { data: hist, error: histError },
       { data: moments, error: momentsError },
       { data: peakRow, error: peakError },
       allMine,
-    ] = await Promise.all([
-      // Both players' ratings going in: the ladder before this game.
-      supabase.from("rating_history").select("profile_id, rating_before, rating_after").eq("match_id", fresh.id),
-      // The badge and streak rows this game wrote for you.
-      supabase.from("activity").select("kind, data").eq("match_id", fresh.id).eq("actor_id", user.id),
-      // Your best rating before this game (the 500 / 600 club).
-      supabase
-        .from("rating_history")
-        .select("rating_after")
-        .eq("profile_id", user.id)
-        .or(`match_id.is.null,match_id.neq.${fresh.id}`)
-        .order("rating_after", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      // Every confirmed game of yours (paged). A failed page drops the lines
-      // that need them rather than counting from a partial list.
-      fetchAllPages<MomentMatch>((from, to) =>
-        supabase
-          .from("matches")
-          .select(MOMENT_COLS)
-          .eq("status", "confirmed")
-          .or(`reporter_id.eq.${user.id},opponent_id.eq.${user.id}`)
-          .order("id")
-          .range(from, to)
-          .then(({ data, error: readError }) => {
-            if (readError) throw new Error(readError.message);
-            return (data ?? []) as MomentMatch[];
-          })
-      ).catch((err: unknown) => {
-        console.error("home: couldn't read your games for the result screen", err);
-        return null;
-      }),
-    ]);
+      laterHistory,
+      laterMatches,
+    ] = freshReads;
     // A failed read keeps its fallback (no screen without your rating
     // history; no badge, streak or achievement lines), but is never silent.
     if (histError) console.error("home: couldn't read the result's rating history", histError);
@@ -299,13 +357,23 @@ export default async function HomePage({
       const won = fresh.winner_id === user.id;
       const opponentFirst = firstName(opponent.display_name);
 
-      // The ladder as this game left it against the ladder with it taken
-      // back out (ruling S4-R3): games either player played on since are not
-      // this game's doing.
-      const ladderAfter = boardAtMatch(rankRows, new Map((hist ?? []).map((h) => [h.profile_id, h.rating_after])));
-      const ratingsGoingIn = new Map((hist ?? []).map((h) => [h.profile_id, h.rating_before]));
-      const ladderBefore = boardBefore(ladderAfter, fresh.winner_id, won ? opponentId : user.id, ratingsGoingIn);
-      const move = boardError ? null : rankMove(ladderBefore, ladderAfter, user.id);
+      // The ladder as it stood the instant this game counted, against it with
+      // the game taken back out (rulings S4-R3, S4-R5): what anyone played
+      // since is not this game's doing. Without the ladder or what came after
+      // it, the rank line is left out rather than guessed.
+      const move =
+        boardError || !laterHistory || !laterMatches
+          ? null
+          : gameRankMove({
+              today: rankRows,
+              laterHistory,
+              laterMatches,
+              winnerId: fresh.winner_id,
+              loserId: won ? opponentId : user.id,
+              ratingBefore: new Map((hist ?? []).map((h) => [h.profile_id, h.rating_before])),
+              meId: user.id,
+              opponentId,
+            });
 
       // Your games as they were played (ruling S3-R7), this one included.
       const byPlay = allMine?.some((m) => m.id === fresh.id) ? [...allMine].sort(byPlayOrder) : null;
@@ -386,20 +454,6 @@ export default async function HomePage({
     }
   }
 
-  // Your place in the running season and who leads it, for the strip under
-  // the progress card; and for a member with no game yet, the people to play
-  // (approved members in the Play sheet's order, with no recent opponents).
-  const [strip, members] = await Promise.all([
-    openSeason ? loadSeasonStandings(supabase, openSeason).then((s) => seasonStrip(s, user.id)) : null,
-    played === 0
-      ? supabase
-          .from("profiles")
-          .select("id, display_name, avatar_url, ball, school_id")
-          .eq("status", "approved")
-          .neq("id", user.id)
-          .then(({ data }) => (data ?? []) as (FirstGameFace & { school_id: string | null })[])
-      : null,
-  ]);
   let firstGameFaces: FirstGameFace[] = [];
   let firstGameEyebrow = "";
   if (members) {
@@ -433,7 +487,6 @@ export default async function HomePage({
       })
     : null;
 
-  const today = clubDateOf(nowIso);
   const greeting = greetingFor(now, me?.display_name ?? "").split(",")[0];
   const first = (me?.display_name ?? "").trim().split(/\s+/)[0] || "there";
 

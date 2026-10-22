@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { boardAtMatch, boardBefore, type RankRow } from "@/lib/ranking";
+import { boardBefore, ladderAt, type RankRow } from "@/lib/ranking";
 import {
   firstWinOver,
+  gameRankMove,
   momentLines,
   rankMove,
   rematchHref,
@@ -52,6 +53,21 @@ describe("rankMove", () => {
     const before = [row("a", 600), row("me", 560), row("b", 550)];
     const after = [row("a", 600), row("b", 550), row("me", 540, 1, 1)];
     expect(rankMove(before, after, "me")).toEqual({ kind: "down", to: 3, otherId: "b" });
+  });
+  it("down names the opponent when they passed me, not a bystander I dropped under (ruling S4-R7)", () => {
+    // I lose to O: me 560 -> 535, O 540 -> 565. B never moved.
+    const before = [row("a", 600), row("me", 560), row("b", 550), row("o", 540)];
+    const after = [row("a", 600), row("o", 565, 2), row("b", 550), row("me", 535, 1, 1)];
+    expect(rankMove(before, after, "me", "o")).toEqual({ kind: "down", to: 4, otherId: "o" });
+    // An opponent who stayed below me is not named; the member above is.
+    const stayed = [row("a", 600), row("b", 550), row("me", 545, 1, 1), row("o", 541, 2)];
+    expect(rankMove(before, stayed, "me", "o")).toEqual({ kind: "down", to: 3, otherId: "b" });
+  });
+  it("down names nobody when whoever passed me was unranked before", () => {
+    // O's first game: unplaced before, so never named; nobody else passed me.
+    const before = [row("a", 600), row("me", 455), row("o", 450, 0, 0)];
+    const after = [row("a", 600), row("o", 465), row("me", 440, 1, 1)];
+    expect(rankMove(before, after, "me", "o")).toEqual({ kind: "down", to: 3, otherId: null });
   });
   it("entered when I was unranked before and ranked after", () => {
     const before = [row("a", 600), row("me", 450, 0, 0)];
@@ -221,28 +237,102 @@ describe("signedChange", () => {
   });
 });
 
-describe("the rank line reads this game only (ruling S4-R3)", () => {
-  // Before the game: me 500 (#1), Taylor 495 (#2). I beat Taylor: 510 / 485,
-  // so nothing moved. Taylor then won on and is 540 today.
-  const today = [row("me", 510, 2, 1), row("t", 540, 5, 2)];
-  const goingIn = new Map([["me", 500], ["t", 495]]);
-  const after = new Map([["me", 510], ["t", 485]]);
-  it("today's board would claim Taylor passed me on a win over Taylor", () => {
-    expect(rankMove(boardBefore(today, "me", "t", goingIn), today, "me")).toEqual({
+// The rank line is told on the ladder as it stood the instant this game
+// counted (rulings S4-R3, S4-R5): everyone's rating and record as they were
+// then, from today's ladder and the rating rows and games that came after.
+describe("the rank line reads this game only (rulings S4-R3, S4-R5)", () => {
+  const h = (profile_id: string, rating_before: number, created_at = "2026-10-21T21:00:00Z") => ({
+    profile_id,
+    rating_before,
+    created_at,
+  });
+  const g = (reporter_id: string, opponent_id: string, winner_id: string) => ({ reporter_id, opponent_id, winner_id });
+
+  it("a win over Taylor is not told as Taylor passing me when Taylor won on since", () => {
+    // Before: me 500 (#1), Taylor 495 (#2). I win: 510 / 485, nothing moved.
+    // Taylor then won twice and is 540 today.
+    const today = [row("me", 510, 2, 1), row("t", 540, 5, 2), row("x", 470, 1, 3)];
+    const goingIn = new Map([["me", 500], ["t", 495]]);
+    // Today's board says Taylor passed me.
+    expect(rankMove(boardBefore(today, "me", "t", goingIn), today, "me", "t")).toEqual({
       kind: "down",
       to: 2,
       otherId: "t",
     });
+    const move = gameRankMove({
+      today,
+      laterHistory: [h("t", 485), h("t", 512, "2026-10-21T22:00:00Z"), h("x", 480), h("x", 475, "2026-10-21T22:00:00Z")],
+      laterMatches: [g("t", "x", "t"), g("x", "t", "t")],
+      winnerId: "me",
+      loserId: "t",
+      ratingBefore: goingIn,
+      meId: "me",
+      opponentId: "t",
+    });
+    expect(move).toBeNull();
   });
-  it("the board at the game says nothing moved", () => {
-    const atMatch = boardAtMatch(today, after);
-    expect(rankMove(boardBefore(atMatch, "me", "t", goingIn), atMatch, "me")).toBeNull();
+
+  it("a new opponent placed only by games after this one is never passed (review case a)", () => {
+    // At game time: A 600, B 550, me 440 (#3); N's first game, unplaced at
+    // 450. I beat N: 460 / 430. N then won five and is 520 today.
+    const today = [row("a", 600, 3, 0), row("b", 550, 2, 1), row("n", 520, 5, 1), row("me", 460, 1, 2)];
+    const goingIn = new Map([["me", 440], ["n", 450]]);
+    const laterHistory = [h("n", 430), h("n", 445, "2026-10-21T21:30:00Z")];
+    const laterMatches = ["z1", "z2", "z3", "z4", "z5"].map((z) => g("n", z, "n"));
+    const at = { today, laterHistory, winnerId: "me", loserId: "n", ratingBefore: goingIn, meId: "me", opponentId: "n" };
+    // Ratings alone (S4-R3) still count N as placed going in: "Up to #3, passing N".
+    expect(gameRankMove({ ...at, laterMatches: [] })).toEqual({ kind: "up", to: 3, otherId: "n" });
+    // As it stood: N unplaced before, me #3 before and after.
+    expect(gameRankMove({ ...at, laterMatches })).toBeNull();
   });
-  it("and a real pass in this game still reads as one", () => {
-    // Before: Taylor 520 (#1), me 500 (#2); I win 515 / 505; Taylor 540 today.
-    const atMatch = boardAtMatch([row("me", 515, 2, 1), row("t", 540, 5, 2)], new Map([["me", 515], ["t", 505]]));
-    const before = boardBefore(atMatch, "me", "t", new Map([["me", 500], ["t", 520]]));
-    expect(rankMove(before, atMatch, "me")).toEqual({ kind: "up", to: 1, otherId: "t" });
+
+  it("a third party's later loss is not told as my pass (review case b)", () => {
+    // At game time: C 520 (#1), me 500 (#2), O 460. I beat O: 510 / 450.
+    // C then lost to D: C 520 -> 505, D 480 -> 495. Today I am above C.
+    const today = [row("me", 510, 3, 1), row("c", 505, 4, 2), row("d", 495, 2, 1), row("o", 450, 1, 3)];
+    const goingIn = new Map([["me", 500], ["o", 460]]);
+    const at = { today, winnerId: "me", loserId: "o", ratingBefore: goingIn, meId: "me", opponentId: "o" };
+    // Today's third parties: "Up to #1, passing C".
+    expect(gameRankMove({ ...at, laterHistory: [], laterMatches: [] })).toEqual({ kind: "up", to: 1, otherId: "c" });
+    // As it stood: C still 520, above my 510, so nothing moved.
+    expect(gameRankMove({ ...at, laterHistory: [h("c", 520), h("d", 480)], laterMatches: [g("d", "c", "d")] })).toBeNull();
+  });
+
+  it("a real pass in this game still reads as one, whatever happened since", () => {
+    // Before: T 505 (#1), me 500 (#2). I win: 512 / 493. T then won on to 520.
+    const today = [row("t", 520, 4, 1), row("me", 512, 3, 1), row("x", 470, 1, 2)];
+    const move = gameRankMove({
+      today,
+      laterHistory: [h("t", 493), h("x", 497)],
+      laterMatches: [g("t", "x", "t")],
+      winnerId: "me",
+      loserId: "t",
+      ratingBefore: new Map([["me", 500], ["t", 505]]),
+      meId: "me",
+      opponentId: "t",
+    });
+    expect(move).toEqual({ kind: "up", to: 1, otherId: "t" });
+  });
+
+  it("a loss names the opponent who passed me, on the ladder as it stood", () => {
+    // Before: me 520 (#1), B 515 (#2), O 505 (#3). I lose to O: 500 / 525.
+    // B then lost a game and is 490 today; at the game B was 515, 2-1.
+    const today = [row("o", 525, 3, 1), row("b", 490, 2, 2), row("me", 500, 2, 2)];
+    const laterHistory = [h("b", 515)];
+    const laterMatches = [g("b", "z", "z")];
+    expect(ladderAt(today, laterHistory, laterMatches).find((r) => r.id === "b")).toEqual(row("b", 515, 2, 1));
+    const move = gameRankMove({
+      today,
+      laterHistory,
+      laterMatches,
+      winnerId: "o",
+      loserId: "me",
+      ratingBefore: new Map([["me", 520], ["o", 505]]),
+      meId: "me",
+      opponentId: "o",
+    });
+    // B is directly above me now, but O is who passed me.
+    expect(move).toEqual({ kind: "down", to: 3, otherId: "o" });
   });
 });
 

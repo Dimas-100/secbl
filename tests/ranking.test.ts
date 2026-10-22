@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   aboveOf,
-  boardAtMatch,
   boardBefore,
   compareRank,
   isPlaced,
+  ladderAt,
   leadOf,
   rankOf,
   rankedIds,
@@ -135,17 +135,42 @@ describe("boardBefore", () => {
   });
 });
 
-describe("boardAtMatch", () => {
-  it("puts the two players at this game's rating_after and leaves everyone else as today", () => {
+describe("ladderAt (ruling S4-R5)", () => {
+  // Today's ladder, plus what happened after the game counted: the rating
+  // rows and confirmed games created strictly later.
+  const h = (profile_id: string, rating_before: number, created_at: string) => ({ profile_id, rating_before, created_at });
+  const g = (reporter_id: string, opponent_id: string, winner_id: string) => ({ reporter_id, opponent_id, winner_id });
+
+  it("with nothing since, is today's ladder", () => {
+    const today: RankRow[] = [row("me", 515, 3, 1), row("t", 540, 6, 2)];
+    expect(ladderAt(today, [], [])).toEqual(today);
+  });
+
+  it("puts each member back at the rating they carried into their first later change", () => {
     const today: RankRow[] = [row("me", 515, 3, 1), row("t", 540, 6, 2), row("x", 505, 2, 2)];
-    expect(boardAtMatch(today, new Map([["me", 510], ["t", 485]]))).toEqual([
-      row("me", 510, 3, 1),
-      row("t", 485, 6, 2),
-      row("x", 505, 2, 2),
+    const later = [
+      h("t", 500, "2026-10-21T21:00:00Z"),
+      h("t", 485, "2026-10-21T20:30:00Z"), // the first after: what the game left Taylor at
+      h("x", 520, "2026-10-21T22:00:00+00:00"),
+    ];
+    expect(ladderAt(today, later, [g("t", "x", "t"), g("x", "t", "t")])).toEqual([
+      row("me", 515, 3, 1),
+      row("t", 485, 4, 2),
+      row("x", 520, 2, 0),
     ]);
   });
-  it("leaves a player with no rating_history row for the game as is", () => {
-    const today: RankRow[] = [row("me", 515, 3, 1), row("t", 540, 6, 2)];
-    expect(boardAtMatch(today, new Map([["me", 510]]))).toEqual([row("me", 510, 3, 1), row("t", 540, 6, 2)]);
+
+  it("a member placed only by later games is unplaced again", () => {
+    const today: RankRow[] = [row("n", 520, 2, 0), row("me", 470, 1, 1)];
+    const was = ladderAt(today, [h("n", 450, "2026-10-21T21:00:00Z")], [g("n", "z", "n"), g("z", "n", "n")]);
+    expect(was[0]).toEqual(row("n", 450, 0, 0));
+    expect(rankedIds(was)).toEqual(["me"]);
+  });
+
+  it("does not change the rows it was given", () => {
+    const today: RankRow[] = [row("me", 515, 3, 1)];
+    const copy = today.map((r) => ({ ...r }));
+    ladderAt(today, [h("me", 500, "2026-10-21T21:00:00Z")], [g("me", "x", "me")]);
+    expect(today).toEqual(copy);
   });
 });
