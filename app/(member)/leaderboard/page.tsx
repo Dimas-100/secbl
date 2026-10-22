@@ -11,7 +11,7 @@ import { UnderlineTabs } from "@/components/underline-tabs";
 import { createClient } from "@/lib/supabase/server";
 import { clubDateOf } from "@/lib/events";
 import { compareRank, isPlaced, toRankRow } from "@/lib/ranking";
-import { emptySchoolsLine, gapLine, movementLabel, placingTag } from "@/lib/ranks";
+import { emptySchoolsLine, gapLine, movementLabel, placingTag, schoolHasMembers } from "@/lib/ranks";
 import {
   formatClubDate,
   pointsUnit,
@@ -54,14 +54,17 @@ function Movement({ value }: { value: number | undefined }) {
   const label = movementLabel(value);
   if (!label) return null;
   return (
-    <span className={cn("stat-number text-[12px]", label.tone === "win" ? "text-win" : "text-loss")}>{label.text}</span>
+    <span className={cn("stat-number text-[12px]", label.tone === "win" ? "text-win" : "text-loss")}>
+      <span aria-hidden="true">{label.text}</span>
+      <span className="sr-only">{label.spoken}</span>
+    </span>
   );
 }
 
 // "placing 3/10": a small outlined pill, so the count isn't mistaken for a record.
 function PlacingTag({ text }: { text: string }) {
   return (
-    <span className="text-muted-foreground rounded-full px-1.5 py-px text-[10px] leading-snug shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]">
+    <span className="text-muted-foreground rounded-full px-1.5 py-px text-[10px] leading-snug shadow-[inset_0_0_0_1px_var(--hairline-ghost)]">
       {text}
     </span>
   );
@@ -147,7 +150,7 @@ export default async function LeaderboardPage({
 
   const schoolRows = (schoolStats ?? []) as SchoolRow[];
   // Only schools with members hold a number; the rest fold into one line.
-  const rankedSchools = schoolRows.filter((s) => s.member_count > 0);
+  const rankedSchools = schoolRows.filter(schoolHasMembers);
   const emptyLine = emptySchoolsLine(schoolRows);
   const schoolById: Record<string, SchoolMarkSchool & { id: string }> = Object.fromEntries(
     ((schools ?? []) as (SchoolMarkSchool & { id: string })[]).map((s) => [s.id, s])
@@ -167,7 +170,7 @@ export default async function LeaderboardPage({
           href={`/players/${s.id}`}
           className={cn(
             isMe && "bg-card -mx-3 rounded-[14px] border-b-transparent px-3",
-            s.rank === null && "opacity-60"
+            s.rank === null && !isMe && "opacity-60"
           )}
           leading={
             <>
@@ -210,7 +213,8 @@ export default async function LeaderboardPage({
 
   const playerRow = (r: Row, rank: number | null) => {
     const isMe = r.id === user.id;
-    const tag = placingTag(r.wins + r.losses);
+    const counted = toRankRow(r);
+    const tag = placingTag(counted.wins + counted.losses);
     const gap = isMe ? gapLine(visibleRankRows, r.id) : null;
     const move = movementLabel(moves[r.id]);
     return (
@@ -230,6 +234,7 @@ export default async function LeaderboardPage({
           title={
             <span className="flex items-center gap-1.5">
               <span className="truncate">{r.display_name}</span>
+              {isMe && <span className="text-muted-foreground shrink-0 font-normal">· you</span>}
               <TitleBadge title={levelOf(levels, r.id).title} size={20} />
             </span>
           }
@@ -408,7 +413,8 @@ export default async function LeaderboardPage({
               {podiumOrder.map((r, slot) => {
                 if (!r) return <div key={`empty-${slot}`} />;
                 const rank = slot === 1 ? 1 : slot === 0 ? 2 : 3;
-                const tag = placingTag(r.wins + r.losses);
+                const counted = toRankRow(r);
+                const tag = placingTag(counted.wins + counted.losses);
                 const isMe = r.id === user.id;
                 const gap = isMe ? gapLine(visibleRankRows, r.id) : null;
                 return (
@@ -417,7 +423,9 @@ export default async function LeaderboardPage({
                     href={`/players/${r.id}`}
                     className={cn(
                       "press flex min-w-0 flex-col items-center gap-2.5 text-center",
-                      isMe && "bg-card rounded-[14px] px-1 py-3"
+                      // The padding is cancelled by the negative margins, so the highlight
+                      // never lifts this cell above the podium baseline.
+                      isMe && "bg-card -mx-1 -my-3 rounded-[14px] px-1 py-3"
                     )}
                   >
                     <Avatar person={r} size={rank === 1 ? "podium" : "xl"} ring={PODIUM_RING[rank - 1]} />
@@ -489,7 +497,7 @@ export default async function LeaderboardPage({
                     />
                   </div>
                   <span className="text-muted-foreground text-[12px]">
-                    {s.member_count} players · {s.wins}–{s.losses}
+                    {s.member_count} {Number(s.member_count) === 1 ? "player" : "players"} · {s.wins}–{s.losses}
                   </span>
                 </div>
               </li>
@@ -498,7 +506,7 @@ export default async function LeaderboardPage({
           {emptyLine && (
             <div className="bg-card flex items-center justify-between gap-3 rounded-[14px] px-3.5 py-3 text-[12px]">
               <span className="text-muted-foreground">{emptyLine}</span>
-              <Link href="/install/card" className="text-brass font-semibold">
+              <Link href="/install/card" className="text-brass -m-2 p-2 font-semibold">
                 Invite
               </Link>
             </div>

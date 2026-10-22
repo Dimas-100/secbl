@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { emptySchoolsLine, gapLine, movementLabel, placingTag } from "@/lib/ranks";
+import { emptySchoolsLine, schoolHasMembers, gapLine, movementLabel, placingTag } from "@/lib/ranks";
 import type { RankRow } from "@/lib/ranking";
 
 const row = (id: string, rating: number, wins = 1, losses = 0): RankRow => ({ id, rating, wins, losses });
 
 describe("movementLabel", () => {
   it("reads a climb as a win-toned up arrow", () => {
-    expect(movementLabel(36)).toEqual({ text: "▲ 36", tone: "win" });
+    expect(movementLabel(36)).toEqual({ text: "▲ 36", spoken: "up 36 this week", tone: "win" });
   });
   it("reads a drop as a loss-toned down arrow", () => {
-    expect(movementLabel(-14)).toEqual({ text: "▼ 14", tone: "loss" });
+    expect(movementLabel(-14)).toEqual({ text: "▼ 14", spoken: "down 14 this week", tone: "loss" });
   });
   it("shows nothing for zero or no movement", () => {
     expect(movementLabel(0)).toBeNull();
@@ -52,13 +52,23 @@ describe("gapLine", () => {
 });
 
 describe("emptySchoolsLine", () => {
-  it("joins the empty schools' short names in input order", () => {
+  it("joins the empty schools' short names alphabetically", () => {
     const line = emptySchoolsLine([
       { short_name: "UGA", member_count: 0 },
       { short_name: "AAA", member_count: 4 },
       { short_name: "KSU", member_count: 0 },
     ]);
-    expect(line).toBe("Not here yet: UGA · KSU");
+    expect(line).toBe("Not here yet: KSU · UGA");
+  });
+  it("puts every school in exactly one place, whatever shape the count is", () => {
+    const schools = [
+      { short_name: "S1", member_count: "3" },
+      { short_name: "S2", member_count: "0" },
+      { short_name: "S3", member_count: null },
+      { short_name: "S4", member_count: 1 },
+    ];
+    expect(schools.filter(schoolHasMembers).map((s) => s.short_name)).toEqual(["S1", "S4"]);
+    expect(emptySchoolsLine(schools)).toBe("Not here yet: S2 · S3");
   });
   it("is null when every school has members", () => {
     expect(emptySchoolsLine([{ short_name: "AAA", member_count: 2 }])).toBeNull();
