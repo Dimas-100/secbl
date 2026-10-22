@@ -165,7 +165,12 @@ export function GameCountsScreen(p: GameCountsProps) {
                     Level {p.level} · {bar} / {p.needed}
                   </span>
                 </div>
-                <LevelBar value={bar} max={p.needed} className="h-1.5 overflow-hidden rounded-full" />
+                <LevelBar
+                  value={bar}
+                  max={p.needed}
+                  label={`Level ${p.level} progress`}
+                  className="h-1.5 overflow-hidden rounded-full"
+                />
               </div>
 
               {p.lines.length > 0 && (
