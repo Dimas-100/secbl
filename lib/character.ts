@@ -120,7 +120,9 @@ export type Earn =
   | { kind: "cup" }
   | { kind: "season" }
   | { kind: "streak"; length: number }
-  | { kind: "night" };
+  | { kind: "night" }
+  // One of the profile's achievements (lib/achievements.ts), by id.
+  | { kind: "achievement"; id: string };
 
 export interface Part {
   id: string;
@@ -211,21 +213,35 @@ export const OUTFITS = part([
 ]);
 
 // Costumes, like Duolingo's: dress-up from head to toe, each with its own
-// headwear and props (a helmet, a cape, a hood), all free. A costume is worn
-// in the outfit slot, so it replaces the outfit, and it takes off the
-// member's hat (a headscarf stays on unless the costume has headwear).
+// headwear and props (a helmet, a cape, a hood). Three are free; the rest
+// come with the profile's achievements (owner, 2026-10-29), the first win
+// first, so a new member earns one fast. The cup and season achievements
+// already bring the cup jacket and the champion's pin. A costume is worn in
+// the outfit slot, so it replaces the outfit, and it takes off the member's
+// hat (a headscarf stays on unless the costume has headwear).
 export const COSTUMES = part([
   { id: "referee", label: "Referee" },
-  { id: "astronaut", label: "Astronaut" },
-  { id: "superhero", label: "Superhero" },
-  { id: "wizard", label: "Wizard" },
-  { id: "pirate", label: "Pirate" },
-  { id: "cowboy", label: "Cowboy" },
   { id: "chef", label: "Chef" },
   { id: "graduate", label: "Graduate" },
-  { id: "tiger", label: "Tiger onesie" },
-  { id: "dino", label: "Dino onesie" },
+  { id: "superhero", label: "Superhero", earn: { kind: "achievement", id: "first-win" } },
+  { id: "cowboy", label: "Cowboy", earn: { kind: "achievement", id: "regular" } },
+  { id: "pirate", label: "Pirate", earn: { kind: "achievement", id: "shutout" } },
+  { id: "astronaut", label: "Astronaut", earn: { kind: "achievement", id: "giant-killer" } },
+  { id: "wizard", label: "Wizard", earn: { kind: "achievement", id: "veteran" } },
+  { id: "tiger", label: "Tiger onesie", earn: { kind: "achievement", id: "five-hundred" } },
+  { id: "dino", label: "Dino onesie", earn: { kind: "achievement", id: "six-hundred" } },
 ]);
+
+// How each achievement that unlocks a costume reads in the builder.
+const ACHIEVEMENT_HINTS: Record<string, string> = {
+  "first-win": "Win your first game",
+  regular: "Play 10 games",
+  shutout: "Win a race without dropping a game",
+  "giant-killer": "Beat someone rated 50+ above you",
+  veteran: "Play 25 games",
+  "five-hundred": "Reach a 500 rating",
+  "six-hundred": "Reach a 600 rating",
+};
 
 export const isCostume = (outfit: string) => COSTUMES.some((c) => c.id === outfit);
 
@@ -339,7 +355,7 @@ const EARNED: Map<string, Earn> = new Map(
   (
     [
       ["neck", NECKWEAR],
-      ["outfit", OUTFITS],
+      ["outfit", [...OUTFITS, ...COSTUMES]],
       ["gear", GEAR],
       ["cue", CUES],
     ] as const
@@ -354,16 +370,35 @@ export function earnOf(field: keyof Look, id: string): Earn | undefined {
 
 // What a member has done that earns parts. All of it is already in the app:
 // the title from XP, cups and seasons won, the best win streak, club nights
-// opened.
+// opened, and the profile's achievements (by id).
 export interface Progress {
   title: TitleName;
   cupsWon: number;
   seasonsWon: number;
   bestStreak: number;
   nightsOpened: number;
+  achievements: readonly string[];
 }
 
-export const NO_PROGRESS: Progress = { title: "Rookie", cupsWon: 0, seasonsWon: 0, bestStreak: 0, nightsOpened: 0 };
+export const NO_PROGRESS: Progress = {
+  title: "Rookie",
+  cupsWon: 0,
+  seasonsWon: 0,
+  bestStreak: 0,
+  nightsOpened: 0,
+  achievements: [],
+};
+
+// Everything earned: for drawing a look the server already checked against
+// its owner's progress, and for the preview page's "everything earned".
+export const ALL_PROGRESS: Progress = {
+  title: "Legend",
+  cupsWon: 1,
+  seasonsWon: 1,
+  bestStreak: 99,
+  nightsOpened: 1,
+  achievements: Object.keys(ACHIEVEMENT_HINTS),
+};
 
 const titleRank = (t: TitleName) => TITLES.findIndex((x) => x.name === t);
 
@@ -380,6 +415,8 @@ export function isEarned(earn: Earn | undefined, p: Progress): boolean {
       return p.bestStreak >= earn.length;
     case "night":
       return p.nightsOpened > 0;
+    case "achievement":
+      return p.achievements.includes(earn.id);
   }
 }
 
@@ -398,6 +435,8 @@ export function earnHint(earn: Earn): string {
       return `Win ${earn.length} in a row`;
     case "night":
       return "Open a club night";
+    case "achievement":
+      return ACHIEVEMENT_HINTS[earn.id] ?? "Earn an achievement";
   }
 }
 
@@ -503,7 +542,11 @@ export function randomLook(progress: Progress, rng: () => number = Math.random):
     facialHair: rng() < 0.4 ? pick(rng, FACIAL_HAIR).id : "none",
     facialHairColor: rng() < 0.8 ? hairColor : pick(rng, HAIR_COLORS).id,
     outfit:
-      rng() < 0.25 ? pick(rng, COSTUMES).id : rng() < 0.45 ? pick(rng, open("outfit", OUTFITS)).id : "classic",
+      rng() < 0.25
+        ? pick(rng, open("outfit", COSTUMES)).id
+        : rng() < 0.45
+          ? pick(rng, open("outfit", OUTFITS)).id
+          : "classic",
     outfitColor: cloth(),
     top: pick(rng, TOPS).id,
     topColor: cloth(),

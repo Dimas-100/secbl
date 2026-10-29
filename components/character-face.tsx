@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 import { Character, POP_ASPECT } from "@/components/character";
-import { backdropColor, sanitizeLook, starterLook, type Look, type Progress } from "@/lib/character";
+import { ALL_PROGRESS, backdropColor, sanitizeLook, starterLook, type Look, type Progress } from "@/lib/character";
 import { cn } from "@/lib/utils";
 
 // Every saved look in the club by member id, loaded once by the member shell
@@ -17,7 +17,7 @@ export function LooksProvider({ looks, children }: { looks: Record<string, unkno
 // A saved look was checked against its owner's progress when the server
 // stored it; drawing someone else's there is no progress to hand, so earned
 // parts pass. Unknown ids still fall back to the starter's.
-const ANY_PROGRESS: Progress = { title: "Legend", cupsWon: 1, seasonsWon: 1, bestStreak: 99, nightsOpened: 1 };
+const ANY_PROGRESS = ALL_PROGRESS;
 
 export function useHasSavedLook(id: string): boolean {
   return useContext(LooksContext)[id] != null;

@@ -22,11 +22,10 @@ Duolingo is the reference (owner, 2026-10-29):
   trousers, cue, gear, and the unlock ladder.
 - Expressions are whole (eyes, brows and mouth together): Happy, Beaming, Laughing, Calm, Cool, Cheeky, Focused,
   Surprised.
-- Costumes, Duolingo's dress-up (owner, 2026-10-29), in the Closet after the outfits: Referee (white gloves),
-  Astronaut (helmet), Superhero (cape, mask; colour of your choice), Wizard (hat; colour of your choice), Pirate
-  (bandana, eyepatch), Cowboy, Chef, Graduate (cap and tassel), Tiger onesie and Dino onesie (hoods). All free. A
-  costume is worn in the outfit slot and takes off the member's hat, except a headscarf, which stays on unless the
-  costume brings headwear of its own. Drawn in `components/character-costumes.tsx`.
+- Costumes, Duolingo's dress-up (owner, 2026-10-29), in the Closet after the outfits, each with its own headwear and
+  props. A costume is worn in the outfit slot and takes off the member's hat, except a headscarf, which stays on
+  unless the costume brings headwear of its own. Drawn in `components/character-costumes.tsx`. Three are free; the
+  rest come with the profile's achievements (lib/achievements.ts, never lost), see Unlocks.
 
 ## Pieces
 
@@ -68,9 +67,16 @@ Cues and the title outfits climb with the title badges (XP-based, never lost); f
 | Winning a season | Champion's pin |
 | 5 wins in a row (best streak) | Flame bow tie |
 | Opening a club night | House-pro towel |
+| First win | Superhero costume |
+| 10 confirmed games | Cowboy costume |
+| A shutout (a race won without dropping a game) | Pirate costume |
+| Beating someone rated 50+ above you | Astronaut costume |
+| 25 confirmed games | Wizard costume |
+| Reaching a 500 rating (best ever) | Tiger onesie |
+| Reaching a 600 rating (best ever) | Dino onesie |
 
 Free from day one: every face, skin, hair and colour, tops, vest/suspenders, bow/tie, the Varsity, Island, Denim and
-Track outfits, every hat (flat cap, fedora, beanie, ball cap, bucket, headband, headscarf), glasses, earrings, chain,
+Track outfits, the Referee, Chef and Graduate costumes, every hat (flat cap, fedora, beanie, ball cap, bucket, headband, headscarf), glasses, earrings, chain,
 headphones, glove, toothpick. A starter carries the best cue its member has reached.
 
 ## Saving and showing

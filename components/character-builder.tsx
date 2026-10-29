@@ -202,7 +202,7 @@ export function CharacterBuilder({
           <Group title="Outfits" note="Each one is a whole look. Tailor the club classic piece by piece.">
             <Tiles field="outfit" parts={OUTFITS} crop={CROP.body} full tall {...tile} />
           </Group>
-          <Group title="Costumes" note="Dress up head to toe. A costume comes with its own headwear.">
+          <Group title="Costumes" note="Dress up head to toe. Three are yours now; the rest come with achievements.">
             <Tiles field="outfit" parts={COSTUMES} crop={CROP.costume} full tall {...tile} />
           </Group>
           {COLORED_OUTFITS.has(look.outfit) && (
@@ -439,6 +439,7 @@ function Ladder({ progress }: { progress: Progress }) {
   }));
   const special = [
     ...OUTFITS.filter((o) => o.earn && o.earn.kind !== "title"),
+    ...COSTUMES.filter((c) => c.earn),
     ...NECKWEAR.filter((n) => n.earn),
     ...GEAR.filter((g) => g.earn),
   ];

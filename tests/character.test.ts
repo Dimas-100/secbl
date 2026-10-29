@@ -183,15 +183,46 @@ describe("the switch", () => {
 });
 
 describe("costumes", () => {
-  it("are free and fit in the outfit slot", async () => {
+  it("give three free from day one, in the outfit slot", async () => {
     const { COSTUMES, isCostume } = await import("@/lib/character");
     const base = starterLook(ids[2], 6);
-    for (const c of COSTUMES) {
-      expect(earnOf("outfit", c.id)).toBeUndefined();
-      expect(isCostume(c.id)).toBe(true);
-      expect(sanitizeLook({ outfit: c.id }, base, NO_PROGRESS).outfit).toBe(c.id);
-    }
+    const free = COSTUMES.filter((c) => !earnOf("outfit", c.id)).map((c) => c.id);
+    expect(free).toEqual(["referee", "chef", "graduate"]);
+    for (const id of free) expect(sanitizeLook({ outfit: id }, base, NO_PROGRESS).outfit).toBe(id);
+    for (const c of COSTUMES) expect(isCostume(c.id)).toBe(true);
     expect(isCostume("classic")).toBe(false);
+  });
+
+  it("unlock the rest with the profile's achievements, as agreed", () => {
+    const unlocks: Record<string, string> = {
+      superhero: "first-win",
+      cowboy: "regular",
+      pirate: "shutout",
+      astronaut: "giant-killer",
+      wizard: "veteran",
+      tiger: "five-hundred",
+      dino: "six-hundred",
+    };
+    for (const [costume, achievement] of Object.entries(unlocks)) {
+      const earn = earnOf("outfit", costume);
+      expect(isEarned(earn, NO_PROGRESS)).toBe(false);
+      expect(isEarned(earn, at("Rookie", { achievements: [achievement] }))).toBe(true);
+      expect(isEarned(earn, at("Legend", { achievements: [] }))).toBe(false);
+    }
+    expect(earnHint({ kind: "achievement", id: "first-win" })).toBe("Win your first game");
+  });
+
+  it("can't be saved, or randomized into, before they're earned", () => {
+    const base = starterLook(ids[3], 2);
+    expect(sanitizeLook({ outfit: "wizard" }, base, NO_PROGRESS).outfit).toBe(base.outfit);
+    expect(sanitizeLook({ outfit: "wizard" }, base, at("Rookie", { achievements: ["veteran"] })).outfit).toBe("wizard");
+    let seed = 7;
+    const rng = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    for (let i = 0; i < 400; i++) {
+      expect(["superhero", "cowboy", "pirate", "astronaut", "wizard", "tiger", "dino"]).not.toContain(
+        randomLook(NO_PROGRESS, rng).outfit
+      );
+    }
   });
 
   it("never dress a starter", async () => {
