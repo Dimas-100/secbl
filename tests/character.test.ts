@@ -260,3 +260,36 @@ describe("body shape and the feminine options", () => {
     expect(sanitizeLook(old, base, NO_PROGRESS)).toEqual(base);
   });
 });
+
+describe("the Male / Female quick start", () => {
+  it("is never picked for a starter", () => {
+    for (const id of ids) expect(starterLook(id, 4).preset).toBe("none");
+  });
+
+  it("applies a bundle and leaves everything else alone", async () => {
+    const { applyPreset } = await import("@/lib/character");
+    const base = { ...starterLook(ids[6], 2), hair: "crop", lips: "red", skin: "s4", hat: "fedora" };
+    const f = applyPreset(base, "female");
+    expect(f).toMatchObject({ preset: "female", body: "curvy", lashes: "lashes", bottom: "skirt", hair: "long" });
+    expect(f).toMatchObject({ skin: "s4", hat: "fedora", lips: "red", bg: base.bg });
+    const m = applyPreset(f, "male");
+    expect(m).toMatchObject({ preset: "male", body: "straight", lashes: "none", lips: "none", bottom: "trousers", hair: "crop" });
+    expect(m).toMatchObject({ skin: "s4", hat: "fedora" });
+  });
+
+  it("keeps hair that suits either", async () => {
+    const { applyPreset } = await import("@/lib/character");
+    for (const hair of ["braids", "locs", "afro"]) {
+      const base = { ...starterLook(ids[7], 5), hair };
+      expect(applyPreset(base, "female").hair).toBe(hair);
+      expect(applyPreset(base, "male").hair).toBe(hair);
+    }
+  });
+
+  it("hides nothing: every part stays savable after either", async () => {
+    const { applyPreset } = await import("@/lib/character");
+    const m = applyPreset(starterLook(ids[8], 3), "male");
+    const tweaked = { ...m, lashes: "lashes", bottom: "skirt", lips: "rose" };
+    expect(sanitizeLook(tweaked, m, NO_PROGRESS)).toEqual(tweaked);
+  });
+});

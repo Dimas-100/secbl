@@ -33,6 +33,7 @@ import {
   OUTFITS,
   SKINS,
   TOPS,
+  applyPreset,
   backdropColor,
   earnHint,
   earnOf,
@@ -176,6 +177,7 @@ export function CharacterBuilder({
 
       {section === "avatar" ? (
         <div role="tabpanel" aria-label="Avatar" className="flex flex-col gap-7">
+          <QuickStart look={look} set={set} />
           <Swatches label="Skin tone" field="skin" options={SKIN_SWATCHES} {...tile} />
           <Group title="Body shape">
             <Tiles field="body" parts={BODIES} crop={CROP.figure} full tall {...tile} />
@@ -266,6 +268,38 @@ export function CharacterBuilder({
         </Button>
       </div>
     </div>
+  );
+}
+
+// Male / Female: a quick start that applies a matching bundle (lib/character
+// applyPreset). Neither is picked until the member taps one, and every piece
+// below stays theirs to change.
+function QuickStart({ look, set }: { look: Look; set: (patch: Partial<Look>) => void }) {
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-2 text-[15px] font-medium">Start from</legend>
+      <div role="radiogroup" aria-label="Start from" className="bg-secondary grid grid-cols-2 gap-1 rounded-2xl p-1">
+        {(["male", "female"] as const).map((p) => {
+          const on = look.preset === p;
+          return (
+            <button
+              key={p}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => set(applyPreset(look, p))}
+              className={cn(
+                "h-11 rounded-xl text-[15px] font-medium transition-colors",
+                on ? "bg-brass text-background" : "text-foreground"
+              )}
+            >
+              {p === "male" ? "Male" : "Female"}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-muted-foreground text-[12px]">Sets your shape, lashes, hair and bottoms. Change any of them after.</p>
+    </fieldset>
   );
 }
 
