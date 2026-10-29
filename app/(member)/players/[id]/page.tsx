@@ -417,6 +417,7 @@ export default async function PlayerPage({
                 seasonsWon: seasonsWon ?? 0,
                 bestStreak: streak,
                 nightsOpened: 0,
+                achievements: achievements.map((a) => a.id),
               }}
               label={`${profile.display_name}'s character`}
             />

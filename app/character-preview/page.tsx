@@ -9,7 +9,7 @@ import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
 import { SectionHeading } from "@/components/section-heading";
 import { TitleBadge } from "@/components/title-badge";
-import { COSTUMES, CUES, OUTFITS, characterPreviewEnabled, starterLook, type Progress } from "@/lib/character";
+import { ALL_PROGRESS, COSTUMES, CUES, OUTFITS, characterPreviewEnabled, starterLook, type Progress } from "@/lib/character";
 import { TITLES, type TitleName } from "@/lib/levels";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +49,7 @@ export default async function CharacterPreview({
     seasonsWon: q.season ? 1 : 0,
     bestStreak: q.streak ? 5 : 0,
     nightsOpened: q.night ? 1 : 0,
+    achievements: q.night ? ALL_PROGRESS.achievements : [],
   };
   const [a, b, c, d, e, f, g, h] = PEOPLE;
 
