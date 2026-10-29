@@ -46,6 +46,10 @@ Duolingo is the reference (owner, 2026-10-29):
 - `components/character.tsx`: the drawing. One 120×200 layered SVG; `full` for the Profile and builder, `pop` for the
   avatar (clipped to the circle below and to the head's width above), `bust` for builder tiles. Gradient ids come
   from `useId`, so a page can hold any number.
+- Fit: under a hat or a costume's headpiece, hair is clipped to below the brim (`HAT_LINE`, a costume's `hairLine`),
+  so nothing pokes out above or around it; inside the astronaut's helmet it is clipped to the glass (`hairCircle`); a
+  headband leaves hair alone. A costume that covers the eyes (mask, eyepatch) takes the place of glasses. The preview
+  page's **Fit check** grid draws every hairstyle under every headpiece, for checking a new hat or hairstyle.
 - `components/character-face.tsx`: the avatar and Profile wrappers, and the stored-look reader.
 - `components/character-builder.tsx`: the builder.
 - `lib/character-data.ts`: a member's progress, read from what the app already records.

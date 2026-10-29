@@ -17,6 +17,10 @@ export interface CostumeArt {
   back?: (c: string) => ReactNode;
   head?: (c: string) => ReactNode;
   face?: ReactNode;
+  // Hair under the headpiece: shown only below this line (its brim), or
+  // only inside this circle (a helmet), so none of it pokes out.
+  hairLine?: number;
+  hairCircle?: readonly [number, number, number];
 }
 
 const BRASS = "#C9A96E";
@@ -60,6 +64,7 @@ export const COSTUME_ART: Record<string, CostumeArt> = {
   },
 
   astronaut: {
+    hairCircle: [60, 49, 26],
     sleeve: () => "#E6E9EE",
     pants: () => "#E6E9EE",
     hands: "#F3F4F6",
@@ -114,6 +119,7 @@ export const COSTUME_ART: Record<string, CostumeArt> = {
   },
 
   wizard: {
+    hairLine: 35,
     sleeve: (c) => c,
     pants: (c) => c,
     torso: (c) => (
@@ -150,6 +156,7 @@ export const COSTUME_ART: Record<string, CostumeArt> = {
   },
 
   pirate: {
+    hairLine: 40,
     sleeve: () => WHITE,
     pants: () => "#3A2A1E",
     torso: () => (
@@ -189,6 +196,7 @@ export const COSTUME_ART: Record<string, CostumeArt> = {
   },
 
   cowboy: {
+    hairLine: 36,
     sleeve: () => "#A8322A",
     pants: () => "#3D5A80",
     torso: () => (
@@ -216,6 +224,7 @@ export const COSTUME_ART: Record<string, CostumeArt> = {
   },
 
   chef: {
+    hairLine: 35,
     sleeve: () => "#F7F7F4",
     pants: () => "#3A3F46",
     torso: () => (
@@ -245,6 +254,7 @@ export const COSTUME_ART: Record<string, CostumeArt> = {
   },
 
   graduate: {
+    hairLine: 37,
     sleeve: () => "#141518",
     pants: () => "#141518",
     torso: () => (
