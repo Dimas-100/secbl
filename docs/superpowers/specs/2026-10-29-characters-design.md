@@ -28,6 +28,11 @@ Duolingo is the reference (owner, 2026-10-29):
   next to trousers in the Closet (bare legs, in the bottoms colour; suits and costumes keep their own), and two more
   hairstyles (long curls, space buns). Starters stay on the straight figure with no lashes or lip colour, in trousers:
   the house kit assigns no gender.
+- **Start from: Male / Female** (owner, 2026-10-29), at the top of the Avatar room: a quick start, not a rule.
+  Neither is picked until the member taps one (starters are "none", so no one is assigned a gender); a tap applies a
+  bundle (`applyPreset`: Female = curvy, lashes, skirt, long hair if theirs is short; Male = straight, no lashes or
+  lip colour, trousers, a crop if their hair is long; hair that suits either stays), the choice is saved with the
+  look, and every piece stays changeable with nothing hidden.
 - Costumes, Duolingo's dress-up (owner, 2026-10-29), in the Closet after the outfits, each with its own headwear and
   props. A costume is worn in the outfit slot and takes off the member's hat, except a headscarf, which stays on
   unless the costume brings headwear of its own. Drawn in `components/character-costumes.tsx`. Three are free; the

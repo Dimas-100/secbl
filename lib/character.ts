@@ -152,6 +152,16 @@ export const LIPS = part([
   { id: "red", label: "Red" },
 ]);
 
+// The Avatar room's Male / Female switch: a quick start, not a rule. Nothing
+// is picked until the member taps one (a starter is "none", so no one is
+// assigned a gender), a tap applies a matching bundle (applyPreset), and
+// every piece stays changeable and nothing is hidden either way.
+export const PRESETS = part([
+  { id: "none", label: "Not picked" },
+  { id: "male", label: "Male" },
+  { id: "female", label: "Female" },
+]);
+
 export const BOTTOMS = part([
   { id: "trousers", label: "Trousers" },
   { id: "skirt", label: "Skirt" },
@@ -323,6 +333,7 @@ export const CUES = part([
 // ---------- the look ----------
 
 export interface Look {
+  preset: string;
   skin: string;
   body: string;
   face: string;
@@ -356,6 +367,7 @@ export interface Look {
 
 // Every single-choice field and the ids it accepts.
 const CHOICES: Record<Exclude<keyof Look, "gear">, readonly { id: string }[]> = {
+  preset: PRESETS,
   skin: SKINS,
   body: BODIES,
   face: FACES,
@@ -533,6 +545,7 @@ export function starterLook(id: string, ballNumber: number, progress: Progress =
   // A bow or tie that stands out from the vest.
   const neckColor = pick(rng, (["black", "brass", "white", "red"] as const).filter((c) => c !== vest));
   return {
+    preset: "none",
     skin: NEUTRAL_SKIN,
     body: "straight",
     face: pick(rng, FACES).id,
@@ -572,6 +585,7 @@ export function randomLook(progress: Progress, rng: () => number = Math.random):
   const cloth = () => pick(rng, CLOTH).id;
   const hairColor = pick(rng, HAIR_COLORS).id;
   return {
+    preset: "none",
     skin: pick(rng, SKINS).id,
     body: pick(rng, BODIES).id,
     face: pick(rng, FACES).id,
@@ -607,6 +621,38 @@ export function randomLook(progress: Progress, rng: () => number = Math.random):
       .map((g) => g.id),
     cue: bestCue(progress),
     bg: pick(rng, BACKDROPS).id,
+  };
+}
+
+// ---------- the quick start ----------
+
+const SHORT_HAIR = new Set(["buzz", "crop", "side-part", "quiff", "curly", "bald"]);
+const LONG_HAIR = new Set(["long", "bob", "ponytail", "bun", "waves", "long-curls", "space-buns"]);
+
+// The Male / Female switch's bundle. Female: the curvy shape, lashes, a skirt,
+// and long hair if theirs is short. Male: the straight shape, no lashes or lip
+// colour, trousers, and a crop if their hair is long. Hair that suits either
+// (braids, locs, afro) stays, and so does everything else.
+export function applyPreset(look: Look, preset: "male" | "female"): Look {
+  if (preset === "female") {
+    return {
+      ...look,
+      preset,
+      body: "curvy",
+      lashes: "lashes",
+      bottom: "skirt",
+      facialHair: "none",
+      hair: SHORT_HAIR.has(look.hair) ? "long" : look.hair,
+    };
+  }
+  return {
+    ...look,
+    preset,
+    body: "straight",
+    lashes: "none",
+    lips: "none",
+    bottom: "trousers",
+    hair: LONG_HAIR.has(look.hair) ? "crop" : look.hair,
   };
 }
 
