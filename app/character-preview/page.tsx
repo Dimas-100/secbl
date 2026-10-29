@@ -9,7 +9,7 @@ import { ListRow } from "@/components/list-row";
 import { MatchRow } from "@/components/match-row";
 import { SectionHeading } from "@/components/section-heading";
 import { TitleBadge } from "@/components/title-badge";
-import { ALL_PROGRESS, COSTUMES, CUES, OUTFITS, characterPreviewEnabled, starterLook, type Progress } from "@/lib/character";
+import { ALL_PROGRESS, COSTUMES, CUES, HAIRS, OUTFITS, characterPreviewEnabled, starterLook, type Progress } from "@/lib/character";
 import { TITLES, type TitleName } from "@/lib/levels";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,26 @@ const CORNER = "ring-background absolute -right-1.5 -bottom-1.5 rounded-full rin
 
 // Four curvy looks for the Body shapes row.
 const SHAPE_BASE = { body: "curvy", lashes: "lashes", hat: "none", eyeColor: "brown" } as const;
+// The fit check: one look under each headpiece, with glasses on so a clash
+// with a mask or patch shows too.
+const FIT_BASE = {
+  ...starterLook(id(500), 2),
+  skin: "s3",
+  hairColor: "brown",
+  eyewear: "round",
+  earrings: "hoop",
+  hat: "none",
+  outfit: "classic",
+};
+const FIT_HEADS: { label: string; patch: Partial<typeof FIT_BASE> }[] = [
+  { label: "none", patch: {} },
+  ...["flatcap", "fedora", "beanie", "backcap", "bucket", "headband", "headscarf"].map((hat) => ({ label: hat, patch: { hat } })),
+  ...["astronaut", "superhero", "wizard", "pirate", "cowboy", "chef", "graduate", "tiger"].map((outfit) => ({
+    label: outfit,
+    patch: { outfit },
+  })),
+];
+
 const SHAPES = [
   { ...starterLook(id(400), 3), ...SHAPE_BASE, skin: "s2", hair: "long-curls", hairColor: "auburn", lips: "rose", bottom: "skirt", pants: "maroon", layerColor: "maroon", bg: "rose" },
   { ...starterLook(id(401), 6), ...SHAPE_BASE, skin: "s5", hair: "space-buns", hairColor: "black", lips: "red", outfit: "varsity", outfitColor: "green", bottom: "skirt", pants: "cream", bg: "teal" },
@@ -175,6 +195,41 @@ export default async function CharacterPreview({
               </span>
             );
           })}
+        </div>
+      </section>
+
+      <section aria-label="Fit check" className="flex flex-col gap-3">
+        <SectionHeading>Fit check</SectionHeading>
+        <p className="text-muted-foreground text-[13px]">
+          Every hairstyle under every hat and costume headpiece, and glasses with every costume, for spotting a bad fit.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="border-separate border-spacing-1 text-[10px]">
+            <thead>
+              <tr>
+                <th />
+                {FIT_HEADS.map((h) => (
+                  <th key={h.label} className="text-muted-foreground font-normal">
+                    {h.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {HAIRS.map((hair) => (
+                <tr key={hair.id}>
+                  <th className="text-muted-foreground pr-1 text-right font-normal whitespace-nowrap">{hair.label}</th>
+                  {FIT_HEADS.map((h) => (
+                    <td key={h.label}>
+                      <span className="block size-12 overflow-hidden rounded-lg bg-[#1A1C20]">
+                        <Character look={{ ...FIT_BASE, hair: hair.id, ...h.patch }} view="bust" crop="22 4 76 76" className="block size-full" />
+                      </span>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 

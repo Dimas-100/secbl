@@ -73,10 +73,22 @@ export function Character({
   // A skirt is part of the wardrobe, not of a costume or a suit's trousers.
   const skirt = look.bottom === "skirt" && !costume && !SUITS.has(look.outfit);
   const lipPaint = LIP_PAINT[look.lips] ? LIP_PAINT[look.lips](skin.lip) : null;
+  // Under a hat or a costume's headpiece, hair shows only below the brim
+  // (nothing pokes out above or around it); inside the astronaut's helmet it
+  // stays inside the glass.
+  const hairLine = costume ? costume.hairLine : HAT_LINE[look.hat];
+  const hairCircle = costume?.hairCircle;
+  const hairClip = hairCircle || hairLine !== undefined ? url("hairclip") : undefined;
 
   const figure = (
     <>
-      {hood ? <ScarfBack color={hood} /> : <HairBack style={look.hair} fill={mix(hair.color, "#000000", 0.12)} />}
+      {hood ? (
+        <ScarfBack color={hood} />
+      ) : (
+        <g clipPath={hairClip}>
+          <HairBack style={look.hair} fill={mix(hair.color, "#000000", 0.12)} />
+        </g>
+      )}
       {costume?.back?.(tint)}
       {view === "full" && <Legs color={wear.pants} bare={skirt ? url("skin") : null} />}
       <rect x={curvy ? 56.5 : 55.5} y="63" width={curvy ? 7 : 9} height="13" fill={skin.shade} />
@@ -114,8 +126,15 @@ export function Character({
       <Brows kind={face.brows} color={brow} />
       <FacialHair style={look.facialHair} color={beard.color} />
       <Mouth kind={face.mouth} lip={skin.lip} paint={lipPaint} />
-      {hood ? <ScarfFront color={hood} /> : <HairFront style={look.hair} fill={url("hair")} />}
-      <Eyewear style={look.eyewear} />
+      {hood ? (
+        <ScarfFront color={hood} />
+      ) : (
+        <g clipPath={hairClip}>
+          <HairFront style={look.hair} fill={url("hair")} />
+        </g>
+      )}
+      {/* A mask or an eyepatch takes the place of glasses. */}
+      {!costume?.face && <Eyewear style={look.eyewear} />}
       {costume ? costume.head?.(tint) : !hood && <Hat style={look.hat} color={clothColor(look.hatColor)} />}
       {!hood && <Earrings style={look.earrings} />}
       {look.gear.includes("toothpick") && (
@@ -151,6 +170,15 @@ export function Character({
           <stop offset="0.45" stopColor="#ffffff" stopOpacity="0" />
           <stop offset="1" stopColor="#000000" stopOpacity="0.28" />
         </linearGradient>
+        {hairClip && (
+          <clipPath id={id("hairclip")}>
+            {hairCircle ? (
+              <circle cx={hairCircle[0]} cy={hairCircle[1]} r={hairCircle[2]} />
+            ) : (
+              <rect x="-100" y={hairLine} width="320" height="400" />
+            )}
+          </clipPath>
+        )}
         {curvy && (
           <clipPath id={id("torso")}>
             <path d={CURVY_TORSO} />
@@ -433,6 +461,10 @@ function clothes(look: Look): Wear {
 // out to the hem. Clips whatever the outfit drew in the 42×60 torso box.
 const CURVY_TORSO =
   "M47 74 Q42 74 41.8 80 L42.6 92 Q44.4 103 45.6 110 Q43.4 120 41.4 127 Q40.6 134 47 134 L73 134 Q79.4 134 78.6 127 Q76.6 120 74.4 110 Q75.6 103 77.4 92 L78.2 80 Q78 74 73 74Z";
+
+// Where each hat's brim sits: hair above this line is under the hat or would
+// poke out around it, so it isn't drawn. A headband leaves the hair alone.
+const HAT_LINE: Record<string, number> = { flatcap: 41, backcap: 40, beanie: 41, bucket: 40, fedora: 35 };
 
 // Trousers belong to these; they don't take a skirt.
 const SUITS = new Set(["pinstripe", "tuxedo", "legend"]);
