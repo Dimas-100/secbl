@@ -21,8 +21,12 @@ export function characterPreviewEnabled(): boolean {
 
 // ---------- colours ----------
 
-// Skin tones are numbered, never named.
+// Skin tones are numbered, never named. First comes chalk: a pale pool-chalk
+// blue that is plainly nobody's skin, which every starter wears, so the app
+// never guesses at a member's skin tone before they choose one.
+export const NEUTRAL_SKIN = "chalk";
 export const SKINS = [
+  { id: NEUTRAL_SKIN, base: "#C3D3E6", shade: "#A6BAD2", lip: "#6F86A3" },
   { id: "s1", base: "#F6DCC7", shade: "#E3BFA5", lip: "#B5655A" },
   { id: "s2", base: "#EFC6A2", shade: "#DAA884", lip: "#A95A48" },
   { id: "s3", base: "#E0AE84", shade: "#C8926A", lip: "#97503A" },
@@ -433,20 +437,20 @@ export function ballBackdrop(ballNumber: number): string {
   return BALL_BACKDROP[Math.min(Math.max(n, 1), 8) - 1];
 }
 
-// What a starter may draw from. Deliberately plain and kind: always a
-// friendly face, natural hair colours, the club classic (dress shirt, vest,
-// bow or tie), and nothing a member might not choose for themselves (no
-// facial hair, earrings, shades, chain or toothpick, no headscarf). Skin,
-// hair, eyes and face are each picked on their own, so no part follows from
-// another, and nothing is guessed from a member's name.
+// What a starter may draw from: the house kit. A starter says nothing about
+// the person wearing it, because nobody chose it. Everyone gets the neutral
+// chalk skin, the same dark eyes, and a club cap with no hair under it, so
+// the app never assigns a skin tone, an eye colour or a hairstyle (owner,
+// 2026-10-29). It varies only in what anyone might wear: the ball-colour
+// backdrop, the cap, the shirt, vest and tie, and a friendly expression.
+// Nothing a member might not choose (facial hair, earrings, shades, chain,
+// toothpick, a headscarf), and nothing is guessed from a member's name.
 export const STARTER = {
   expressions: ["happy", "beaming", "calm"],
-  hairs: ["buzz", "crop", "side-part", "quiff", "curly", "afro", "waves", "long", "bob", "ponytail", "bun", "braids", "locs"],
-  hairColors: ["black", "dark-brown", "brown", "auburn", "blonde"],
   shirts: ["white", "cream", "sky"],
   vests: ["charcoal", "navy", "brown", "felt", "maroon", "grey", "black", "blue"],
   hats: ["flatcap", "beanie", "backcap", "bucket"],
-  hatColors: ["charcoal", "navy", "brown", "felt"],
+  hatColors: ["charcoal", "navy", "brown", "felt", "maroon", "grey"],
 } as const;
 
 export function starterLook(id: string, ballNumber: number, progress: Progress = NO_PROGRESS): Look {
@@ -454,16 +458,16 @@ export function starterLook(id: string, ballNumber: number, progress: Progress =
   const vest = pick(rng, STARTER.vests);
   // A bow or tie that stands out from the vest.
   const neckColor = pick(rng, (["black", "brass", "white", "red"] as const).filter((c) => c !== vest));
-  const hairColor = pick(rng, STARTER.hairColors);
   return {
-    skin: pick(rng, SKINS).id,
+    skin: NEUTRAL_SKIN,
     face: pick(rng, FACES).id,
-    eyeColor: pick(rng, EYE_COLORS).id,
+    eyeColor: "dark",
     expression: pick(rng, STARTER.expressions),
-    hair: pick(rng, STARTER.hairs),
-    hairColor,
+    // Under the cap; a member who takes it off picks their own hair.
+    hair: "bald",
+    hairColor: "dark-brown",
     facialHair: "none",
-    facialHairColor: hairColor,
+    facialHairColor: "dark-brown",
     outfit: "classic",
     outfitColor: "blue",
     top: "shirt",
@@ -473,8 +477,8 @@ export function starterLook(id: string, ballNumber: number, progress: Progress =
     neck: rng() < 0.6 ? "bow" : "tie",
     neckColor,
     pants: "charcoal",
-    hat: rng() < 0.3 ? pick(rng, STARTER.hats) : "none",
-    hatColor: pick(rng, STARTER.hatColors),
+    hat: pick(rng, STARTER.hats),
+    hatColor: pick(rng, STARTER.hatColors.filter((c) => c !== vest)),
     eyewear: rng() < 0.15 ? pick(rng, ["round", "square"] as const) : "none",
     earrings: "none",
     gear: [],

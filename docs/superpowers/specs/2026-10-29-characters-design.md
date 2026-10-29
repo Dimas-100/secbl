@@ -43,12 +43,14 @@ Duolingo is the reference (owner, 2026-10-29):
 
 ## Starters (members who never open the builder)
 
-Picked from the member id with a seeded generator, like the ball today, so they differ from person to person and
-never change between screens. The ball's colour becomes the backdrop, so the colour people know them by carries over;
-shirts and vests vary. Starters are plain and kind on purpose: always a friendly face (Happy, Beaming or Calm),
-natural hair colours, the club classic (dress shirt, vest, bow or tie), sometimes a cap or glasses. Never facial hair, earrings, shades, chain, toothpick or a headscarf. Skin, eyes, hair
-and face are picked independently (no part follows from another) and nothing is guessed from a name. Skin tones are
-numbered, never named.
+The house kit, picked from the member id with a seeded generator so it never changes between screens. A starter says
+nothing about the person wearing it, because nobody chose it (owner, 2026-10-29): everyone gets the neutral **chalk**
+skin (a pale pool-chalk blue that is plainly nobody's skin), the same dark eyes, and a club cap with no hair under it,
+so the app never assigns a skin tone, an eye colour or a hairstyle. Starters vary only in what anyone might wear: the
+ball colour as the backdrop (the colour people already know them by), cap style and colour, shirt, vest, bow or tie,
+a friendly expression (Happy, Beaming or Calm), sometimes glasses. Never facial hair, earrings, shades, chain,
+toothpick or a headscarf, and nothing is guessed from a name. Chalk is also the first swatch in the builder, for anyone
+who wants to keep it; the human tones are numbered, never named.
 
 ## Unlocks
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CUES,
   HAIR_COLORS,
+  NEUTRAL_SKIN,
   NO_PROGRESS,
   STARTER,
   ballBackdrop,
@@ -42,19 +43,33 @@ describe("starter characters", () => {
     expect(shirts.size).toBe(STARTER.shirts.length);
   });
 
-  it("stay plain and kind: a friendly face, natural hair, nothing a member might not pick", () => {
+  it("never assign a skin tone, eye colour or hairstyle: chalk skin, dark eyes, a cap over no hair", () => {
     const natural = new Set<string>(HAIR_COLORS.filter((h) => h.natural).map((h) => h.id));
     for (const id of ids) {
       const l = starterLook(id, 5);
-      expect(STARTER.expressions as readonly string[]).toContain(l.expression);
+      expect(l.skin).toBe(NEUTRAL_SKIN);
+      expect(l.eyeColor).toBe("dark");
+      expect(l.hair).toBe("bald");
+      expect(STARTER.hats as readonly string[]).toContain(l.hat);
       expect(natural.has(l.hairColor)).toBe(true);
+    }
+  });
+
+  it("stay plain and kind: a friendly face, nothing a member might not pick", () => {
+    for (const id of ids) {
+      const l = starterLook(id, 5);
+      expect(STARTER.expressions as readonly string[]).toContain(l.expression);
       expect(l.facialHair).toBe("none");
       expect(l.earrings).toBe("none");
       expect(l.gear).toEqual([]);
       expect(l.outfit).toBe("classic");
       expect(["none", "round", "square"] as string[]).toContain(l.eyewear);
-      expect(["none", ...STARTER.hats] as string[]).toContain(l.hat);
     }
+  });
+
+  it("vary in what anyone might wear", () => {
+    const caps = new Set(ids.map((id) => `${starterLook(id, 1).hat}/${starterLook(id, 1).hatColor}`));
+    expect(caps.size).toBeGreaterThanOrEqual(STARTER.hats.length * (STARTER.hatColors.length - 1));
   });
 
   it("never take a headscarf or shades by default", () => {

@@ -49,7 +49,7 @@ export function Character({
   label?: string;
 }) {
   const uid = useId().replace(/:/g, "");
-  const skin = SKINS.find((s) => s.id === look.skin) ?? SKINS[3];
+  const skin = SKINS.find((s) => s.id === look.skin) ?? SKINS[0];
   const hair = HAIR_COLORS.find((h) => h.id === look.hairColor) ?? HAIR_COLORS[0];
   const beard = HAIR_COLORS.find((h) => h.id === look.facialHairColor) ?? hair;
   const eye = EYE_COLORS.find((e) => e.id === look.eyeColor)?.color ?? EYE_COLORS[0].color;
