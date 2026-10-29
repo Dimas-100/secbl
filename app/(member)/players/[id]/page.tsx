@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Camera, SlidersHorizontal } from "lucide-react";
+import { Camera, Pencil, SlidersHorizontal } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { CharacterFigure } from "@/components/character-face";
 import { BackButton } from "@/components/nav-history";
 import { Button } from "@/components/ui/button";
 import { LevelBar } from "@/components/level-bar";
@@ -19,7 +20,8 @@ import { ACHIEVEMENTS, earnedAchievements } from "@/lib/achievements";
 import { clubDateOf, clubMonthName, clubMonthStart, clubTimeToISO } from "@/lib/events";
 import { winnerDelta } from "@/lib/form";
 import { firstName, formDots, PLACEMENT_GAMES } from "@/lib/home";
-import { GAME_LABEL } from "@/lib/identity";
+import { charactersEnabled } from "@/lib/character";
+import { GAME_LABEL, ballFor } from "@/lib/identity";
 import { nextBadge, xpCaption } from "@/lib/levels";
 import { fetchAllPages } from "@/lib/paging";
 import { formatShort } from "@/lib/race";
@@ -404,6 +406,31 @@ export default async function PlayerPage({
       </header>
 
       <section className="-mt-4 flex flex-col items-center gap-[18px]">
+        {charactersEnabled() ? (
+          <div className="relative">
+            <CharacterFigure
+              id={profile.id}
+              ball={ballFor(profile.ball, profile.id).number}
+              progress={{
+                title: level.title,
+                cupsWon: titles ?? 0,
+                seasonsWon: seasonsWon ?? 0,
+                bestStreak: streak,
+                nightsOpened: 0,
+              }}
+              label={`${profile.display_name}'s character`}
+            />
+            {isMe && (
+              <Link
+                href="/settings/character"
+                aria-label="Edit your character"
+                className="bg-primary text-primary-foreground ring-background press absolute right-6 bottom-3 flex size-[38px] items-center justify-center rounded-full ring-4"
+              >
+                <Pencil className="size-[18px]" strokeWidth={1.8} />
+              </Link>
+            )}
+          </div>
+        ) : (
         <div className="relative size-32">
           <Avatar person={profile} size="2xl" ring="var(--brass)" />
           {isMe && (
@@ -416,10 +443,25 @@ export default async function PlayerPage({
             </Link>
           )}
         </div>
+        )}
         <div className="flex max-w-full flex-col items-center gap-1.5 text-center">
-          <h1 className="max-w-full truncate text-[28px] leading-[1.1] font-semibold tracking-[-0.025em]">
-            {profile.display_name}
-          </h1>
+          <div className="flex max-w-full items-center gap-2.5">
+            {/* With characters on, the photo lives here, small, so people
+                can still spot each other at the hall. */}
+            {charactersEnabled() && profile.avatar_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profile.avatar_url}
+                alt={`Photo of ${profile.display_name}`}
+                width={36}
+                height={36}
+                className="size-9 shrink-0 rounded-full object-cover shadow-[0_0_0_1px_var(--hairline-strong)]"
+              />
+            )}
+            <h1 className="min-w-0 truncate text-[28px] leading-[1.1] font-semibold tracking-[-0.025em]">
+              {profile.display_name}
+            </h1>
+          </div>
           <span className="text-muted-foreground flex flex-wrap items-center justify-center gap-2 text-[13px]">
             <span className="flex items-center gap-2">
               <SchoolMark school={school} size={16} />

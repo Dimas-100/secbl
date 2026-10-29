@@ -1,6 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 import { ballFor, ballStyle } from "@/lib/identity";
 import { OnlineDot } from "@/components/online-dot";
+import { CharacterFace } from "@/components/character-face";
+import { charactersEnabled } from "@/lib/character";
 import { cn } from "@/lib/utils";
 
 const SIZES = {
@@ -48,7 +50,20 @@ export function Avatar({
   // The wrapper carries the caller's classes (stack offsets, rings) and
   // anchors the online dot; the face itself keeps its size and shadow.
   const dot = size === "xs" || size === "sm" ? 8 : size === "md" || size === "lg" ? 10 : 12;
-  const face = person.avatar_url ? (
+  // With characters on, every member's face is their character: the photo
+  // and the ball step aside, and the ball's colour lives on as the starter's
+  // backdrop (lib/character.ts). The colour is the edge, so the hairline only
+  // comes with a ring or a pick.
+  const face = charactersEnabled() ? (
+    <span aria-hidden="true" className={base}>
+      <CharacterFace
+        id={person.id}
+        ball={ballFor(person.ball, person.id).number}
+        className="size-full"
+        circleStyle={ring || selected ? { boxShadow } : undefined}
+      />
+    </span>
+  ) : person.avatar_url ? (
     <img
       src={person.avatar_url}
       alt=""

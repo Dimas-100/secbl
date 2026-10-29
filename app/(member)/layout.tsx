@@ -1,8 +1,11 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { LooksProvider } from "@/components/character-face";
 import { NavHistory } from "@/components/nav-history";
 import { PresenceProvider } from "@/components/presence-provider";
 import { TabBar } from "@/components/tab-bar";
+import { charactersEnabled } from "@/lib/character";
+import { loadLooks } from "@/lib/character-data";
 import { createClient } from "@/lib/supabase/server";
 
 // The member shell is the auth gate plus the tab bar. Each screen renders
@@ -19,18 +22,23 @@ export default async function MemberLayout({ children }: { children: React.React
     .eq("id", user.id)
     .single();
   if (!profile || profile.status !== "approved") redirect("/pending");
+  // Every saved character, for the avatars on every screen (saving one
+  // revalidates this layout).
+  const looks = charactersEnabled() ? await loadLooks(supabase) : {};
 
   return (
     // w-full matters: body is a flex column, and a flex child with mx-auto
     // shrink-wraps its content instead of stretching.
     <PresenceProvider meId={profile.id}>
-      <div className="mx-auto w-full max-w-3xl px-6 pb-32">
-        <Suspense fallback={null}>
-          <NavHistory />
-        </Suspense>
-        {children}
-        <TabBar profileHref={`/players/${profile.id}`} meId={profile.id} />
-      </div>
+      <LooksProvider looks={looks}>
+        <div className="mx-auto w-full max-w-3xl px-6 pb-32">
+          <Suspense fallback={null}>
+            <NavHistory />
+          </Suspense>
+          {children}
+          <TabBar profileHref={`/players/${profile.id}`} meId={profile.id} />
+        </div>
+      </LooksProvider>
     </PresenceProvider>
   );
 }

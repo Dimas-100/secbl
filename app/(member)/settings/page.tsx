@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { SectionLabel } from "@/components/section-label";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { charactersEnabled } from "@/lib/character";
 import { createClient } from "@/lib/supabase/server";
 import { updateDisplayName } from "./actions";
 import { LookEditor } from "./look-editor";
@@ -55,6 +56,16 @@ export default async function SettingsPage({
           title="Admin"
           meta="Members, disputes, event sources, tournaments"
           ariaLabel="Admin"
+          trailing={<ChevronRight className="text-muted-foreground size-4" strokeWidth={1.7} />}
+        />
+      )}
+
+      {charactersEnabled() && (
+        <ListRow
+          href="/settings/character"
+          title="Your character"
+          meta="Hair, outfits, hats, your cue"
+          ariaLabel="Your character"
           trailing={<ChevronRight className="text-muted-foreground size-4" strokeWidth={1.7} />}
         />
       )}

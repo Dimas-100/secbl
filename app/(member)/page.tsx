@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Avatar, type AvatarIdentity } from "@/components/avatar";
 import { AvatarStack } from "@/components/avatar-stack";
+import { CharacterNudge } from "@/components/character-nudge";
 import { ActivityRow, RecapRow } from "@/components/activity-row";
 import { FirstGameCard, type FirstGameFace } from "@/components/first-game-card";
 import { GameCountsScreen, type GameCountsProps } from "@/components/game-counts-screen";
@@ -30,7 +31,8 @@ import { clubDateOf, clubMonthStart, formatEventWhen, partitionEvents, tallyRsvp
 import { FEED_SELECT, RECENT_KINDS, mergeRecent, one, schoolOf, type FeedPerson, type FeedRow } from "@/lib/feed";
 import { confirmMeta, facesEyebrow, firstName, formDots, nextLine, playedFrom, xpNote } from "@/lib/home";
 import { LIVE_SHOWN, LIVE_STALE_MS, orderLiveGames } from "@/lib/live";
-import { GAME_LABEL, greetingFor } from "@/lib/identity";
+import { charactersEnabled } from "@/lib/character";
+import { GAME_LABEL, ballFor, greetingFor } from "@/lib/identity";
 import { levelFromXp, nextBadge } from "@/lib/levels";
 import { myNightStatus } from "@/lib/night";
 import { fetchAllPages } from "@/lib/paging";
@@ -759,6 +761,8 @@ export default async function HomePage({
           </Link>
         </section>
       )}
+
+      {charactersEnabled() && <CharacterNudge meId={user.id} ball={ballFor(me?.ball, user.id).number} />}
 
       <section className="flex flex-col gap-1.5">
         <SectionHeading action={{ href: `/players/${user.id}`, label: "Your games" }}>Recent</SectionHeading>
