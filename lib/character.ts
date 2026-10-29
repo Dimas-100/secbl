@@ -132,6 +132,31 @@ export interface Part {
 
 const part = (xs: readonly Part[]) => xs;
 
+// Body shape: today's figure and a curvier one (narrower shoulders, a
+// defined waist). Labelled by shape, not by gender; a starter keeps the
+// straight figure under the house kit and assigns no one anything.
+export const BODIES = part([
+  { id: "straight", label: "Straight" },
+  { id: "curvy", label: "Curvy" },
+]);
+
+export const LASHES = part([
+  { id: "none", label: "None" },
+  { id: "lashes", label: "Lashes" },
+]);
+
+export const LIPS = part([
+  { id: "none", label: "None" },
+  { id: "natural", label: "Natural" },
+  { id: "rose", label: "Rose" },
+  { id: "red", label: "Red" },
+]);
+
+export const BOTTOMS = part([
+  { id: "trousers", label: "Trousers" },
+  { id: "skirt", label: "Skirt" },
+]);
+
 export const FACES = part([
   { id: "round", label: "Round" },
   { id: "oval", label: "Oval" },
@@ -164,6 +189,8 @@ export const HAIRS = part([
   { id: "bun", label: "Bun" },
   { id: "braids", label: "Braids" },
   { id: "locs", label: "Locs" },
+  { id: "long-curls", label: "Long curls" },
+  { id: "space-buns", label: "Space buns" },
   { id: "bald", label: "Bald" },
 ]);
 
@@ -297,9 +324,12 @@ export const CUES = part([
 
 export interface Look {
   skin: string;
+  body: string;
   face: string;
   eyeColor: string;
   expression: string;
+  lashes: string;
+  lips: string;
   hair: string;
   hairColor: string;
   facialHair: string;
@@ -314,6 +344,7 @@ export interface Look {
   neck: string;
   neckColor: string;
   pants: string;
+  bottom: string;
   hat: string;
   hatColor: string;
   eyewear: string;
@@ -326,9 +357,12 @@ export interface Look {
 // Every single-choice field and the ids it accepts.
 const CHOICES: Record<Exclude<keyof Look, "gear">, readonly { id: string }[]> = {
   skin: SKINS,
+  body: BODIES,
   face: FACES,
   eyeColor: EYE_COLORS,
   expression: EXPRESSIONS,
+  lashes: LASHES,
+  lips: LIPS,
   hair: HAIRS,
   hairColor: HAIR_COLORS,
   facialHair: FACIAL_HAIR,
@@ -342,6 +376,7 @@ const CHOICES: Record<Exclude<keyof Look, "gear">, readonly { id: string }[]> = 
   neck: NECKWEAR,
   neckColor: CLOTH,
   pants: CLOTH,
+  bottom: BOTTOMS,
   hat: HATS,
   hatColor: CLOTH,
   eyewear: EYEWEAR,
@@ -499,9 +534,12 @@ export function starterLook(id: string, ballNumber: number, progress: Progress =
   const neckColor = pick(rng, (["black", "brass", "white", "red"] as const).filter((c) => c !== vest));
   return {
     skin: NEUTRAL_SKIN,
+    body: "straight",
     face: pick(rng, FACES).id,
     eyeColor: "dark",
     expression: pick(rng, STARTER.expressions),
+    lashes: "none",
+    lips: "none",
     // Under the cap; a member who takes it off picks their own hair.
     hair: "bald",
     hairColor: "dark-brown",
@@ -516,6 +554,7 @@ export function starterLook(id: string, ballNumber: number, progress: Progress =
     neck: rng() < 0.6 ? "bow" : "tie",
     neckColor,
     pants: "charcoal",
+    bottom: "trousers",
     hat: pick(rng, STARTER.hats),
     hatColor: pick(rng, STARTER.hatColors.filter((c) => c !== vest)),
     eyewear: rng() < 0.15 ? pick(rng, ["round", "square"] as const) : "none",
@@ -534,9 +573,12 @@ export function randomLook(progress: Progress, rng: () => number = Math.random):
   const hairColor = pick(rng, HAIR_COLORS).id;
   return {
     skin: pick(rng, SKINS).id,
+    body: pick(rng, BODIES).id,
     face: pick(rng, FACES).id,
     eyeColor: pick(rng, EYE_COLORS).id,
     expression: pick(rng, EXPRESSIONS).id,
+    lashes: pick(rng, LASHES).id,
+    lips: rng() < 0.4 ? pick(rng, LIPS).id : "none",
     hair: pick(rng, HAIRS).id,
     hairColor,
     facialHair: rng() < 0.4 ? pick(rng, FACIAL_HAIR).id : "none",
@@ -555,6 +597,7 @@ export function randomLook(progress: Progress, rng: () => number = Math.random):
     neck: pick(rng, open("neck", NECKWEAR)).id,
     neckColor: cloth(),
     pants: pick(rng, ["charcoal", "black", "navy", "brown", "grey"] as const),
+    bottom: pick(rng, BOTTOMS).id,
     hat: rng() < 0.45 ? pick(rng, HATS.filter((h) => h.id !== "none")).id : "none",
     hatColor: cloth(),
     eyewear: rng() < 0.3 ? pick(rng, EYEWEAR).id : "none",

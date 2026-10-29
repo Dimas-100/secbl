@@ -67,22 +67,31 @@ export function Character({
   const url = (name: string) => `url(#${id(name)})`;
   const face = expression(look.expression);
   const hands = costume?.hands ?? url("skin");
+  // The curvy figure is the same drawing clipped to a narrower-shouldered,
+  // waisted torso, so every outfit and costume fits both shapes.
+  const curvy = look.body === "curvy";
+  // A skirt is part of the wardrobe, not of a costume or a suit's trousers.
+  const skirt = look.bottom === "skirt" && !costume && !SUITS.has(look.outfit);
+  const lipPaint = LIP_PAINT[look.lips] ? LIP_PAINT[look.lips](skin.lip) : null;
 
   const figure = (
     <>
       {hood ? <ScarfBack color={hood} /> : <HairBack style={look.hair} fill={mix(hair.color, "#000000", 0.12)} />}
       {costume?.back?.(tint)}
-      {view === "full" && <Legs color={wear.pants} />}
-      <rect x="55.5" y="63" width="9" height="13" fill={skin.shade} />
-      {costume ? costume.torso(tint) : <Torso look={look} />}
-      <rect x="39" y="74" width="42" height="60" rx="10" fill={url("cloth")} />
-      <ellipse cx="49" cy="77.5" rx="7" ry="2.2" fill="#ffffff" opacity="0.1" />
+      {view === "full" && <Legs color={wear.pants} bare={skirt ? url("skin") : null} />}
+      <rect x={curvy ? 56.5 : 55.5} y="63" width={curvy ? 7 : 9} height="13" fill={skin.shade} />
+      <g clipPath={curvy ? url("torso") : undefined}>
+        {costume ? costume.torso(tint) : <Torso look={look} />}
+        <rect x="39" y="74" width="42" height="60" rx="10" fill={url("cloth")} />
+        <ellipse cx="49" cy="77.5" rx="7" ry="2.2" fill="#ffffff" opacity="0.1" />
+      </g>
+      {view === "full" && skirt && <Skirt color={wear.pants} />}
       {look.gear.includes("headphones") && <Headphones />}
       {look.gear.includes("chain") && <Chain />}
       {look.gear.includes("pin") && <Pin />}
       {scarf && <ScarfDrape color={clothColor(look.hatColor)} />}
       <Cue tier={look.cue} />
-      <Arms sleeve={wear.sleeve} stripe={wear.sleeveStripe} />
+      <Arms sleeve={wear.sleeve} stripe={wear.sleeveStripe} curvy={curvy} />
       <circle cx="45" cy="140" r="5" fill={hands} />
       <circle cx="62" cy="104" r="5" fill={hands} />
       {look.gear.includes("glove") && <path d="M40 137 Q45 133 50 137 L50 143 Q45 146.5 40 143Z" fill="#141414" />}
@@ -100,11 +109,11 @@ export function Character({
       <ellipse cx="48" cy="57.5" rx="3" ry="1.9" fill="#E58C82" opacity="0.3" />
       <ellipse cx="72" cy="57.5" rx="3" ry="1.9" fill="#E58C82" opacity="0.3" />
       <path d="M60.4 53 Q62.2 56.4 59.6 57" stroke={skin.shade} strokeWidth="1.5" fill="none" strokeLinecap="round" />
-      <Eyes kind={face.eyes} iris={eye} />
+      <Eyes kind={face.eyes} iris={eye} lashes={look.lashes === "lashes"} />
       {costume?.face}
       <Brows kind={face.brows} color={brow} />
       <FacialHair style={look.facialHair} color={beard.color} />
-      <Mouth kind={face.mouth} lip={skin.lip} />
+      <Mouth kind={face.mouth} lip={skin.lip} paint={lipPaint} />
       {hood ? <ScarfFront color={hood} /> : <HairFront style={look.hair} fill={url("hair")} />}
       <Eyewear style={look.eyewear} />
       {costume ? costume.head?.(tint) : !hood && <Hat style={look.hat} color={clothColor(look.hatColor)} />}
@@ -142,6 +151,11 @@ export function Character({
           <stop offset="0.45" stopColor="#ffffff" stopOpacity="0" />
           <stop offset="1" stopColor="#000000" stopOpacity="0.28" />
         </linearGradient>
+        {curvy && (
+          <clipPath id={id("torso")}>
+            <path d={CURVY_TORSO} />
+          </clipPath>
+        )}
         {view === "pop" && (
           <clipPath id={id("pop")}>
             <circle cx={POP_CIRCLE.cx} cy={POP_CIRCLE.cy} r={POP_CIRCLE.r} />
@@ -187,7 +201,23 @@ const EXPRESSION: Record<string, { eyes: EyeKind; brows: BrowKind; mouth: MouthK
 
 const expression = (id: string) => EXPRESSION[id] ?? EXPRESSION.happy;
 
-function OpenEye({ cx, iris, wide = false }: { cx: number; iris: string; wide?: boolean }) {
+// Eyelashes: two flicks at each eye's outer corner, from where its lid
+// line ends (dir -1 for the left eye, +1 for the right).
+function Lashes({ x, y, dir }: { x: number; y: number; dir: number }) {
+  return (
+    <path
+      d={`M${x} ${y} l${dir * 1.7} -1.3 M${x - dir * 0.9} ${y - 0.9} l${dir * 1.1} -1.6`}
+      stroke={INK}
+      strokeWidth="1.1"
+      fill="none"
+      strokeLinecap="round"
+    />
+  );
+}
+
+const side = (cx: number) => (cx < 60 ? -1 : 1);
+
+function OpenEye({ cx, iris, wide = false, lashes = false }: { cx: number; iris: string; wide?: boolean; lashes?: boolean }) {
   const rx = wide ? 3.4 : 3.1;
   const ry = wide ? 3.9 : 3.4;
   return (
@@ -200,19 +230,25 @@ function OpenEye({ cx, iris, wide = false }: { cx: number; iris: string; wide?: 
       <path
         d={`M${cx - rx - 0.1} ${51 - ry * 0.4} Q${cx} ${51 - ry - 0.6} ${cx + rx + 0.1} ${51 - ry * 0.4}`}
         stroke={INK}
-        strokeWidth="1.1"
+        strokeWidth={lashes ? 1.5 : 1.1}
         fill="none"
         strokeLinecap="round"
       />
+      {lashes && <Lashes x={cx + side(cx) * (rx + 0.1)} y={51 - ry * 0.4} dir={side(cx)} />}
     </>
   );
 }
 
-function ClosedEye({ cx }: { cx: number }) {
-  return <path d={`M${cx - 2.6} 52.2 Q${cx} 48.6 ${cx + 2.6} 52.2`} stroke={INK} strokeWidth="2" fill="none" strokeLinecap="round" />;
+function ClosedEye({ cx, lashes = false }: { cx: number; lashes?: boolean }) {
+  return (
+    <>
+      <path d={`M${cx - 2.6} 52.2 Q${cx} 48.6 ${cx + 2.6} 52.2`} stroke={INK} strokeWidth="2" fill="none" strokeLinecap="round" />
+      {lashes && <Lashes x={cx + side(cx) * 2.6} y={52.2} dir={side(cx)} />}
+    </>
+  );
 }
 
-function RelaxedEye({ cx, iris }: { cx: number; iris: string }) {
+function RelaxedEye({ cx, iris, lashes = false }: { cx: number; iris: string; lashes?: boolean }) {
   return (
     <>
       <ellipse cx={cx} cy="51.8" rx="3.1" ry="2.3" fill="#FFFFFF" />
@@ -220,45 +256,46 @@ function RelaxedEye({ cx, iris }: { cx: number; iris: string }) {
       <circle cx={cx + 0.3} cy="52.2" r="1" fill="#120C08" />
       <circle cx={cx + 1} cy="51.5" r="0.6" fill="#FFFFFF" />
       <path d={`M${cx - 3.4} 50.9 Q${cx} 49.2 ${cx + 3.4} 50.9`} stroke={INK} strokeWidth="1.7" fill="none" strokeLinecap="round" />
+      {lashes && <Lashes x={cx + side(cx) * 3.4} y={50.9} dir={side(cx)} />}
     </>
   );
 }
 
-function Eyes({ kind, iris }: { kind: EyeKind; iris: string }) {
+function Eyes({ kind, iris, lashes }: { kind: EyeKind; iris: string; lashes: boolean }) {
   switch (kind) {
     case "closed":
       return (
         <>
-          <ClosedEye cx={53} />
-          <ClosedEye cx={67} />
+          <ClosedEye cx={53} lashes={lashes} />
+          <ClosedEye cx={67} lashes={lashes} />
         </>
       );
     case "relaxed":
       return (
         <>
-          <RelaxedEye cx={53} iris={iris} />
-          <RelaxedEye cx={67} iris={iris} />
+          <RelaxedEye cx={53} iris={iris} lashes={lashes} />
+          <RelaxedEye cx={67} iris={iris} lashes={lashes} />
         </>
       );
     case "wide":
       return (
         <>
-          <OpenEye cx={53} iris={iris} wide />
-          <OpenEye cx={67} iris={iris} wide />
+          <OpenEye cx={53} iris={iris} wide lashes={lashes} />
+          <OpenEye cx={67} iris={iris} wide lashes={lashes} />
         </>
       );
     case "wink":
       return (
         <>
-          <OpenEye cx={53} iris={iris} />
-          <ClosedEye cx={67} />
+          <OpenEye cx={53} iris={iris} lashes={lashes} />
+          <ClosedEye cx={67} lashes={lashes} />
         </>
       );
     default:
       return (
         <>
-          <OpenEye cx={53} iris={iris} />
-          <OpenEye cx={67} iris={iris} />
+          <OpenEye cx={53} iris={iris} lashes={lashes} />
+          <OpenEye cx={67} iris={iris} lashes={lashes} />
         </>
       );
   }
@@ -277,13 +314,25 @@ function Brows({ kind, color }: { kind: BrowKind; color: string }) {
   return <path d={b.d} stroke={color} strokeWidth={b.w} fill="none" strokeLinecap="round" />;
 }
 
-function Mouth({ kind, lip }: { kind: MouthKind; lip: string }) {
+// Lip colour, from the member's own lip tone to rose and red.
+const LIP_PAINT: Record<string, (lip: string) => string> = {
+  natural: (lip) => mix(lip, "#C0606A", 0.5),
+  rose: () => "#C8607A",
+  red: () => "#B8283A",
+};
+
+// `paint` colours the lips: a line mouth takes it as its stroke, an open
+// one gets a rim of it.
+function Mouth({ kind, lip, paint }: { kind: MouthKind; lip: string; paint: string | null }) {
+  const line = paint ?? lip;
+  const lw = paint ? 2.5 : 0;
   switch (kind) {
     case "grin":
       return (
         <>
           <path d="M54.5 59.2 Q60 66.5 65.5 59.2Z" fill="#3A140C" />
           <path d="M55.6 59.7 L64.4 59.7 Q63.9 61.3 60 61.5 Q56.1 61.3 55.6 59.7Z" fill="#FFFFFF" />
+          {paint && <path d="M54.5 59.2 Q60 66.5 65.5 59.2Z" fill="none" stroke={paint} strokeWidth="1.3" strokeLinejoin="round" />}
         </>
       );
     case "laugh":
@@ -292,16 +341,17 @@ function Mouth({ kind, lip }: { kind: MouthKind; lip: string }) {
           <path d="M54.2 58.8 Q60 68.5 65.8 58.8Z" fill="#3A140C" />
           <path d="M57 63.8 Q60 61.8 63 63.8 Q60 66.4 57 63.8Z" fill="#D8706A" />
           <path d="M55.3 59.3 L64.7 59.3 Q64.2 60.7 60 60.9 Q55.8 60.7 55.3 59.3Z" fill="#FFFFFF" />
+          {paint && <path d="M54.2 58.8 Q60 68.5 65.8 58.8Z" fill="none" stroke={paint} strokeWidth="1.3" strokeLinejoin="round" />}
         </>
       );
     case "calm":
-      return <path d="M56.5 61 Q60 62 63.5 61" stroke={lip} strokeWidth="1.8" fill="none" strokeLinecap="round" />;
+      return <path d="M56.5 61 Q60 62 63.5 61" stroke={line} strokeWidth={lw || 1.8} fill="none" strokeLinecap="round" />;
     case "smirk":
-      return <path d="M55.5 61.2 Q60 62.3 65.2 59.2" stroke={lip} strokeWidth="1.9" fill="none" strokeLinecap="round" />;
+      return <path d="M55.5 61.2 Q60 62.3 65.2 59.2" stroke={line} strokeWidth={lw || 1.9} fill="none" strokeLinecap="round" />;
     case "o":
-      return <ellipse cx="60" cy="61.6" rx="2.2" ry="2.8" fill="#3A140C" />;
+      return <ellipse cx="60" cy="61.6" rx="2.2" ry="2.8" fill="#3A140C" stroke={paint ?? "none"} strokeWidth="1.2" />;
     default:
-      return <path d="M55 60 Q60 64 65 60" stroke={lip} strokeWidth="2" fill="none" strokeLinecap="round" />;
+      return <path d="M55 60 Q60 64 65 60" stroke={line} strokeWidth={lw || 2} fill="none" strokeLinecap="round" />;
   }
 }
 
@@ -379,18 +429,31 @@ function clothes(look: Look): Wear {
   return { sleeve: clothColor(look.topColor), pants };
 }
 
-function Arms({ sleeve, stripe }: { sleeve: string; stripe?: string }) {
+// The curvy figure's torso: narrower shoulders, a defined waist, hips back
+// out to the hem. Clips whatever the outfit drew in the 42×60 torso box.
+const CURVY_TORSO =
+  "M47 74 Q42 74 41.8 80 L42.6 92 Q44.4 103 45.6 110 Q43.4 120 41.4 127 Q40.6 134 47 134 L73 134 Q79.4 134 78.6 127 Q76.6 120 74.4 110 Q75.6 103 77.4 92 L78.2 80 Q78 74 73 74Z";
+
+// Trousers belong to these; they don't take a skirt.
+const SUITS = new Set(["pinstripe", "tuxedo", "legend"]);
+
+function Arms({ sleeve, stripe, curvy = false }: { sleeve: string; stripe?: string; curvy?: boolean }) {
+  // Curvy shoulders sit a little further in, with slimmer arms; the hands
+  // stay on the cue.
+  const lx = curvy ? 43.5 : 42;
+  const rx = curvy ? 76.5 : 78;
+  const w = curvy ? 7.5 : 9;
   return (
     <>
-      <line x1="42" y1="82" x2="45" y2="138" stroke={sleeve} strokeWidth="9" strokeLinecap="round" />
-      <line x1="78" y1="82" x2="62" y2="104" stroke={sleeve} strokeWidth="9" strokeLinecap="round" />
-      <line x1="44.6" y1="85" x2="47.2" y2="135" stroke="#000000" strokeOpacity="0.2" strokeWidth="3" />
-      <line x1="39.8" y1="85" x2="42.4" y2="133" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="2" />
-      <line x1="80" y1="85.5" x2="66" y2="105" stroke="#000000" strokeOpacity="0.2" strokeWidth="3" />
+      <line x1={lx} y1="82" x2="45" y2="138" stroke={sleeve} strokeWidth={w} strokeLinecap="round" />
+      <line x1={rx} y1="82" x2="62" y2="104" stroke={sleeve} strokeWidth={w} strokeLinecap="round" />
+      <line x1={lx + 2.4} y1="85" x2="47" y2="135" stroke="#000000" strokeOpacity="0.2" strokeWidth={w / 3} />
+      <line x1={lx - 2} y1="85" x2="42.6" y2="133" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="2" />
+      <line x1={rx + 2} y1="85.5" x2="66" y2="105" stroke="#000000" strokeOpacity="0.2" strokeWidth={w / 3} />
       {stripe && (
         <>
-          <line x1="42" y1="82" x2="45" y2="138" stroke={stripe} strokeWidth="1.6" />
-          <line x1="78" y1="82" x2="62" y2="104" stroke={stripe} strokeWidth="1.6" />
+          <line x1={lx} y1="82" x2="45" y2="138" stroke={stripe} strokeWidth="1.6" />
+          <line x1={rx} y1="82" x2="62" y2="104" stroke={stripe} strokeWidth="1.6" />
         </>
       )}
     </>
@@ -698,17 +761,31 @@ function Suit({
   );
 }
 
-function Legs({ color }: { color: string }) {
+// `bare` (the skin fill) draws bare legs, for a skirt.
+function Legs({ color, bare }: { color: string; bare: string | null }) {
+  const leg = bare ?? color;
   return (
     <>
-      <rect x="47" y="128" width="12" height="58" rx="5" fill={color} />
-      <rect x="61" y="128" width="12" height="58" rx="5" fill={color} />
-      <rect x="54" y="130" width="5" height="54" rx="2.5" fill="#000000" opacity="0.18" />
-      <rect x="68" y="130" width="5" height="54" rx="2.5" fill="#000000" opacity="0.18" />
+      <rect x={bare ? 48.5 : 47} y="128" width={bare ? 10 : 12} height="58" rx="5" fill={leg} />
+      <rect x={bare ? 61.5 : 61} y="128" width={bare ? 10 : 12} height="58" rx="5" fill={leg} />
+      <rect x="54" y="130" width="5" height="54" rx="2.5" fill="#000000" opacity={bare ? 0.1 : 0.18} />
+      <rect x="67" y="130" width="5" height="54" rx="2.5" fill="#000000" opacity={bare ? 0.1 : 0.18} />
       <ellipse cx="52" cy="189" rx="10" ry="4.5" fill="#0B0C0E" />
       <ellipse cx="68" cy="189" rx="10" ry="4.5" fill="#0B0C0E" />
       <ellipse cx="49" cy="187.2" rx="3.5" ry="1.2" fill="#ffffff" opacity="0.14" />
       <ellipse cx="65" cy="187.2" rx="3.5" ry="1.2" fill="#ffffff" opacity="0.14" />
+    </>
+  );
+}
+
+// A knee-length A-line skirt from a high waist, in the bottoms colour.
+function Skirt({ color }: { color: string }) {
+  return (
+    <>
+      <path d="M43.5 122 L76.5 122 L82 160 Q60 165 38 160Z" fill={color} />
+      <path d="M43.5 122 L76.5 122 L76.9 126 L43.1 126Z" fill="#000000" opacity="0.18" />
+      <path d="M52 128 L49 160 M68 128 L71 160" stroke="#000000" strokeOpacity="0.15" strokeWidth="1.2" />
+      <path d="M38 160 Q60 165 82 160" stroke="#ffffff" strokeOpacity="0.12" strokeWidth="1.2" fill="none" />
     </>
   );
 }
@@ -859,6 +936,33 @@ function HairBack({ style, fill }: { style: string; fill: string }) {
           <rect x="77" y="48" width="4.5" height="32" rx="2.25" />
         </g>
       );
+    case "long-curls":
+      return (
+        <g fill={fill}>
+          <path d="M35 52 C35 28 47 23 60 23 C73 23 85 28 85 52 L86 80 Q60 86 34 80Z" />
+          {(
+            [
+              [35, 50],
+              [33.5, 60],
+              [34.5, 70],
+              [37, 79],
+              [85, 50],
+              [86.5, 60],
+              [85.5, 70],
+              [83, 79],
+            ] as const
+          ).map(([x, y]) => (
+            <circle key={`${x}-${y}`} cx={x} cy={y} r="5.4" />
+          ))}
+        </g>
+      );
+    case "space-buns":
+      return (
+        <g fill={fill}>
+          <circle cx="42" cy="25" r="8" />
+          <circle cx="78" cy="25" r="8" />
+        </g>
+      );
     default:
       return null;
   }
@@ -980,6 +1084,34 @@ function HairFront({ style, fill }: { style: string; fill: string }) {
           <rect x="40" y="38" width="4.5" height="17" rx="2.25" fill={fill} />
           <rect x="75.5" y="38" width="4.5" height="17" rx="2.25" fill={fill} />
           <path d="M50 35 L50 29 M56 34.5 L56 27.5 M64 34.5 L64 27.5 M70 35 L70 29" stroke="#ffffff" strokeOpacity="0.14" strokeWidth="1" />
+        </>
+      );
+    case "long-curls":
+      return (
+        <g fill={fill}>
+          {(
+            [
+              [40.5, 46, 5],
+              [44, 37.5, 6],
+              [51.5, 32, 6.5],
+              [60, 30, 6.8],
+              [68.5, 32, 6.5],
+              [76, 37.5, 6],
+              [79.5, 46, 5],
+            ] as const
+          ).map(([x, y, r]) => (
+            <circle key={x} cx={x} cy={y} r={r} />
+          ))}
+          <circle cx="50" cy="29.5" r="2" fill="#ffffff" fillOpacity="0.16" />
+          <circle cx="64" cy="27" r="2" fill="#ffffff" fillOpacity="0.16" />
+        </g>
+      );
+    case "space-buns":
+      return (
+        <>
+          <path d="M39 48 C39 32 49 27 60 27 C71 27 81 32 81 48 C77 39 70 35 60 35 C50 35 43 39 39 48Z" fill={fill} />
+          <path d="M60 27.5 L60 35" stroke={SHADE} strokeWidth="1" />
+          <path d="M37 21 Q42 17 47 21 M73 21 Q78 17 83 21" stroke="#ffffff" strokeOpacity="0.18" strokeWidth="1.4" fill="none" strokeLinecap="round" />
         </>
       );
     case "bald":

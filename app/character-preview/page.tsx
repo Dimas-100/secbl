@@ -35,6 +35,15 @@ const PEOPLE = [
 
 const CORNER = "ring-background absolute -right-1.5 -bottom-1.5 rounded-full ring-2";
 
+// Four curvy looks for the Body shapes row.
+const SHAPE_BASE = { body: "curvy", lashes: "lashes", hat: "none", eyeColor: "brown" } as const;
+const SHAPES = [
+  { ...starterLook(id(400), 3), ...SHAPE_BASE, skin: "s2", hair: "long-curls", hairColor: "auburn", lips: "rose", bottom: "skirt", pants: "maroon", layerColor: "maroon", bg: "rose" },
+  { ...starterLook(id(401), 6), ...SHAPE_BASE, skin: "s5", hair: "space-buns", hairColor: "black", lips: "red", outfit: "varsity", outfitColor: "green", bottom: "skirt", pants: "cream", bg: "teal" },
+  { ...starterLook(id(402), 4), ...SHAPE_BASE, skin: "s7", hair: "braids", hairColor: "black", lips: "natural", expression: "beaming", outfit: "tuxedo", bg: "purple" },
+  { ...starterLook(id(403), 2), ...SHAPE_BASE, skin: "s3", hair: "bob", hairColor: "blonde", lips: "none", top: "polo", topColor: "sky", layer: "none", neck: "none", bottom: "trousers", pants: "navy", bg: "sky" },
+];
+
 export default async function CharacterPreview({
   searchParams,
 }: {
@@ -170,8 +179,27 @@ export default async function CharacterPreview({
       </section>
 
       <section className="flex flex-col gap-3">
+        <SectionHeading>Body shapes</SectionHeading>
+        <p className="text-muted-foreground text-[13px]">The curvy figure with lashes, lip colour, a skirt and the new hair.</p>
+        <div className="grid grid-cols-4 gap-x-3 gap-y-6 pt-3">
+          {SHAPES.map((l, i) => (
+            <span key={i} className="mx-auto block size-16">
+              <CharacterAvatar look={l} className="size-full" />
+            </span>
+          ))}
+        </div>
+        <div className="grid grid-cols-4 gap-3">
+          {SHAPES.map((l, i) => (
+            <span key={i} className="bg-card flex aspect-[3/5] items-end justify-center rounded-2xl p-1 shadow-[0_0_0_1px_var(--hairline)]">
+              <Character look={l} view="full" className="h-full w-full" />
+            </span>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
         <SectionHeading>Costumes</SectionHeading>
-        <p className="text-muted-foreground text-[13px]">Head-to-toe dress-up, free for everyone.</p>
+        <p className="text-muted-foreground text-[13px]">Head-to-toe dress-up: three free, the rest earned.</p>
         <div className="grid grid-cols-5 gap-x-2 gap-y-6 pt-4">
           {COSTUMES.map((c, i) => (
             <span key={c.id} className="mx-auto block size-14">

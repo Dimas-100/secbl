@@ -22,6 +22,12 @@ Duolingo is the reference (owner, 2026-10-29):
   trousers, cue, gear, and the unlock ladder.
 - Expressions are whole (eyes, brows and mouth together): Happy, Beaming, Laughing, Calm, Cool, Cheeky, Focused,
   Surprised.
+- Body shape and feminine options (owner asked for "a female", 2026-10-29), all free: **Body shape** Straight or
+  Curvy (the same drawing clipped to a narrower-shouldered, waisted torso with slimmer arms, so every outfit and
+  costume fits both; labelled by shape, not gender), **Eyelashes**, **Lip colour** (natural, rose, red), a **Skirt**
+  next to trousers in the Closet (bare legs, in the bottoms colour; suits and costumes keep their own), and two more
+  hairstyles (long curls, space buns). Starters stay on the straight figure with no lashes or lip colour, in trousers:
+  the house kit assigns no gender.
 - Costumes, Duolingo's dress-up (owner, 2026-10-29), in the Closet after the outfits, each with its own headwear and
   props. A costume is worn in the outfit slot and takes off the member's hat, except a headscarf, which stays on
   unless the costume brings headwear of its own. Drawn in `components/character-costumes.tsx`. Three are free; the
