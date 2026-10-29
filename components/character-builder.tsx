@@ -9,6 +9,8 @@ import { TitleBadge } from "@/components/title-badge";
 import { Button } from "@/components/ui/button";
 import {
   BACKDROPS,
+  BODIES,
+  BOTTOMS,
   CLOTH,
   COLORED_OUTFITS,
   COSTUMES,
@@ -23,7 +25,9 @@ import {
   HAIRS,
   HAIR_COLORS,
   HATS,
+  LASHES,
   LAYERS,
+  LIPS,
   NEUTRAL_SKIN,
   NECKWEAR,
   OUTFITS,
@@ -55,6 +59,9 @@ const CROP = {
   cue: "12 14 96 186",
   glove: "22 80 76 95",
   costume: "12 -8 96 120",
+  mouth: "45 47 30 22",
+  figure: "14 24 92 115",
+  legs: "22 96 76 95",
 } as const;
 
 const SKIN_SWATCHES = SKINS.map((s, i) => ({
@@ -170,12 +177,21 @@ export function CharacterBuilder({
       {section === "avatar" ? (
         <div role="tabpanel" aria-label="Avatar" className="flex flex-col gap-7">
           <Swatches label="Skin tone" field="skin" options={SKIN_SWATCHES} {...tile} />
+          <Group title="Body shape">
+            <Tiles field="body" parts={BODIES} crop={CROP.figure} full tall {...tile} />
+          </Group>
           <Group title="Face shape">
             <Tiles field="face" parts={FACES} crop={CROP.head} {...tile} />
           </Group>
           <Swatches label="Eye colour" field="eyeColor" options={EYE_COLORS} {...tile} />
           <Group title="Expression">
             <Tiles field="expression" parts={EXPRESSIONS} crop={CROP.face} {...tile} look={{ ...look, eyewear: "none" }} />
+          </Group>
+          <Group title="Eyelashes">
+            <Tiles field="lashes" parts={LASHES} crop={CROP.face} {...tile} look={{ ...look, eyewear: "none" }} />
+          </Group>
+          <Group title="Lip colour">
+            <Tiles field="lips" parts={LIPS} crop={CROP.mouth} {...tile} look={{ ...look, facialHair: "none" }} />
           </Group>
           <Swatches label="Hair colour" field="hairColor" options={HAIR_COLORS} {...tile} />
           <Group title="Hairstyle">
@@ -227,7 +243,10 @@ export function CharacterBuilder({
               )}
             </div>
           )}
-          <Swatches label="Trousers" field="pants" options={CLOTH} {...tile} />
+          <Group title="Bottoms" note={isCostume(look.outfit) ? "Your costume brings its own." : undefined}>
+            <Tiles field="bottom" parts={BOTTOMS} crop={CROP.legs} full tall {...tile} look={isCostume(look.outfit) ? { ...look, outfit: "classic" } : look} />
+          </Group>
+          <Swatches label="Bottoms colour" field="pants" options={CLOTH} {...tile} />
           <Group title="Cue" note="A better cue with every title badge. You keep each one you reach.">
             <Tiles field="cue" parts={CUES} crop={CROP.cue} full tall {...tile} />
           </Group>

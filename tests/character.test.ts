@@ -230,3 +230,33 @@ describe("costumes", () => {
     for (const id of ids) expect(isCostume(starterLook(id, 4).outfit)).toBe(false);
   });
 });
+
+describe("body shape and the feminine options", () => {
+  it("leave a starter on the straight figure, bare lashes and lips, in trousers", () => {
+    for (const id of ids) {
+      const l = starterLook(id, 9);
+      expect(l.body).toBe("straight");
+      expect(l.lashes).toBe("none");
+      expect(l.lips).toBe("none");
+      expect(l.bottom).toBe("trousers");
+    }
+  });
+
+  it("are free and saved like any other part", () => {
+    const base = starterLook(ids[4], 3);
+    const want = { ...base, body: "curvy", lashes: "lashes", lips: "rose", bottom: "skirt", hair: "space-buns" };
+    expect(sanitizeLook(want, base, NO_PROGRESS)).toEqual(want);
+    expect(sanitizeLook({ ...want, hair: "long-curls" }, base, NO_PROGRESS).hair).toBe("long-curls");
+    expect(sanitizeLook({ body: "giant", lips: "blue" }, base, NO_PROGRESS)).toMatchObject({ body: "straight", lips: "none" });
+  });
+
+  it("fill in for looks saved before they existed", () => {
+    const base = starterLook(ids[5], 1);
+    const old = { ...base } as Partial<typeof base>;
+    delete old.body;
+    delete old.lashes;
+    delete old.lips;
+    delete old.bottom;
+    expect(sanitizeLook(old, base, NO_PROGRESS)).toEqual(base);
+  });
+});
