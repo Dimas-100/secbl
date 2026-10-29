@@ -24,6 +24,7 @@ import {
   HAIR_COLORS,
   HATS,
   LAYERS,
+  NEUTRAL_SKIN,
   NECKWEAR,
   OUTFITS,
   SKINS,
@@ -56,7 +57,11 @@ const CROP = {
   costume: "12 -8 96 120",
 } as const;
 
-const SKIN_SWATCHES = SKINS.map((s, i) => ({ id: s.id, label: `Tone ${i + 1}`, color: s.base }));
+const SKIN_SWATCHES = SKINS.map((s, i) => ({
+  id: s.id,
+  label: s.id === NEUTRAL_SKIN ? "Chalk (neutral)" : `Tone ${i}`,
+  color: s.base,
+}));
 
 // The builder, after Duolingo's: your character big on its backdrop, then two
 // rooms. Avatar is you (skin, eyes, expression, hair, glasses, facial hair,
